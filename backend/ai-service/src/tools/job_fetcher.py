@@ -1,18 +1,18 @@
-import requests
 import os
+import requests
 
 
 def fetch_active_jobs() -> list:
     """
-    Fetches all active job listings from the job-service.
-    Returns a list of job dictionaries.
+    Calls the job-service API and returns all active job listings.
+    Returns an empty list if the service is unreachable.
     """
     job_service_url = os.getenv("JOB_SERVICE_URL", "http://localhost:3002")
 
     try:
         response = requests.get(
             f"{job_service_url}/api/v1/jobs",
-            params={"limit": 50},  # Get up to 50 active jobs
+            params={"limit": 50},
             timeout=10,
         )
         response.raise_for_status()
@@ -20,8 +20,8 @@ def fetch_active_jobs() -> list:
         return data.get("data", {}).get("jobs", [])
 
     except requests.exceptions.ConnectionError:
-        print("Warning: Could not connect to job-service")
+        print("Warning: Cannot connect to job-service — returning empty list")
         return []
     except Exception as e:
-        print(f"Warning: Could not fetch jobs: {e}")
+        print(f"Warning: Job fetch failed — {e}")
         return []

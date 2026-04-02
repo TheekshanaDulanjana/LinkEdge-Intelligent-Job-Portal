@@ -5,59 +5,67 @@ from src.agents.gap_analysis_agent import gap_analysis_agent
 from src.agents.recommendation_agent import recommendation_agent
 
 
-def should_continue_after_parsing(state: CVAnalysisState) -> str:
+def route_after_parsing(state: CVAnalysisState) -> str:
     """
-    Router function: after parsing, decide what to do next.
-    If parsing failed badly, stop. Otherwise continue.
+    Decision function — runs after the parsing agent.
+    If parsing produced no skills AND an error occurred, stop the pipeline.
+    Otherwise continue to gap analysis.
     """
-    if state.get("error") and not state.get("extracted_skills"):
-        return "end"   # Something went badly wrong, stop here
+    has_skills = bool(state.get("extracted_skills"))
+    has_error = bool(state.get("error"))
+
+    if has_error and not has_skills:
+        print("   Router: parsing produced no data — stopping pipeline")
+        return "end"
+
+    print("   Router: parsing succeeded — continuing to gap analysis")
     return "gap_analysis"
 
 
-def build_cv_analysis_workflow():
+def build_workflow():
     """
-    Builds and compiles the LangGraph agent pipeline.
+    Assembles the three agents into a LangGraph state machine.
 
-    The flow is:
-      START
-        → parsing_agent         (reads CV, extracts skills)
-        → [router decides]
-        → gap_analysis_agent    (finds skill gaps, suggests courses)
-        → recommendation_agent  (matches CV to live jobs)
-        → END
+    Pipeline:
+        START
+          ↓
+        parsing_agent
+          ↓  (router checks result)
+        gap_analysis_agent
+          ↓
+        recommendation_agent
+          ↓
+        END
     """
+    graph = StateGraph(CVAnalysisState)
 
-    # Create the state graph — tell it what state shape to use
-    workflow = StateGraph(CVAnalysisState)
+    # Register each agent as a named node
+    graph.add_node("parsing_agent", parsing_agent)
+    graph.add_node("gap_analysis_agent", gap_analysis_agent)
+    graph.add_node("recommendation_agent", recommendation_agent)
 
-    # Add each agent as a node
-    workflow.add_node("parsing_agent", parsing_agent)
-    workflow.add_node("gap_analysis_agent", gap_analysis_agent)
-    workflow.add_node("recommendation_agent", recommendation_agent)
+    # Always start at parsing
+    graph.set_entry_point("parsing_agent")
 
-    # Set the entry point — always start with parsing
-    workflow.set_entry_point("parsing_agent")
-
-    # After parsing: use router to decide next step
-    workflow.add_conditional_edges(
+    # After parsing: router decides whether to continue or stop
+    graph.add_conditional_edges(
         "parsing_agent",
-        should_continue_after_parsing,
+        route_after_parsing,
         {
             "gap_analysis": "gap_analysis_agent",
             "end": END,
-        }
+        },
     )
 
     # After gap analysis: always go to recommendation
-    workflow.add_edge("gap_analysis_agent", "recommendation_agent")
+    graph.add_edge("gap_analysis_agent", "recommendation_agent")
 
     # After recommendation: always end
-    workflow.add_edge("recommendation_agent", END)
+    graph.add_edge("recommendation_agent", END)
 
-    # Compile and return the runnable workflow
-    return workflow.compile()
+    return graph.compile()
 
 
-# Create one instance that gets reused across all requests
-cv_analysis_workflow = build_cv_analysis_workflow()
+# Build once at import time — reused for every request
+cv_analysis_workflow = build_workflow()
+print("LangGraph workflow compiled successfully")

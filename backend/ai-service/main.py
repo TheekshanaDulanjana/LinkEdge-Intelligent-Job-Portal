@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env BEFORE importing anything that uses environment variables
+# Load .env FIRST — before any other imports that use env vars
 load_dotenv()
 
 from fastapi import FastAPI
@@ -9,12 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.routers.analysis import router as analysis_router
 
 app = FastAPI(
-    title="Intelligent Job Portal - AI Service",
-    description="CV analysis and job recommendation using LangGraph + Gemini API",
+    title="Intelligent Job Portal — AI Service",
+    description="CV analysis and job recommendation using LangGraph + Gemini",
     version="1.0.0",
 )
 
-# Allow requests from your Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -25,9 +24,16 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "service": "ai-service"}
+def health_check():
+    return {
+        "status": "ok",
+        "service": "ai-service",
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.0 flash"),
+    }
 
 
-# Register routes — all AI endpoints live under /api/v1/ai
-app.include_router(analysis_router, prefix="/api/v1/ai", tags=["AI Analysis"])
+app.include_router(
+    analysis_router,
+    prefix="/api/v1/ai",
+    tags=["CV Analysis"],
+)

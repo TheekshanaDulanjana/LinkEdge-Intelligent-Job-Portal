@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -12,75 +11,91 @@ router = APIRouter()
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
+MIN_CV_TEXT_LENGTH = 100   # Minimum characters — catches blank/image PDFs
+MAX_FILE_SIZE_MB = 5
+
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_cv(
-    cv_file: UploadFile = File(..., description="CV as PDF file"),
-    desired_role: str = Form(..., description="e.g. Software Engineer"),
-    additional_inputs: str = Form("", description="Extra skills or interests"),
+    cv_file: UploadFile = File(...),
+    desired_role: str = Form(...),
+    additional_inputs: str = Form(""),
 ):
     """
-    Main endpoint — receives a CV file + inputs, runs all 3 agents,
-    returns the full analysis result.
+    Receives a CV file + job role inputs, runs the 3-agent
+    LangGraph pipeline, and returns the full analysis.
     """
 
-    # Step 1: Validate file type
-    if not cv_file.filename.endswith((".pdf", ".doc", ".docx")):
+    # --- Validate file extension ---
+    file_suffix = Path(cv_file.filename).suffix.lower()
+    if file_suffix not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail="Only PDF and Word documents are accepted"
+            detail=f"File type not allowed. Please upload a PDF or Word document.",
         )
 
-    # Step 2: Save the uploaded file temporarily
+    # --- Save file temporarily ---
     temp_path = UPLOAD_DIR / f"temp_{cv_file.filename}"
+
     try:
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(cv_file.file, buffer)
     except Exception:
-        raise HTTPException(status_code=500, detail="Could not save uploaded file")
+        raise HTTPException(status_code=500, detail="Could not save uploaded file.")
 
     try:
-        # Step 3: Extract text from the CV
-        print(f"Extracting text from: {cv_file.filename}")
-        cv_text = extract_text_from_file(str(temp_path))
+        # --- Extract text ---
+        print(f"\n{'='*50}")
+        print(f"New analysis request")
+        print(f"  File       : {cv_file.filename}")
+        print(f"  Desired role: {desired_role}")
+        print(f"  Extra inputs: {additional_inputs[:80]}")
+        print(f"{'='*50}")
 
-        if len(cv_text.strip()) < 50:
+        cv_text = extract_text_from_file(str(temp_path))
+        print(f"  Extracted {len(cv_text)} characters from CV")
+
+        if len(cv_text.strip()) < MIN_CV_TEXT_LENGTH:
             raise HTTPException(
                 status_code=400,
-                detail="Could not extract enough text from the CV. Please ensure it is not a scanned image."
+                detail=(
+                    "Could not extract enough text from the CV. "
+                    "Please make sure it is a text-based PDF, not a scanned image."
+                ),
             )
 
-        # Step 4: Fetch live job listings
-        print("Fetching active jobs...")
+        # --- Fetch live jobs ---
         job_listings = fetch_active_jobs()
-        print(f"Found {len(job_listings)} active jobs")
+        print(f"  Fetched {len(job_listings)} active job listings")
 
-        # Step 5: Build the initial state and run the workflow
-        initial_state: dict = {
+        # --- Build initial state ---
+        initial_state = {
             "cv_text": cv_text,
             "desired_role": desired_role,
             "additional_skills": additional_inputs,
             "job_listings": job_listings,
-            # Initialize all output fields as empty
+            # Agent outputs — all empty at start
+            "candidate_name": "",
             "extracted_skills": [],
             "extracted_experience": "",
             "extracted_education": "",
-            "candidate_name": "",
             "matching_skills": [],
             "missing_skills": [],
-            "course_suggestions": [],
             "gap_summary": "",
+            "course_suggestions": [],
             "recommended_jobs": [],
             "recommendation_summary": "",
             "error": None,
             "current_step": "starting",
         }
 
-        print("Running LangGraph workflow...")
+        # --- Run the LangGraph workflow ---
+        print("\nStarting LangGraph pipeline...")
         final_state = cv_analysis_workflow.invoke(initial_state)
-        print(f"Workflow complete. Final step: {final_state.get('current_step')}")
+        print(f"\nPipeline complete — final step: {final_state.get('current_step')}")
 
-        # Step 6: Build and return the response
+        # --- Return structured response ---
         return AnalysisResponse(
             candidate_name=final_state.get("candidate_name", ""),
             extracted_skills=final_state.get("extracted_skills", []),
@@ -95,12 +110,17 @@ async def analyze_cv(
         )
 
     except HTTPException:
-        raise
+        raise  # Re-raise HTTP errors as-is
+
     except Exception as e:
-        print(f"Workflow error: {e}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        print(f"Unexpected error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
+        )
 
     finally:
-        # Always clean up the temp file
+        # Always delete the temp file — even if something crashed
         if temp_path.exists():
             temp_path.unlink()
+            print(f"  Temp file deleted")
