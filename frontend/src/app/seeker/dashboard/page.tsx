@@ -37,7 +37,8 @@ export default function SeekerDashboard() {
       return;
     }
 
-    applicationApi.get('/applications/my-applications')
+    applicationApi
+      .get('/applications/my-applications')
       .then(res => setApplications(res.data.data))
       .catch(console.error);
   }, [isAuthenticated, router]);
@@ -117,18 +118,28 @@ export default function SeekerDashboard() {
                   </p>
                 </div>
 
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-medium ${
-                    statusColors[app.status]
-                  }`}
-                >
-                  {app.status}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`text-xs px-3 py-1 rounded-full font-medium ${
+                      statusColors[app.status]
+                    }`}
+                  >
+                    {app.status}
+                  </span>
+
+                  {/* ✅ Practice Interview Button */}
+                  {(app.status === 'SHORTLISTED' || app.status === 'INTERVIEW') && (
+                    <Link href={`/seeker/interview/${app.id}`}>
+                      <Button size="sm" variant="outline">
+                        Practice interview
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
-
 
       </div>
     </div>

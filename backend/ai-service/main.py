@@ -7,6 +7,8 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.routers.analysis import router as analysis_router
+from src.routers.ranking import router as ranking_router 
+
 
 app = FastAPI(
     title="Intelligent Job Portal — AI Service",
@@ -37,3 +39,9 @@ app.include_router(
     prefix="/api/v1/ai",
     tags=["CV Analysis"],
 )
+
+app.include_router(
+    ranking_router, 
+    prefix="/api/v1/ai", 
+    tags=["Candidate Ranking"]
+    ) 
