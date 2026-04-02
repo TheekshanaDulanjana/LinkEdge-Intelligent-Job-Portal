@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+///////////////////////
+// USER + AUTH
+///////////////////////
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(SEEKER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  seeker       JobSeeker?
+  company      Company?
+}
+
+enum Role {
+  SEEKER
+  COMPANY
+}
+
+///////////////////////
+// JOB SEEKER
+///////////////////////
+
+model JobSeeker {
+  id           String        @id @default(uuid())
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id])
+
+  fullName     String
+  phone        String?
+  location     String?
+
+  applications Application[]
+
+  createdAt    DateTime      @default(now())
+}
+
+///////////////////////
+// COMPANY
+///////////////////////
+
+model Company {
+  id           String        @id @default(uuid())
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id])
+
+  companyName  String
+  industry     String?
+  website      String?
+
+  jobs         JobPosting[]
+
+  createdAt    DateTime      @default(now())
+}
+
+///////////////////////
+// JOB POSTING
+///////////////////////
+
+model JobPosting {
+  id             String        @id @default(uuid())
+
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+
+  title          String
+  description    String
+  requirements   String
+  location       String
+
+  jobType        JobType       @default(FULL_TIME)
+  salaryMin      Int?
+  salaryMax      Int?
+
+  deadline       DateTime
+  status         JobStatus     @default(ACTIVE)
+
+  applications   Application[]
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  REMOTE
+}
+
+enum JobStatus {
+  ACTIVE
+  CLOSED
+  DRAFT
+}
+
+///////////////////////
+// APPLICATION
+///////////////////////
+
+model Application {
+  id          String            @id @default(uuid())
+
+  jobId       String
+  job         JobPosting        @relation(fields: [jobId], references: [id])
+
+  seekerId    String
+  seeker      JobSeeker         @relation(fields: [seekerId], references: [id])
+
+  cvUrl       String
+  coverLetter String?
+
+  status      ApplicationStatus @default(PENDING)
+  aiScore     Float?
+
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  SHORTLISTED
+  REJECTED
+  INTERVIEW
+}
