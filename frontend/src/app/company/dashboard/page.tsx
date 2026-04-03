@@ -7,6 +7,8 @@ import { jobApi } from '@/lib/api';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
+import AuthGuard from '@/components/AuthGuard';
+
 interface Job {
   id: string;
   title: string;
@@ -15,7 +17,7 @@ interface Job {
   deadline: string;
 }
 
-export default function CompanyDashboard() {
+function CompanyDashboard() {
   const { user, logout, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -129,5 +131,13 @@ export default function CompanyDashboard() {
 
       </div>
     </div>
+  );
+}
+
+export default function CompanyDashboardPage() {
+  return (
+    <AuthGuard requiredRole="COMPANY">
+      <CompanyDashboard />
+    </AuthGuard>
   );
 }

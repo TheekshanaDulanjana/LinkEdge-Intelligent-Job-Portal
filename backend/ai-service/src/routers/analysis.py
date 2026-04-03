@@ -1,81 +1,100 @@
+import os
 import shutil
+import time
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import JSONResponse
 from src.models.schemas import AnalysisResponse
 from src.agents.workflow import cv_analysis_workflow
 from src.tools.pdf_extractor import extract_text_from_file
 from src.tools.job_fetcher import fetch_active_jobs
+from src.security.validator import (
+    validate_cv_file,
+    sanitize_desired_role,
+    sanitize_additional_inputs,
+)
 
 router = APIRouter()
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
-MIN_CV_TEXT_LENGTH = 100   # Minimum characters — catches blank/image PDFs
-MAX_FILE_SIZE_MB = 5
+MIN_CV_TEXT_LENGTH = 100
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_cv(
+    request: Request,
     cv_file: UploadFile = File(...),
     desired_role: str = Form(...),
     additional_inputs: str = Form(""),
 ):
-    """
-    Receives a CV file + job role inputs, runs the 3-agent
-    LangGraph pipeline, and returns the full analysis.
-    """
+    start_time = time.time()
+    request_id = request.headers.get("x-request-id", "unknown")
 
-    # --- Validate file extension ---
-    file_suffix = Path(cv_file.filename).suffix.lower()
-    if file_suffix not in ALLOWED_EXTENSIONS:
+    print(f"[{request_id}] CV analysis request received")
+
+    # ── Validate and sanitize inputs ──────────────────────────────
+    file_size = 0
+    file_bytes = await cv_file.read()
+    file_size = len(file_bytes)
+    await cv_file.seek(0)  # Reset for saving
+
+    is_valid, file_error = validate_cv_file(cv_file.filename or "", file_size)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=file_error)
+
+    # Sanitize text inputs — prevents prompt injection
+    clean_role = sanitize_desired_role(desired_role)
+    clean_inputs = sanitize_additional_inputs(additional_inputs)
+
+    if not clean_role:
         raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed. Please upload a PDF or Word document.",
+            status_code=400, detail="Desired role is required."
         )
 
-    # --- Save file temporarily ---
-    temp_path = UPLOAD_DIR / f"temp_{cv_file.filename}"
+    # ── Save file securely ────────────────────────────────────────
+    # Use only the basename — never trust the original filename path
+    safe_filename = f"cv_{request_id}_{Path(cv_file.filename or 'upload').name}"
+    # Strip any path components from the name
+    safe_filename = Path(safe_filename).name
+    temp_path = UPLOAD_DIR / safe_filename
 
     try:
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(cv_file.file, buffer)
     except Exception:
-        raise HTTPException(status_code=500, detail="Could not save uploaded file.")
+        raise HTTPException(
+            status_code=500, detail="Could not process uploaded file."
+        )
 
     try:
-        # --- Extract text ---
-        print(f"\n{'='*50}")
-        print(f"New analysis request")
-        print(f"  File       : {cv_file.filename}")
-        print(f"  Desired role: {desired_role}")
-        print(f"  Extra inputs: {additional_inputs[:80]}")
-        print(f"{'='*50}")
-
+        # ── Extract text ──────────────────────────────────────────
         cv_text = extract_text_from_file(str(temp_path))
-        print(f"  Extracted {len(cv_text)} characters from CV")
 
         if len(cv_text.strip()) < MIN_CV_TEXT_LENGTH:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Could not extract enough text from the CV. "
-                    "Please make sure it is a text-based PDF, not a scanned image."
+                    "Ensure it is a text-based PDF, not a scanned image."
                 ),
             )
 
-        # --- Fetch live jobs ---
-        job_listings = fetch_active_jobs()
-        print(f"  Fetched {len(job_listings)} active job listings")
+        # Sanitize extracted CV text as well
+        cv_text = sanitize_additional_inputs.__wrapped__(cv_text, 50000) \
+            if hasattr(sanitize_additional_inputs, '__wrapped__') \
+            else cv_text[:50000]
 
-        # --- Build initial state ---
+        # ── Fetch live jobs ───────────────────────────────────────
+        job_listings = fetch_active_jobs()
+
+        # ── Build initial state and run pipeline ──────────────────
         initial_state = {
             "cv_text": cv_text,
-            "desired_role": desired_role,
-            "additional_skills": additional_inputs,
+            "desired_role": clean_role,
+            "additional_skills": clean_inputs,
             "job_listings": job_listings,
-            # Agent outputs — all empty at start
             "candidate_name": "",
             "extracted_skills": [],
             "extracted_experience": "",
@@ -90,12 +109,11 @@ async def analyze_cv(
             "current_step": "starting",
         }
 
-        # --- Run the LangGraph workflow ---
-        print("\nStarting LangGraph pipeline...")
         final_state = cv_analysis_workflow.invoke(initial_state)
-        print(f"\nPipeline complete — final step: {final_state.get('current_step')}")
 
-        # --- Return structured response ---
+        duration = round(time.time() - start_time, 2)
+        print(f"[{request_id}] Analysis complete in {duration}s")
+
         return AnalysisResponse(
             candidate_name=final_state.get("candidate_name", ""),
             extracted_skills=final_state.get("extracted_skills", []),
@@ -110,17 +128,15 @@ async def analyze_cv(
         )
 
     except HTTPException:
-        raise  # Re-raise HTTP errors as-is
-
+        raise
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"[{request_id}] Unexpected error: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis failed. Please try again."
+            # Never expose internal error details to the client
         )
-
     finally:
-        # Always delete the temp file — even if something crashed
+        # Always clean up temp file
         if temp_path.exists():
             temp_path.unlink()
-            print(f"  Temp file deleted")

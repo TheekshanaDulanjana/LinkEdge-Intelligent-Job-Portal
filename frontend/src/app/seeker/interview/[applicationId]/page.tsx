@@ -10,6 +10,8 @@ import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 import { useCamera } from '@/hooks/useCamera';
 
+import AuthGuard from '@/components/AuthGuard';
+
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
@@ -55,7 +57,7 @@ function gradeColor(grade: string) {
 // ─────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────
-export default function InteractiveInterviewPage() {
+ function InterviewPage() {
   const { applicationId } = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
@@ -700,7 +702,7 @@ export default function InteractiveInterviewPage() {
                       <div className="bg-gray-800 rounded-lg px-4 py-3 mb-3">
                         <p className="text-xs text-gray-500 mb-1">Your spoken answer</p>
                         <p className="text-xs text-gray-300 italic leading-relaxed">
-                          "{ev.answer}"
+                          &quot;{ev.answer}&quot;
                         </p>
                       </div>
                     )}
@@ -734,5 +736,14 @@ export default function InteractiveInterviewPage() {
         </div>
       )}
     </div>
+  );
+}
+
+
+export default function InteractiveInterviewPage() {
+  return (
+    <AuthGuard requiredRole="SEEKER">
+      <InterviewPage />
+    </AuthGuard>
   );
 }

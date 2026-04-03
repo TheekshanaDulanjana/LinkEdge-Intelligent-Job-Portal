@@ -7,6 +7,8 @@ import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
+import AuthGuard from '@/components/AuthGuard';
+
 interface Candidate {
   application_id: string;
   seeker_id: string;
@@ -24,7 +26,7 @@ interface Application {
   createdAt: string;
 }
 
-export default function ApplicantsPage() {
+ function ApplicantsPageContent() {
   const { id: jobId } = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
@@ -299,12 +301,20 @@ export default function ApplicantsPage() {
             )}
             {applications.length > 0 && (
               <p className="text-sm text-gray-400 mt-4 text-center">
-                Click "Rank candidates with AI" to see AI-powered scoring and analysis
+                Click &quot;Rank candidates with AI&quot; to see AI-powered scoring and analysis
               </p>
             )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function ApplicantsPage() {
+  return (
+    <AuthGuard requiredRole="COMPANY">
+      <ApplicantsPageContent />
+    </AuthGuard>
   );
 }

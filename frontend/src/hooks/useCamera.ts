@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface CameraResult {
-  videoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
   isCameraOn: boolean;
   cameraError: string;
   startCamera: () => Promise<void>;

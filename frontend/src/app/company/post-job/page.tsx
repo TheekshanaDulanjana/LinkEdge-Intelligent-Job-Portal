@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 
+import AuthGuard from '@/components/AuthGuard';
+
 const schema = z.object({
   title: z.string().min(3, 'Title required'),
   description: z.string().min(20, 'Description must be at least 20 characters'),
@@ -24,7 +26,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function PostJobPage() {
+function PostJobPageContent() {
   const router = useRouter();
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -138,5 +140,13 @@ export default function PostJobPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PostJobPage() {
+  return (
+    <AuthGuard requiredRole="COMPANY">
+      <PostJobPageContent />
+    </AuthGuard>
   );
 }

@@ -7,6 +7,8 @@ import { applicationApi } from '@/lib/api';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
+import AuthGuard from '@/components/AuthGuard';
+
 interface Application {
   id: string;
   status: string;
@@ -25,7 +27,7 @@ const statusColors: Record<string, string> = {
   INTERVIEW: 'bg-purple-100 text-purple-700',
 };
 
-export default function SeekerDashboard() {
+ function SeekerDashboard() {
   const { user, logout, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
@@ -143,5 +145,13 @@ export default function SeekerDashboard() {
 
       </div>
     </div>
+  );
+}
+
+export default function SeekerDashboardPage() {
+  return (
+    <AuthGuard requiredRole="SEEKER">
+      <SeekerDashboard />
+    </AuthGuard>
   );
 }

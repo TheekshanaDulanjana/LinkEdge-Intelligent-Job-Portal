@@ -1,111 +1,38 @@
-# ============================================================================
-# ENVIRONMENT FILES - DO NOT COMMIT
-# ============================================================================
-# Place .env files in the following locations (one file per service):
-#   - backend/auth-service/.env
-#   - backend/application-service/.env
-#   - backend/ai-service/.env
-#   - backend/interview-service/.env
-#   - backend/job-service/.env
-#   - frontend/.env.local
-#   - frontend/.env.local.example (can be committed as template)
-# ============================================================================
-
-# Environment variables
+# Environment files — NEVER commit these
 .env
 .env.local
+.env.production
 .env.*.local
-.env.production.local
+**/.env
+**/.env.*
 
-# ============================================================================
-# NODE.JS & NPM
-# ============================================================================
+# Dependencies
 node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+**/node_modules/
 
-# ============================================================================
-# RUNTIME & BUILD ARTIFACTS
-# ============================================================================
-dist/
-build/
-.next/
-.out/
-.cache/
-.turbo/
+# Python
+**/__pycache__/
+**/*.pyc
+**/venv/
+**/.venv/
 
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
+# Build outputs
+**/dist/
+**/.next/
 
-# ============================================================================
-# LOGS
-# ============================================================================
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Uploaded files — these are user data, not code
+**/uploads/*.pdf
+**/uploads/*.doc
+**/uploads/*.docx
+
+# Logs
 *.log
+**/logs/
 
-# ============================================================================
-# IDE & EDITOR
-# ============================================================================
-.vscode/
-.idea/
+# OS files
 .DS_Store
-*.swp
-*.swo
-*~
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# ============================================================================
-# OS SPECIFIC
-# ============================================================================
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# ============================================================================
-# DATABASE & PRISMA
-# ============================================================================
-prisma/dev.db
-prisma/dev.db-journal
-*.sqlite
-*.sqlite3
-
-# ============================================================================
-# TESTING
-# ============================================================================
-coverage/
-.nyc_output/
-
-# ============================================================================
-# DOCKER & SERVICES
-# ============================================================================
-.dockerignore
-
-# ============================================================================
-# MISC
-# ============================================================================
-*.pem
-.coverage
-.env.test
-.env.test.local
+# IDE
+.vscode/settings.json
+.idea/

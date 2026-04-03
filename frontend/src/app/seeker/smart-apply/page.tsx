@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+import AuthGuard from '@/components/AuthGuard';
+
 interface CourseRecommendation {
   title: string;
   platform: string;
@@ -37,7 +39,7 @@ interface AnalysisResult {
 
 type Step = 'upload' | 'analyzing' | 'results';
 
-export default function SmartApplyPage() {
+function SmartApplyContent() {
   const { isAuthenticated } = useAuthStore();
   const router = useRouter();
 
@@ -303,5 +305,13 @@ export default function SmartApplyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SmartApplyPage() {
+  return (
+    <AuthGuard requiredRole="SEEKER">
+      <SmartApplyContent />
+    </AuthGuard>
   );
 }
