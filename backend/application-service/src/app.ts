@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
 import applicationRoutes from './routes/application.routes';
+import notificationRoutes from './routes/notification.routes';
 
 dotenv.config();
 
@@ -21,8 +22,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'application-service' });
 });
 
+// Routes
 app.use('/api/v1/applications', applicationRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
+// 404 Handler
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });
 });

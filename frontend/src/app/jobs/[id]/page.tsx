@@ -18,6 +18,7 @@ interface Job {
   salaryMax?: number;
   deadline: string;
   createdAt: string;
+  status: string; // Added status to interface
 }
 
 export default function JobDetailPage() {
@@ -48,7 +49,10 @@ export default function JobDetailPage() {
   }, [id, router]);
 
   async function handleApply() {
-    if (!cvFile) { setError('Please select your CV file'); return; }
+    if (!cvFile) {
+      setError('Please select your CV file');
+      return;
+    }
     setApplying(true);
     setError('');
     try {
@@ -91,7 +95,15 @@ export default function JobDetailPage() {
         <div className="bg-white rounded-xl border p-8">
           <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-2xl font-semibold">{job.title}</h1>
+              <div className="flex items-center">
+                <h1 className="text-2xl font-semibold">{job.title}</h1>
+                {/* Status badge in header */}
+                {job.status === 'INACTIVE' && (
+                  <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 ml-2">
+                    Inactive
+                  </span>
+                )}
+              </div>
               <p className="text-gray-500 mt-1">{job.location} · {job.jobType.replace('_', ' ')}</p>
               {job.salaryMin && (
                 <p className="text-green-600 font-medium mt-1">
@@ -117,14 +129,22 @@ export default function JobDetailPage() {
             <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{job.requirements}</p>
           </div>
 
-          {/* Apply section */}
+          {/* Updated Apply section */}
           {applied ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 text-center">
-              Application submitted successfully! We will be in touch.
+              Application submitted successfully!
+            </div>
+          ) : job.status === 'INACTIVE' ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+              <p className="text-gray-500 font-medium">This job posting is currently inactive</p>
+              <p className="text-gray-400 text-sm mt-1">Applications are not being accepted at this time</p>
+              <Button disabled className="mt-3 w-full opacity-50 cursor-not-allowed">
+                Applications closed
+              </Button>
             </div>
           ) : isPast ? (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600 text-center">
-              This job is no longer accepting applications
+              Application deadline has passed
             </div>
           ) : !isAuthenticated ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
@@ -177,7 +197,7 @@ export default function JobDetailPage() {
               )}
             </>
           ) : (
-            <p className="text-gray-400 text-center text-sm">Companies cannot apply to jobs</p>
+            <p className="text-gray-400 text-sm text-center">Companies cannot apply to jobs</p>
           )}
         </div>
       </div>

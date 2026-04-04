@@ -7,89 +7,110 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-///////////////////////
-// USER + AUTH
-///////////////////////
-
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  passwordHash String
-  role         Role       @default(SEEKER)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                                         String         @id @default(uuid())
+  email                                      String         @unique
+  passwordHash                               String?
+  role                                       Role           @default(SEEKER)
+  createdAt                                  DateTime       @default(now())
+  updatedAt                                  DateTime       @updatedAt
+  authProvider                               AuthProvider   @default(LOCAL)
+  googleId                                   String?        @unique
+  isEmailVerified                            Boolean        @default(false)
+  resetToken                                 String?
+  resetTokenExpiresAt                        DateTime?
+  verificationCode                           String?
+  verificationExpiresAt                      DateTime?
+  company                                    Company?
+  seeker                                     JobSeeker?
+  Notification_Notification_receiverIdToUser Notification[] @relation("Notification_receiverIdToUser")
+  Notification_Notification_senderIdToUser   Notification[] @relation("Notification_senderIdToUser")
+}
 
-  seeker       JobSeeker?
-  company      Company?
+model JobSeeker {
+  id                  String     @id @default(uuid())
+  userId              String     @unique
+  fullName            String
+  phone               String?
+  location            String?
+  createdAt           DateTime   @default(now())
+  interestArea        String?
+  professionalSummary String?
+  profileImageUrl     String?
+  updatedAt           DateTime
+  workStatus          WorkStatus @default(UNEMPLOYED)
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id                                 String           @id @default(uuid())
+  senderId                           String?
+  receiverId                         String
+  type                               NotificationType
+  title                              String
+  message                            String
+  isRead                             Boolean          @default(false)
+  metadata                           Json?
+  createdAt                          DateTime         @default(now())
+  User_Notification_receiverIdToUser User             @relation("Notification_receiverIdToUser", fields: [receiverId], references: [id])
+  User_Notification_senderIdToUser   User?            @relation("Notification_senderIdToUser", fields: [senderId], references: [id])
+}
+
+model Company {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  companyName   String
+  industry      String?
+  website       String?
+  createdAt     DateTime @default(now())
+  aboutUs       String?
+  coverImageUrl String?
+  location      String?
+  logoUrl       String?
+  phone         String?
+  updatedAt     DateTime
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model JobPosting {
+  id           String        @id @default(uuid())
+  companyId    String
+  title        String
+  description  String
+  requirements String
+  location     String
+  jobType      JobType       @default(FULL_TIME)
+  salaryMin    Int?
+  salaryMax    Int?
+  deadline     DateTime
+  status       JobStatus     @default(ACTIVE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  applications Application[]
+}
+
+model Application {
+  id                String            @id @default(uuid())
+  jobId             String
+  seekerId          String
+  cvUrl             String
+  coverLetter       String?
+  status            ApplicationStatus @default(PENDING)
+  aiScore           Float?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  interviewDate     DateTime?
+  interviewTime     String?
+  interviewVenue    String?
+  practiceExpiresAt DateTime?
+  rejectionMessage  String?
+  rejectionReason   String?
+  job               JobPosting        @relation(fields: [jobId], references: [id])
 }
 
 enum Role {
   SEEKER
   COMPANY
-}
-
-///////////////////////
-// JOB SEEKER
-///////////////////////
-
-model JobSeeker {
-  id           String        @id @default(uuid())
-  userId       String        @unique
-  user         User          @relation(fields: [userId], references: [id])
-
-  fullName     String
-  phone        String?
-  location     String?
-
-  applications Application[]
-
-  createdAt    DateTime      @default(now())
-}
-
-///////////////////////
-// COMPANY
-///////////////////////
-
-model Company {
-  id           String        @id @default(uuid())
-  userId       String        @unique
-  user         User          @relation(fields: [userId], references: [id])
-
-  companyName  String
-  industry     String?
-  website      String?
-
-  jobs         JobPosting[]
-
-  createdAt    DateTime      @default(now())
-}
-
-///////////////////////
-// JOB POSTING
-///////////////////////
-
-model JobPosting {
-  id             String        @id @default(uuid())
-
-  companyId      String
-  company        Company       @relation(fields: [companyId], references: [id])
-
-  title          String
-  description    String
-  requirements   String
-  location       String
-
-  jobType        JobType       @default(FULL_TIME)
-  salaryMin      Int?
-  salaryMax      Int?
-
-  deadline       DateTime
-  status         JobStatus     @default(ACTIVE)
-
-  applications   Application[]
-
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
 }
 
 enum JobType {
@@ -104,29 +125,7 @@ enum JobStatus {
   ACTIVE
   CLOSED
   DRAFT
-}
-
-///////////////////////
-// APPLICATION
-///////////////////////
-
-model Application {
-  id          String            @id @default(uuid())
-
-  jobId       String
-  job         JobPosting        @relation(fields: [jobId], references: [id])
-
-  seekerId    String
-  seeker      JobSeeker         @relation(fields: [seekerId], references: [id])
-
-  cvUrl       String
-  coverLetter String?
-
-  status      ApplicationStatus @default(PENDING)
-  aiScore     Float?
-
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  INACTIVE
 }
 
 enum ApplicationStatus {
@@ -135,4 +134,23 @@ enum ApplicationStatus {
   SHORTLISTED
   REJECTED
   INTERVIEW
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum NotificationType {
+  NEW_APPLICATION
+  APPLICATION_SHORTLISTED
+  INTERVIEW_SCHEDULED
+  APPLICATION_REJECTED
+  STATUS_UPDATE
+  SYSTEM
+}
+
+enum WorkStatus {
+  EMPLOYED
+  UNEMPLOYED
 }

@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from src.database.db import get_db
 from src.database.models import InterviewSession, InterviewQuestion
 from src.agents.workflow import question_workflow, evaluation_workflow
@@ -11,6 +12,66 @@ from src.models.schemas import (
 )
 
 router = APIRouter()
+
+
+@router.get("/can-practice/{application_id}")
+def check_practice_eligibility(application_id: str, db: Session = Depends(get_db)):
+    """
+    Server-clock controlled check.
+    Returns whether the practice feature is still available.
+    This CANNOT be bypassed by the client — the check is server-side.
+    """
+    # Query the application directly from DB
+    result = db.execute(
+        text("""
+            SELECT 
+                status,
+                practice_expires_at,
+                interview_date,
+                interview_time,
+                interview_venue
+            FROM applications
+            WHERE id = :app_id
+        """),
+        {"app_id": application_id}
+    ).fetchone()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    status = result[0]
+    practice_expires_at = result[1]
+    
+    # Must be INTERVIEW status
+    if status != 'INTERVIEW':
+        return {
+            "can_practice": False,
+            "reason": "Practice interview is only available for shortlisted candidates",
+            "interview_date": None,
+            "interview_time": None,
+            "interview_venue": None,
+        }
+
+    # Check server clock against expiry — client cannot fake this
+    now = datetime.utcnow()
+    
+    if practice_expires_at and now > practice_expires_at:
+        return {
+            "can_practice": False,
+            "reason": "Practice interview period has expired. Your actual interview is approaching.",
+            "interview_date": str(result[2]),
+            "interview_time": result[3],
+            "interview_venue": result[4],
+        }
+
+    return {
+        "can_practice": True,
+        "reason": None,
+        "expires_at": practice_expires_at.isoformat() if practice_expires_at else None,
+        "interview_date": str(result[2]) if result[2] else None,
+        "interview_time": result[3],
+        "interview_venue": result[4],
+    }
 
 
 @router.post("/start", response_model=StartSessionResponse)

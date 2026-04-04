@@ -11,7 +11,11 @@ import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Card, CardContent, CardHeader,
+  CardTitle, CardDescription,
+} from '@/components/ui/card';
+import GoogleAuthButton from '@/components/GoogleAuthButton';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -25,10 +29,13 @@ export default function LoginPage() {
   const { setAuth } = useAuthStore();
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleRole, setGoogleRole] = useState<'SEEKER' | 'COMPANY'>('SEEKER');
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
 
   async function onSubmit(data: LoginForm) {
     setLoading(true);
@@ -36,18 +43,12 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', data);
       const { user, accessToken } = res.data.data;
-
       setAuth(user, accessToken);
-
-      // Redirect based on role
-      if (user.role === 'SEEKER') {
-        router.push('/seeker/dashboard');
-      } else {
-        router.push('/company/dashboard');
-      }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setServerError(error.response?.data?.message || 'Login failed');
+      router.push(
+        user.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
+      );
+    } catch (err: any) {
+      setServerError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -60,30 +61,100 @@ export default function LoginPage() {
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {serverError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
               {serverError}
+              {serverError.includes('verify') && (
+                <Link
+                  href="/verify-email"
+                  className="block mt-1 underline font-medium"
+                >
+                  Resend verification code
+                </Link>
+              )}
             </div>
           )}
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
-              {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>}
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                {...register('email')}
+              />
+              {errors.email && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.email.message}
+                </p>
+              )}
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" placeholder="Your password" {...register('password')} />
-              {errors.password && <p className="text-sm text-red-500 mt-1">{errors.password.message}</p>}
+              <div className="flex justify-between items-center mb-1">
+                <Label>Password</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-purple-600 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                type="password"
+                placeholder="Your password"
+                {...register('password')}
+              />
+              {errors.password && (
+                <p className="text-xs text-red-500 mt-1">
+                  {errors.password.message}
+                </p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
-          <p className="text-center text-sm text-gray-500 mt-4">
+
+          {/* Divider */}
+          <div className="relative my-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-xs text-gray-400">
+                or continue with Google
+              </span>
+            </div>
+          </div>
+
+          {/* Google role selector */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+            {(['SEEKER', 'COMPANY'] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setGoogleRole(r)}
+                className={`py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  googleRole === r
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-500'
+                }`}
+              >
+                {r === 'SEEKER' ? 'Job Seeker' : 'Company'}
+              </button>
+            ))}
+          </div>
+          <GoogleAuthButton role={googleRole} />
+
+          <p className="text-center text-sm text-gray-500">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-blue-600 hover:underline">Create one</Link>
+            <Link
+              href="/register"
+              className="text-purple-600 hover:underline"
+            >
+              Create one
+            </Link>
           </p>
         </CardContent>
       </Card>
