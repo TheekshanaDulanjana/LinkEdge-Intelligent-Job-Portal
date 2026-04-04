@@ -106,7 +106,7 @@ function SeekerProfileContent() {
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/seeker/dashboard" className="text-sm text-purple-600 hover:underline">
-            ← Dashboard
+            Dashboard
           </Link>
           <h1 className="text-2xl font-semibold">My Profile</h1>
         </div>

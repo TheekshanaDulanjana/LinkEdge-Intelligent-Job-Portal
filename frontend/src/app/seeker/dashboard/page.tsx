@@ -13,6 +13,7 @@ interface Application {
   status: string;
   createdAt: string;
   rejectionReason?: string;
+  rejectionMessage?: string;
   interviewDate?: string;
   interviewTime?: string;
   interviewVenue?: string;
@@ -121,7 +122,8 @@ function SeekerDashboardContent() {
                   {/* Rejection reason */}
                   {app.status === 'REJECTED' && app.rejectionReason && (
                     <div className="mt-3 bg-red-50 rounded-lg px-3 py-2 text-xs text-red-600">
-                      Reason: {app.rejectionReason}
+                      Reason: {app.rejectionReason} <br />
+                      {app.rejectionMessage }
                     </div>
                   )}
 

@@ -199,7 +199,7 @@ function ApplicantsContent() {
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
             <Link href="/company/dashboard" className="text-sm text-purple-600 hover:underline">
-              ← Dashboard
+              Dashboard
             </Link>
             <div>
               <h1 className="text-2xl font-semibold">{job?.title}</h1>
