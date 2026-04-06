@@ -25,13 +25,13 @@ def check_practice_eligibility(application_id: str, db: Session = Depends(get_db
     result = db.execute(
         text("""
             SELECT 
-                status,
-                practice_expires_at,
-                interview_date,
-                interview_time,
-                interview_venue
-            FROM applications
-            WHERE id = :app_id
+            status,
+            "practiceExpiresAt",
+            "interviewDate",
+            "interviewTime",
+            "interviewVenue"
+        FROM "Application"
+        WHERE id = :app_id
         """),
         {"app_id": application_id}
     ).fetchone()
