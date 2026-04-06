@@ -59,7 +59,7 @@ function CompanyDashboardContent() {
           </div>
         </div>
 
-        {/* Stats row */}
+        
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
             { label: 'Total postings', value: jobs.length },
