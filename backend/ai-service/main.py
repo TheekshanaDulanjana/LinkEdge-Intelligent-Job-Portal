@@ -14,6 +14,8 @@ import uuid
 
 from src.routers.analysis import router as analysis_router
 from src.routers.ranking import router as ranking_router
+from src.routers.rejection import router as rejection_router
+
 
 app = FastAPI(
     title="Intelligent Job Portal — AI Service",
@@ -93,3 +95,4 @@ def health():
 # ── Routes ────────────────────────────────────────────────────────
 app.include_router(analysis_router, prefix="/api/v1/ai", tags=["Analysis"])
 app.include_router(ranking_router, prefix="/api/v1/ai", tags=["Ranking"])
+app.include_router(rejection_router, prefix="/api/v1/ai", tags=["Rejection"])

@@ -86,6 +86,7 @@ model Application {
   jobId             String
   seekerId          String
   cvUrl             String
+  cvTextSnapshot  String? 
   coverLetter       String?
   status            ApplicationStatus @default(PENDING)
   rejectionReason   String?

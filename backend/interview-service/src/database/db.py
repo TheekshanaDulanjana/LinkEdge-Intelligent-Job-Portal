@@ -21,5 +21,5 @@ def get_db():
 
 def create_tables():
     """Creates all tables defined in models.py."""
-    from src.database.models import InterviewSession, InterviewQuestion
+    import src.database.models 
     Base.metadata.create_all(bind=engine)

@@ -4,7 +4,6 @@ from sqlalchemy import Column, String, Float, Integer, DateTime, Text, ForeignKe
 from sqlalchemy.orm import relationship
 from src.database.db import Base
 
-
 class InterviewSession(Base):
     __tablename__ = "interview_sessions"
 

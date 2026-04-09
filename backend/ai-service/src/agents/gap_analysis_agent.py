@@ -5,8 +5,7 @@ from google.genai import Client
 from src.models.state import CVAnalysisState
 
 
-
-# Create the new Gemini client
+# Create the new Gemini client (UNCHANGED)
 client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
@@ -21,12 +20,7 @@ def clean_json_response(raw: str) -> str:
 def gap_analysis_agent(state: CVAnalysisState) -> CVAnalysisState:
     """
     Agent 2: Gap Analysis Agent
-    Compares the candidate's skills to what their desired role requires.
-    Identifies what they have, what they're missing, and suggests courses.
-
-    Input  : extracted_skills, extracted_experience, extracted_education,
-             desired_role, additional_skills
-    Output : matching_skills, missing_skills, gap_summary, course_suggestions
+    Now includes course URLs for frontend clickable navigation
     """
     print(">> [Agent 2] Gap analysis agent started")
 
@@ -75,7 +69,8 @@ Start directly with {{ and end with }}.
         {{
             "title": "Specific course or certification name",
             "platform": "Platform name (Coursera, Udemy, YouTube, Google, Microsoft Learn, etc.)",
-            "reason": "One sentence explaining exactly how this course helps bridge their specific gap"
+            "reason": "One sentence explaining exactly how this course helps bridge their specific gap",
+            "url": "Real working URL (search page or platform link)"
         }}
     ]
 }}
@@ -84,11 +79,23 @@ Rules:
 - matching_skills: include 3 to 6 relevant skills they already have
 - missing_skills: list the 5 to 7 most critical gaps, ordered by importance
 - course_suggestions: provide exactly 4 specific, real courses
+
+CRITICAL URL rules:
+- url must be real and working
+- Coursera: https://www.coursera.org/search?query=COURSE+NAME
+- Udemy: https://www.udemy.com/courses/search/?q=COURSE+NAME
+- YouTube: https://www.youtube.com/results?search_query=COURSE+NAME
+- Google: https://grow.google/certificates/
+- freeCodeCamp: https://www.freecodecamp.org/learn
+- Microsoft Learn: https://learn.microsoft.com/en-us/training/
+- AWS: https://aws.amazon.com/training/
+- Replace spaces with +
+- DO NOT invent fake URLs
+
 - gap_summary: be motivating, acknowledge what they have, then guide improvement
 - Be specific to the actual desired role, not generic"""
 
     try:
-        # Generate text using the new genai client
         response = client.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
             contents=prompt,
@@ -97,7 +104,7 @@ Rules:
                 "max_output_tokens": 3000,
             }
         )
-        
+
         raw = clean_json_response(response.text)
         data = json.loads(raw)
 

@@ -203,21 +203,39 @@ router.patch(
 
 // -- Public Profile Routes --
 
+// UPDATED: Now includes company data AND their active job listings
 router.get('/company/:companyId/public', async (req, res, next) => {
   try {
     const company = await prisma.company.findUnique({
       where: { id: req.params.companyId },
       select: {
-        companyName: true, industry: true, website: true,
-        location: true, phone: true, aboutUs: true,
-        logoUrl: true, coverImageUrl: true,
+        id: true,
+        companyName: true,
+        industry: true,
+        website: true,
+        location: true,
+        phone: true,
+        aboutUs: true,
+        logoUrl: true,
+        coverImageUrl: true,
       },
     });
+
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
       return;
     }
-    res.json({ success: true, data: company });
+
+    const jobs = await prisma.jobPosting.findMany({
+      where: { companyId: company.id, status: 'ACTIVE' },
+      select: {
+        id: true, title: true, location: true,
+        jobType: true, deadline: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ success: true, data: { ...company, jobs } });
   } catch (e) { next(e); }
 });
 

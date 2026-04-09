@@ -27,6 +27,9 @@ export default function Header() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // New state for profile image
+  const [profileImageUrl, setProfileImageUrl] = useState('');
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,19 @@ export default function Header() {
   }
 
   useEffect(() => { loadFromStorage(); }, []);
+
+  // Fetch profile image when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    applicationApi.get('/auth/me').then((res) => {
+      const profile = res.data.data.profile;
+      const imgUrl = profile?.profileImageUrl || profile?.logoUrl || '';
+      if (imgUrl) {
+        setProfileImageUrl(`http://localhost:3001${imgUrl}`);
+      }
+    }).catch(() => {});
+  }, [isAuthenticated]);
 
   // Poll for notification count every 30 seconds
   useEffect(() => {
@@ -143,7 +159,6 @@ export default function Header() {
           <div className="flex items-center gap-3">
 
             {!isAuthenticated ? (
-              /* Guest buttons */
               <>
                 <Link href="/login">
                   <button className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors">
@@ -157,7 +172,6 @@ export default function Header() {
                 </Link>
               </>
             ) : (
-              /* Authenticated state */
               <>
                 {/* Notification Bell */}
                 <div className="relative" ref={notifRef}>
@@ -229,8 +243,20 @@ export default function Header() {
                     onClick={() => { setShowUserMenu(!showUserMenu); setShowNotifications(false); }}
                     className="flex items-center gap-2 p-1 rounded-full hover:bg-gray-100 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {user?.email?.[0]?.toUpperCase() || 'U'}
+                    {/* Profile image or initial - UPDATED SECTION */}
+                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-purple-200 bg-purple-100 flex-shrink-0">
+                      {profileImageUrl ? (
+                        <img
+                          src={profileImageUrl}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                          onError={() => setProfileImageUrl('')}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-purple-600 font-semibold text-sm">
+                          {user?.email?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
                     </div>
                     <svg className="w-4 h-4 text-gray-500 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>

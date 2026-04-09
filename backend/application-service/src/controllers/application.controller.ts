@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import { applicationService } from '../services/application.service';
 import { PrismaClient } from '@prisma/client';
 import { notificationHelper } from '../services/notification.helper';
+import pdfParse = require('pdf-parse');
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
 
 const prisma = new PrismaClient();
 
@@ -23,11 +27,34 @@ export const applicationController = {
         res.status(400).json({ success: false, message: 'CV file is required' });
         return;
       }
+
       const cvUrl = `/uploads/${req.file.filename}`;
       const { jobId, coverLetter } = req.body;
-      const application = await applicationService.applyForJob(
-        jobId, req.user.userId, cvUrl, coverLetter
-      );
+
+      // Extract CV text for later AI use
+      let cvTextSnapshot = '';
+      try {
+        const filePath = path.join('uploads', req.file.filename);
+        if (req.file.mimetype === 'application/pdf' || req.file.filename.endsWith('.pdf')) {
+          const dataBuffer = fs.readFileSync(filePath);
+          const pdfData = await (pdfParse as any)(dataBuffer);
+          cvTextSnapshot = pdfData.text.substring(0, 5000); // cap at 5000 chars
+        }
+      } catch (pdfErr) {
+        console.warn('Could not extract CV text for snapshot:', pdfErr);
+      }
+
+      // Create application with snapshot
+      const application = await prisma.application.create({
+        data: {
+          jobId,
+          seekerId: req.user.userId,
+          cvUrl,
+          coverLetter,
+          status: 'PENDING',
+          cvTextSnapshot,
+        },
+      });
 
       // Trigger notifications
       const job = await prisma.jobPosting.findUnique({ where: { id: jobId } });
@@ -135,18 +162,51 @@ export const applicationController = {
         return;
       }
 
-      const aiMessage = await generateRejectionMessage(reason);
-
-      const application = await prisma.application.update({
+      // Fetch full application with CV text snapshot
+      const application = await prisma.application.findUnique({
         where: { id },
-        data: { status: 'REJECTED', rejectionReason: reason, rejectionMessage: aiMessage },
         include: { job: true },
       });
+
+      if (!application) {
+        res.status(404).json({ success: false, message: 'Application not found' });
+        return;
+      }
 
       const seeker = await prisma.jobSeeker.findFirst({
         where: { userId: application.seekerId },
         include: { user: true },
       });
+
+      // Call AI Service for personalized message
+      let aiMessage = '';
+      try {
+        const aiRes = await axios.post(
+          `${process.env.AI_SERVICE_URL || 'http://localhost:8001'}/api/v1/ai/generate-rejection-message`,
+          {
+            reason,
+            cv_text: application.cvTextSnapshot || '',
+            job_title: application.job.title,
+            candidate_name: seeker?.fullName || 'the candidate',
+          },
+          { timeout: 30000 }
+        );
+        aiMessage = aiRes.data.ai_message;
+      } catch (aiErr) {
+        console.warn('AI rejection generation failed, using fallback:', aiErr);
+        aiMessage = `After reviewing your application for ${application.job.title}, we have decided not to proceed. The primary reason is: ${reason}. We appreciate your interest and encourage you to apply again in the future.`;
+      }
+
+      const updated = await prisma.application.update({
+        where: { id },
+        data: { 
+          status: 'REJECTED', 
+          rejectionReason: reason, 
+          rejectionMessage: aiMessage 
+        },
+        include: { job: true },
+      });
+
       const company = await prisma.company.findFirst({
         where: { id: application.job.companyId },
       });
@@ -164,14 +224,13 @@ export const applicationController = {
         );
       }
 
-      res.json({ success: true, message: 'Application rejected.', data: application });
+      res.json({ success: true, message: 'Application rejected.', data: updated });
     } catch (e) {
       console.error(e);
       res.status(500).json({ success: false, message: 'Server error' });
     }
   },
 
-  // ADDED THIS METHOD TO FIX THE TSERROR
   async updateStatus(req: any, res: Response) {
     try {
       const { id } = req.params;
@@ -211,9 +270,7 @@ export const applicationController = {
     try {
       const applications = await prisma.application.findMany({
         where: { jobId: req.params.jobId },
-        include: {
-          job: true,
-        },
+        include: { job: true },
         orderBy: [{ aiScore: 'desc' }, { createdAt: 'asc' }],
       });
 
@@ -255,16 +312,3 @@ export const applicationController = {
     }
   },
 };
-
-async function generateRejectionMessage(reason: string): Promise<string> {
-  const messages: Record<string, string> = {
-    'Insufficient experience': 'Your profile shows strong potential, but this role requires more hands-on experience in the field.',
-    'Missing required technical skills': 'The role requires specific technical competencies that are not yet reflected in your CV.',
-    'Qualification mismatch': 'The academic or professional qualifications listed in your CV do not fully align with our requirements.',
-    'Overqualified for the role': 'Your impressive background suggests this role may not offer the challenge you deserve.',
-    'Cultural fit concerns': 'While your skills are commendable, we felt the environment may not be the ideal match at this time.',
-    'Position filled internally': 'This position has been filled through an internal promotion.',
-    'Budget constraints': 'Due to internal budget adjustments, we are unable to proceed with external hires.',
-  };
-  return messages[reason] || 'We appreciate your interest and encourage you to apply to future openings.';
-}

@@ -11,6 +11,7 @@ class CourseRecommendation(BaseModel):
     title: str
     platform: str
     reason: str
+    url: str = "" 
 
 
 class JobRecommendation(BaseModel):

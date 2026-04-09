@@ -7,13 +7,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
 import AuthGuard from '@/components/AuthGuard';
 
 interface CourseRecommendation {
   title: string;
   platform: string;
   reason: string;
+  url?: string; // Added url property
 }
 
 interface JobRecommendation {
@@ -245,17 +245,77 @@ function SmartApplyContent() {
               </div>
             </div>
 
-            {/* Course recommendations */}
+            {/* Course recommendations — clickable */}
             <div className="bg-white rounded-xl border p-6">
-              <h3 className="font-semibold mb-4">Recommended courses to bridge the gap</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {result.course_suggestions.map((course, i) => (
-                  <div key={i} className="border rounded-lg p-4">
-                    <p className="font-medium text-sm">{course.title}</p>
-                    <p className="text-xs text-blue-600 mt-1">{course.platform}</p>
-                    <p className="text-xs text-gray-500 mt-2">{course.reason}</p>
-                  </div>
-                ))}
+              <h3 className="font-semibold mb-1">Recommended courses to bridge the gap</h3>
+              <p className="text-sm text-gray-400 mb-4">
+                Click any course to open it in a new tab
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {result.course_suggestions.map((course, i) => {
+                  const platformColors: Record<string, string> = {
+                    'Coursera': 'bg-blue-50 border-blue-200 hover:border-blue-400',
+                    'Udemy': 'bg-purple-50 border-purple-200 hover:border-purple-400',
+                    'YouTube': 'bg-red-50 border-red-200 hover:border-red-400',
+                    'Google': 'bg-green-50 border-green-200 hover:border-green-400',
+                    'freeCodeCamp': 'bg-orange-50 border-orange-200 hover:border-orange-400',
+                    'Microsoft Learn': 'bg-blue-50 border-blue-200 hover:border-blue-400',
+                    'AWS Training': 'bg-yellow-50 border-yellow-200 hover:border-yellow-400',
+                    'LinkedIn Learning': 'bg-sky-50 border-sky-200 hover:border-sky-400',
+                  };
+
+                  const platformTextColors: Record<string, string> = {
+                    'Coursera': 'text-blue-600',
+                    'Udemy': 'text-purple-600',
+                    'YouTube': 'text-red-600',
+                    'Google': 'text-green-600',
+                    'freeCodeCamp': 'text-orange-600',
+                    'Microsoft Learn': 'text-blue-700',
+                    'AWS Training': 'text-yellow-700',
+                    'LinkedIn Learning': 'text-sky-600',
+                  };
+
+                  const cardClass = platformColors[course.platform] || 'bg-gray-50 border-gray-200 hover:border-gray-400';
+                  const textClass = platformTextColors[course.platform] || 'text-gray-600';
+                  const hasUrl = course.url && course.url.startsWith('http');
+
+                  const CardContent = () => (
+                    <div className={`border-2 rounded-xl p-4 h-full transition-all duration-200 ${cardClass} ${hasUrl ? 'cursor-pointer group' : ''}`}>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="font-medium text-sm text-gray-800 leading-snug">{course.title}</p>
+                        {hasUrl && (
+                          <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600 flex-shrink-0 mt-0.5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-white border ${textClass} mb-2`}>
+                        {course.platform}
+                      </span>
+                      <p className="text-xs text-gray-500 leading-relaxed">{course.reason}</p>
+                      {hasUrl && (
+                        <p className={`text-xs font-medium mt-2 ${textClass} opacity-0 group-hover:opacity-100 transition-opacity`}>
+                          Click to open →
+                        </p>
+                      )}
+                    </div>
+                  );
+
+                  if (hasUrl) {
+                    return (
+                      <a
+                        key={i}
+                        href={course.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block no-underline"
+                      >
+                        <CardContent />
+                      </a>
+                    );
+                  }
+                  return <div key={i}><CardContent /></div>;
+                })}
               </div>
             </div>
 
@@ -272,10 +332,9 @@ function SmartApplyContent() {
                         <p className="text-sm text-gray-400">{job.location}</p>
                       </div>
                       <div className="text-right">
-                        <span className={`text-sm font-semibold ${
-                          job.match_score >= 75 ? 'text-green-600' :
+                        <span className={`text-sm font-semibold ${job.match_score >= 75 ? 'text-green-600' :
                           job.match_score >= 50 ? 'text-yellow-600' : 'text-gray-400'
-                        }`}>
+                          }`}>
                           {job.match_score}% match
                         </span>
                       </div>

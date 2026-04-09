@@ -181,6 +181,7 @@ function CompanyProfileContent() {
             </div>
           </div>
 
+          {/* About us section */}
           <div>
             <Label>About us</Label>
             <textarea
@@ -196,6 +197,15 @@ function CompanyProfileContent() {
           <Button onClick={handleSave} disabled={saving} className="w-full">
             {saving ? 'Saving...' : 'Save profile'}
           </Button>
+
+          {/* Delete account section */}
+          <div className="pt-4 border-t mt-2">
+            <Link href="/settings/delete-account">
+              <button className="text-sm text-red-500 hover:text-red-700 hover:underline transition-colors">
+                Delete my account permanently
+              </button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

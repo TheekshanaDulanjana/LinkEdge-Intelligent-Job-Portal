@@ -58,6 +58,8 @@ model Company {
   companyName  String
   industry     String?
   website      String?
+  logoUrl     String?    
+  location    String?     
 
   jobs         JobPosting[]
 
@@ -121,6 +123,7 @@ model Application {
 
   cvUrl       String
   coverLetter String?
+  cvTextSnapshot  String? 
 
   status      ApplicationStatus @default(PENDING)
   aiScore     Float?
