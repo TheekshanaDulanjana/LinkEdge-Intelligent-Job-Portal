@@ -111,9 +111,15 @@ export default function LoginPage() {
                 </p>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in'}
-            </Button>
+     <Button 
+  type="submit" 
+  variant="gradient" 
+  size="md" 
+  className="w-full" 
+  disabled={loading}
+>
+  {loading ? 'Signing in...' : 'Sign in'}
+</Button>
           </form>
 
           {/* Divider */}
