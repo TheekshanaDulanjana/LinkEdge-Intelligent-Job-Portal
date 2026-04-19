@@ -60,7 +60,7 @@ export default function GoogleAuthButton({
       <button
         onClick={handleGoogleAuth}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center rounded-full justify-center gap-3 px-4 py-2.5 border border-gray-300  bg-white hover:bg-gray-50 transition-colors text-xs font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? (
           <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />

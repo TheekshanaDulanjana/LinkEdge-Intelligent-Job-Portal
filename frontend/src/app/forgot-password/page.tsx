@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -15,47 +14,88 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
 
   async function handleSubmit() {
-    if (!email) { setError('Enter your email'); return; }
-    setLoading(true); setError('');
+    if (!email) {
+      setError('Enter your email');
+      return;
+    }
+    setLoading(true);
+    setError('');
     try {
       await api.post('/auth/forgot-password', { email });
       setSent(true);
     } catch (err: any) {
       setError(err.message || 'Request failed');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle>{sent ? 'Check your email' : 'Forgot password'}</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2">
+      <div className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[16px] items-center w-full max-w-md bg-white p-8">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-black">
+              {sent ? 'Check your email' : 'Forgot password'}
+            </h2>
+            <p className="text-black/60 mt-1 text-sm">
+              {sent 
+                ? 'We sent a reset link to your inbox' 
+                : 'Enter your email to reset your password'}
+            </p>
+          </div>
+
           {sent ? (
-            <div className="text-center">
-              <p className="text-gray-500 text-sm mb-6">
-                If <strong>{email}</strong> is registered, a password reset link has been sent. Check your inbox.
-              </p>
-              <Link href="/login"><Button variant="outline" className="w-full">Back to login</Button></Link>
+            <div className="space-y-6">
+              <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
+                <p className="text-gray-600 text-sm">
+                  If <strong>{email}</strong> is registered, a password reset link has been sent.
+                </p>
+              </div>
+              <Link href="/login" className="block">
+                <Button variant="outline" className="w-full h-12">
+                  Back to login
+                </Button>
+              </Link>
             </div>
           ) : (
-            <>
-              {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">{error}</div>}
-              <div className="mb-4">
-                <Label>Email address</Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com"/>
+            <div className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@domain.com"
+                  className="h-10"
+                />
               </div>
-              <Button onClick={handleSubmit} className="w-full mb-3" disabled={loading}>
+
+              <Button 
+                onClick={handleSubmit} 
+                variant="gradient" 
+                className="w-full h-12 mt-4" 
+                disabled={loading}
+              >
                 {loading ? 'Sending...' : 'Send reset link'}
               </Button>
-              <p className="text-center text-sm text-gray-500">
-                <Link href="/login" className="text-purple-600 hover:underline">Back to login</Link>
+
+              <p className="text-center text-sm text-gray-600">
+                Remember your password?{' '}
+                <Link href="/login" className="text-blue-600 font-semibold hover:underline">
+                  Login
+                </Link>
               </p>
-            </>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

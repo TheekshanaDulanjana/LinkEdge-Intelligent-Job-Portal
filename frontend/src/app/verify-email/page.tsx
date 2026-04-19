@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
@@ -20,7 +19,9 @@ export default function VerifyEmailPage() {
   const [resent, setResent] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => { inputRefs.current[0]?.focus(); }, []);
+  useEffect(() => {
+    inputRefs.current[0]?.focus();
+  }, []);
 
   function handleChange(index: number, value: string) {
     if (value.length > 1) return;
@@ -40,8 +41,12 @@ export default function VerifyEmailPage() {
 
   async function handleSubmit() {
     const fullCode = code.join('');
-    if (fullCode.length < 6) { setError('Enter all 6 digits'); return; }
-    setLoading(true); setError('');
+    if (fullCode.length < 6) {
+      setError('Enter all 6 digits');
+      return;
+    }
+    setLoading(true);
+    setError('');
     try {
       const res = await api.post('/auth/verify-email', { email, code: fullCode });
       const { accessToken, user } = res.data.data;
@@ -51,7 +56,9 @@ export default function VerifyEmailPage() {
       setError(err.message || 'Invalid code');
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleResend() {
@@ -60,61 +67,77 @@ export default function VerifyEmailPage() {
       await api.post('/auth/resend-verification', { email });
       setResent(true);
       setTimeout(() => setResent(false), 30000);
-    } finally { setResending(false); }
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </div>
-          <CardTitle>Verify your email</CardTitle>
-          <p className="text-sm text-gray-500 mt-1">
-            Enter the 6-digit code sent to<br/><strong>{email}</strong>
-          </p>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600 text-center">{error}</div>
-          )}
-
-          {/* Code inputs */}
-          <div className="flex gap-2 justify-center mb-6">
-            {code.map((digit, i) => (
-              <input
-                key={i}
-                ref={(el) => { inputRefs.current[i] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(i, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(i, e)}
-                className="w-10 h-12 text-center text-xl font-bold border-2 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
-              />
-            ))}
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2">
+      <div className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[16px] items-center w-full max-w-md bg-white p-8">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="text-center">
+            {/* Icon */}
+            <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-blue-100">
+              <svg className="w-7 h-7 text-[#0F9DE4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            
+            <h2 className="text-xl font-semibold text-black">Verify your email</h2>
+            <p className="text-black/60 mt-1 text-xs">
+              Enter the 6-digit code sent to<br />
+              <strong className="text-black">{email}</strong>
+            </p>
           </div>
 
-          <Button onClick={handleSubmit} className="w-full mb-3" disabled={loading}>
-            {loading ? 'Verifying...' : 'Verify email'}
-          </Button>
+          <div className="space-y-4 ">
+            <div className='flex justify-center items-center'>
+            {error && (
+              <div className="p-3 w-58  bg-red-50 border border-red-200 rounded text-sm text-red-600 text-center">
+                {error}
+              </div>
+            )}</div>
 
-          <p className="text-center text-sm text-gray-500">
-            Didn&apos;t receive it?{' '}
-            <button
-              onClick={handleResend}
-              disabled={resending || resent}
-              className="text-purple-600 hover:underline disabled:opacity-50"
+            {/* Code inputs */}
+            <div className="flex gap-2 justify-center">
+              {code.map((digit, i) => (
+                <input
+                  key={i}
+                  ref={(el) => { inputRefs.current[i] = el; }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  className="w-8 h-10 text-center text-xl font-bold border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#0F9DE4] transition-colors"
+                />
+              ))}
+            </div>
+                <div className='flex justify-center items-center'>
+            <Button 
+              onClick={handleSubmit} 
+              variant="gradient" 
+              className="w-64  h-10 mt-2" 
+              disabled={loading}
             >
-              {resent ? 'Code resent!' : resending ? 'Sending...' : 'Resend code'}
-            </button>
-          </p>
-        </CardContent>
-      </Card>
+              {loading ? 'Verifying...' : 'Verify email'}
+            </Button></div>
+
+            <p className="text-center text-sm text-gray-600">
+              Didn&apos;t receive it?{' '}
+              <button
+                onClick={handleResend}
+                disabled={resending || resent}
+                className="text-[#0F9DE4] font-semibold hover:underline disabled:opacity-50"
+              >
+                {resent ? 'Code resent!' : resending ? 'Sending...' : 'Resend code'}
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
