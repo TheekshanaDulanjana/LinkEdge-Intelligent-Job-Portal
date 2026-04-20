@@ -37,13 +37,14 @@ export default function LoginHero() {
           </Link>
 
           <h1 className="text-4xl font-bold leading-tight mb-6 text-left">
-            Your Career Edge,<br />
-            Powered by Intelligence
+            Your Career Journey<br />
+            Continues Here!
           </h1>
           <p className="text-sm max-w-lg mb-8 text-left">
-            Experience a recruitment portal that does more than just list jobs. 
-            LinkEdge analyzes your potential, recommends paths for growth, 
-            and streamlines hiring with automated candidate ranking.
+           Welcome back to your personalized career hub.
+            Log in to track your applications, explore new
+             AI-recommended paths, and see where your 
+             skills can take you today.
           </p>
           
           <div className="flex gap-4">

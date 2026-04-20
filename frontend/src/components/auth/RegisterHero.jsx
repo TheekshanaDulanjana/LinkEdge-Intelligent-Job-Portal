@@ -36,13 +36,14 @@ export default function LoginHero() {
             />
           </Link>
           <h1 className="text-4xl font-bold leading-tight mb-6 text-left">
-            Your Career Edge,<br />
-            Powered by Intelligence
+            Beyond Job Searching.<br />
+            Career Building.
           </h1>
           <p className="text-sm max-w-lg mb-8 text-left">
-            Experience a recruitment portal that does more than just list jobs. 
-            LinkEdge analyzes your potential, recommends paths for growth, 
-            and streamlines hiring with automated candidate ranking.
+            Step into a recruitment ecosystem that understands your 
+            potential. LinkEdge uses advanced AI to match your 
+            skills with the right roles, provides personalized 
+            growth paths, and automates your journey to the top.
           </p>
           
           <div className="flex gap-4">

@@ -175,7 +175,7 @@ export default function JobDetailPage() {
               <>
                 {!showForm ? (
                   <Button 
-                    className="w-full bg-[#0052CC] hover:bg-[#0041a3] h-12 rounded-xl text-white font-bold" 
+                    className="w-full " 
                     onClick={() => setShowForm(true)}
                   >
                     Apply Now
@@ -196,7 +196,7 @@ export default function JobDetailPage() {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                      <Button onClick={handleApply} disabled={applying} className="flex-1 bg-[#0052CC] hover:bg-[#0041a3] h-11 rounded-xl">
+                      <Button onClick={handleApply} disabled={applying} className="flex-1 h-10">
                         {applying ? 'Submitting...' : 'Submit Application'}
                       </Button>
                       <Button variant="outline" onClick={() => setShowForm(false)} className="h-11 rounded-xl">Cancel</Button>
