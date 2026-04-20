@@ -62,7 +62,6 @@ function PostJobPageContent() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/company/dashboard" className="text-sm text-blue-600 hover:underline">← Dashboard</Link>
           <h1 className="text-xl font-semibold">Post a new job</h1>
         </div>
 

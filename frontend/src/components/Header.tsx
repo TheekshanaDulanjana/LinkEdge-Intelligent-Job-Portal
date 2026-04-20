@@ -131,7 +131,7 @@ export default function Header() {
 
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-8">
-            <Link href="/discover" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">Discover</Link>
+            <Link href="/jobs" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">Discover</Link>
             <Link href="/overview" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">Overview</Link>
             <Link href="/seeker" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">For Job Seekers</Link>
             <Link href="/companies" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">For Companies</Link>
