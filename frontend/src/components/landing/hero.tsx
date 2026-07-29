@@ -99,7 +99,7 @@ export default function HeroSection() {
             <div className="relative flex flex-col gap-6">
 
               {/* Floating Glass Shape */}
-              <div className="absolute left-0 top-10 w-56 h-56 bg-white/5 backdrop-blur-xl rounded-3xl border border-white/20" />
+              {/* <div className="absolute left-0 top-10 w-56 h-56 bg-white/5 backdrop-blur-xl rounded-3xl border border-white/20" /> */}
 
               {/* Main Card */}
               <div className="relative z-20 bg-white rounded-[16px] p-6 shadow-2xl max-w-sm ml-auto">

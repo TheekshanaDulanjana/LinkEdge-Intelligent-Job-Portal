@@ -56,8 +56,11 @@ function createApiInstance(baseURL: string): AxiosInstance {
 }
 
 // One instance per service
-const api = createApiInstance('http://localhost:3001/api/v1');
-export const jobApi = createApiInstance('http://localhost:3002/api/v1');
-export const applicationApi = createApiInstance('http://localhost:3003/api/v1');
+const api = createApiInstance(process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1');
+export const jobApi = createApiInstance(process.env.NEXT_PUBLIC_JOB_SERVICE_URL || 'http://localhost:3002/api/v1');
+export const applicationApi = createApiInstance(process.env.NEXT_PUBLIC_APPLICATION_SERVICE_URL || 'http://localhost:3003/api/v1');
+
+// ATS Service API Instance
+export const atsApi = createApiInstance(process.env.NEXT_PUBLIC_ATS_SERVICE_URL || 'http://localhost:8003/api/v1');
 
 export default api;

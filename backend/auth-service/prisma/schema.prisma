@@ -10,54 +10,55 @@ datasource db {
 // ─── User & Auth ────────────────────────────────────────────────
 
 model User {
-  id                    String    @id @default(uuid())
-  email                 String    @unique
-  passwordHash          String?   // Nullable — Google users have no password
-  role                  Role      @default(SEEKER)
-  isEmailVerified       Boolean   @default(false)
-  googleId              String?   @unique
-  authProvider          AuthProvider @default(LOCAL)
+  id                    String           @id @default(uuid())
+  email                 String           @unique
+  passwordHash          String?          // Nullable — Google users have no password
+  role                  Role             @default(SEEKER)
+  isEmailVerified       Boolean          @default(false)
+  googleId              String?          @unique
+  authProvider          AuthProvider     @default(LOCAL)
   verificationCode      String?
   verificationExpiresAt DateTime?
   resetToken            String?
   resetTokenExpiresAt   DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
   seeker                JobSeeker?
   company               Company?
-  sentNotifications     Notification[] @relation("NotificationSender")
-  receivedNotifications Notification[] @relation("NotificationReceiver")
+  sentNotifications     Notification[]   @relation("NotificationSender")
+  receivedNotifications Notification[]   @relation("NotificationReceiver")
+  resume                CandidateResume? // NEW — one-to-one optional
 }
 
 model JobSeeker {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName        String
-  phone           String?
-  location        String?
-  profileImageUrl String?
-  interestArea    String?
-  workStatus      WorkStatus @default(UNEMPLOYED)
+  id                  String     @id @default(uuid())
+  userId              String     @unique
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName            String
+  phone               String?
+  location            String?
+  profileImageUrl     String?
+  interestArea        String?
+  workStatus          WorkStatus @default(UNEMPLOYED)
   professionalSummary String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 }
 
 model Company {
-  id             String   @id @default(uuid())
-  userId         String   @unique
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyName    String
-  industry       String?
-  website        String?
-  location       String?
-  phone          String?
-  logoUrl        String?
-  coverImageUrl  String?
-  aboutUs        String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName   String
+  industry      String?
+  website       String?
+  location      String?
+  phone         String?
+  logoUrl       String?
+  coverImageUrl String?
+  aboutUs       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // ─── Jobs ───────────────────────────────────────────────────────
@@ -86,35 +87,86 @@ model Application {
   jobId             String
   seekerId          String
   cvUrl             String
-  cvTextSnapshot  String? 
+  cvTextSnapshot    String?
   coverLetter       String?
   status            ApplicationStatus @default(PENDING)
   rejectionReason   String?
-  rejectionMessage  String?           
+  rejectionMessage  String?
   interviewDate     DateTime?
   interviewTime     String?
   interviewVenue    String?
-  practiceExpiresAt DateTime?         
+  practiceExpiresAt DateTime?
   aiScore           Float?
+  atsScore          Float?            // NEW — cached score at time of application
+  atsBreakdown      Json?             // NEW — score breakdown snapshot
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   job               JobPosting        @relation(fields: [jobId], references: [id])
 }
 
+// ─── Resume & ATS ───────────────────────────────────────────────
+
+model CandidateResume {
+  id              String    @id @default(uuid())
+  candidateId     String    @unique @map("candidate_id")
+  filePath        String    @map("file_path")
+  originalName    String    @map("original_name")
+  fileSize        Int       @map("file_size")
+  mimeType        String    @map("mime_type")
+  uploadedDate    DateTime  @default(now()) @map("uploaded_date")
+  parsedText      String?   @map("parsed_text")
+  skills          String[]  @default([])
+  experienceYears Float?    @map("experience_years")
+  experience      Json?
+  education       Json?
+  certifications  String[]  @default([])
+  technologies    String[]  @default([])
+  jobTitle        String?   @map("job_title")
+  isParsed        Boolean   @default(false) @map("is_parsed")
+  parseError      String?   @map("parse_error")
+  lastUpdated     DateTime  @updatedAt @map("last_updated")
+  user            User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  atsScores       ATSScore[]
+
+  @@map("candidate_resumes")
+}
+
+model ATSScore {
+  id                 String          @id @default(uuid())
+  resumeId           String          @map("resume_id")
+  jobId              String          @map("job_id")
+  overallScore       Float           @map("overall_score")
+  technicalScore     Float           @map("technical_score")
+  experienceScore    Float           @map("experience_score")
+  educationScore     Float           @map("education_score")
+  certificationScore Float           @map("certification_score")
+  keywordScore       Float           @map("keyword_score")
+  matchedSkills      String[]        @default([]) @map("matched_skills")
+  missingSkills      String[]        @default([]) @map("missing_skills")
+  breakdown          Json
+  calculatedAt       DateTime        @default(now()) @map("calculated_at")
+  resume             CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@unique([resumeId, jobId])
+  @@index([jobId])
+  @@index([resumeId])
+  @@map("ats_scores")
+}
+
 // ─── Notifications ──────────────────────────────────────────────
 
 model Notification {
-  id          String           @id @default(uuid())
-  senderId    String?
-  receiverId  String
-  type        NotificationType
-  title       String
-  message     String
-  isRead      Boolean          @default(false)
-  metadata    Json?            
-  createdAt   DateTime         @default(now())
-  sender      User?            @relation("NotificationSender", fields: [senderId], references: [id])
-  receiver    User             @relation("NotificationReceiver", fields: [receiverId], references: [id])
+  id         String           @id @default(uuid())
+  senderId   String?
+  receiverId String
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false)
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  sender     User?            @relation("NotificationSender", fields: [senderId], references: [id])
+  receiver   User             @relation("NotificationReceiver", fields: [receiverId], references: [id])
 }
 
 // ─── Enums ──────────────────────────────────────────────────────

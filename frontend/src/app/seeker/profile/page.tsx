@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthGuard from '@/components/AuthGuard';
 import Link from 'next/link';
+import ResumeManager from '@/components/profile/ResumeManager';
 
 const INTEREST_AREAS = [
   'Software Engineering', 'Data Science & AI', 'Cybersecurity',
@@ -61,8 +61,11 @@ function SeekerProfileContent() {
           profileImageUrl: p?.profileImageUrl || '',
         });
         if (p?.profileImageUrl) setImagePreview(p.profileImageUrl);
-      } catch { setError('Failed to load profile'); }
-      finally { setLoading(false); }
+      } catch {
+        setError('Failed to load profile');
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -89,8 +92,11 @@ function SeekerProfileContent() {
       });
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
-    } catch { setError('Failed to save profile'); }
-    finally { setSaving(false); }
+    } catch {
+      setError('Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -238,6 +244,18 @@ function SeekerProfileContent() {
             <p className="text-xs text-gray-400 mt-1 text-right">
               {profile.professionalSummary.length} / 500 characters
             </p>
+          </div>
+
+          {/* Resume Section */}
+          <div className="border-t pt-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-gray-800">Primary Resume</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Used for all job applications and ATS match scoring.
+                Upload once — replace any time.
+              </p>
+            </div>
+            <ResumeManager />
           </div>
 
           <Button onClick={handleSave} disabled={saving} className="w-full">

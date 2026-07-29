@@ -5,19 +5,49 @@ services:
     image: postgres:16
     container_name: jobportal_postgres
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password123}
+      POSTGRES_DB: ${DB_NAME:-jobportal}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobportal_network
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     container_name: jobportal_redis
     ports:
       - "6379:6379"
+    networks:
+      - jobportal_network
+    restart: unless-stopped
+
+  ats-service:
+    build:
+      context: ./backend/ats-service
+      dockerfile: Dockerfile
+    container_name: jobportal_ats
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-admin}:${DB_PASSWORD:-password123}@postgres:5432/${DB_NAME:-jobportal}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: gemini-2.0-flash
+      ALLOWED_ORIGINS: http://localhost:3000
+    volumes:
+      - ./backend/uploads:/app/uploads # shared with auth-service for file access
+    depends_on:
+      - postgres
+    networks:
+      - jobportal_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+
+networks:
+  jobportal_network:
+    driver: bridge

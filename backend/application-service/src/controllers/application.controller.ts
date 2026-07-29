@@ -19,6 +19,34 @@ const REJECTION_REASONS = [
   'Budget constraints',
 ];
 
+async function fetchAndSnapshotATSScore(
+  applicationId: string,
+  seekerId: string,
+  jobId: string
+) {
+  const ATS_URL = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
+  const job = await prisma.jobPosting.findUnique({ where: { id: jobId } });
+  if (!job) return;
+
+  const res = await axios.post(`${ATS_URL}/api/v1/ats/score`, {
+    candidate_id: seekerId,
+    job_id: jobId,
+    job_title: job.title,
+    job_description: job.description,
+    job_requirements: job.requirements,
+  }, { timeout: 20000 });
+
+  if (res.data.overall_score !== null) {
+    await prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        atsScore: res.data.overall_score,
+        atsBreakdown: res.data.breakdown,
+      },
+    });
+  }
+}
+
 export const applicationController = {
 
   async apply(req: any, res: Response) {
@@ -55,6 +83,11 @@ export const applicationController = {
           cvTextSnapshot,
         },
       });
+
+      // Fetch ATS score at application time and snapshot it (non-blocking background call)
+      fetchAndSnapshotATSScore(application.id, req.user.userId, jobId).catch(
+        (e) => console.warn('ATS snapshot failed:', e.message)
+      );
 
       // Trigger notifications
       const job = await prisma.jobPosting.findUnique({ where: { id: jobId } });

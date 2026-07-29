@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
+
+import resumeRoutes from './routes/resume.routes';
+
 dotenv.config();
 
 import { validateEnv, authEnvSchema } from '../../shared/config/envValidator';
@@ -33,10 +36,13 @@ app.use(
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
   })
 );
+
+//resume
+app.use('/api/v1/auth/resume', resumeRoutes);
 
 // -- Static Files --
 // Serves uploaded images from the uploads directory

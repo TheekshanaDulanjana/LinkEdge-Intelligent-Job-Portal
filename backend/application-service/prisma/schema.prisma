@@ -7,70 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── User & Auth ────────────────────────────────────────────────
+
 model User {
-  id                                         String         @id @default(uuid())
-  email                                      String         @unique
-  passwordHash                               String?
-  role                                       Role           @default(SEEKER)
-  createdAt                                  DateTime       @default(now())
-  updatedAt                                  DateTime       @updatedAt
-  authProvider                               AuthProvider   @default(LOCAL)
-  googleId                                   String?        @unique
-  isEmailVerified                            Boolean        @default(false)
-  resetToken                                 String?
-  resetTokenExpiresAt                        DateTime?
-  verificationCode                           String?
-  verificationExpiresAt                      DateTime?
-  company                                    Company?
-  seeker                                     JobSeeker?
-  Notification_Notification_receiverIdToUser Notification[] @relation("Notification_receiverIdToUser")
-  Notification_Notification_senderIdToUser   Notification[] @relation("Notification_senderIdToUser")
+  id                    String           @id @default(uuid())
+  email                 String           @unique
+  passwordHash          String?          // Nullable — Google users have no password
+  role                  Role             @default(SEEKER)
+  isEmailVerified       Boolean          @default(false)
+  googleId              String?          @unique
+  authProvider          AuthProvider     @default(LOCAL)
+  verificationCode      String?
+  verificationExpiresAt DateTime?
+  resetToken            String?
+  resetTokenExpiresAt   DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  seeker                JobSeeker?
+  company               Company?
+  sentNotifications     Notification[]   @relation("NotificationSender")
+  receivedNotifications Notification[]   @relation("NotificationReceiver")
+  resume                CandidateResume? // NEW — one-to-one optional
 }
 
 model JobSeeker {
   id                  String     @id @default(uuid())
   userId              String     @unique
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName            String
   phone               String?
   location            String?
-  createdAt           DateTime   @default(now())
-  interestArea        String?
-  professionalSummary String?
   profileImageUrl     String?
-  updatedAt           DateTime
+  interestArea        String?
   workStatus          WorkStatus @default(UNEMPLOYED)
-  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Notification {
-  id                                 String           @id @default(uuid())
-  senderId                           String?
-  receiverId                         String
-  type                               NotificationType
-  title                              String
-  message                            String
-  isRead                             Boolean          @default(false)
-  metadata                           Json?
-  createdAt                          DateTime         @default(now())
-  User_Notification_receiverIdToUser User             @relation("Notification_receiverIdToUser", fields: [receiverId], references: [id])
-  User_Notification_senderIdToUser   User?            @relation("Notification_senderIdToUser", fields: [senderId], references: [id])
+  professionalSummary String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 }
 
 model Company {
   id            String   @id @default(uuid())
   userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   companyName   String
   industry      String?
   website       String?
-  createdAt     DateTime @default(now())
-  aboutUs       String?
-  coverImageUrl String?
   location      String?
-  logoUrl       String?
   phone         String?
-  updatedAt     DateTime
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logoUrl       String?
+  coverImageUrl String?
+  aboutUs       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
+
+// ─── Jobs ───────────────────────────────────────────────────────
 
 model JobPosting {
   id           String        @id @default(uuid())
@@ -89,29 +80,109 @@ model JobPosting {
   applications Application[]
 }
 
+// ─── Applications ───────────────────────────────────────────────
+
 model Application {
   id                String            @id @default(uuid())
   jobId             String
   seekerId          String
   cvUrl             String
-  cvTextSnapshot  String? 
+  cvTextSnapshot    String?
   coverLetter       String?
   status            ApplicationStatus @default(PENDING)
-  aiScore           Float?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  rejectionReason   String?
+  rejectionMessage  String?
   interviewDate     DateTime?
   interviewTime     String?
   interviewVenue    String?
   practiceExpiresAt DateTime?
-  rejectionMessage  String?
-  rejectionReason   String?
+  aiScore           Float?
+  atsScore          Float?            // NEW — cached score at time of application
+  atsBreakdown      Json?             // NEW — score breakdown snapshot
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
   job               JobPosting        @relation(fields: [jobId], references: [id])
 }
+
+// ─── Resume & ATS ───────────────────────────────────────────────
+
+model CandidateResume {
+  id              String     @id @default(uuid())
+  candidateId     String     @unique
+  filePath        String
+  originalName    String
+  fileSize        Int
+  mimeType        String
+  uploadedDate    DateTime   @default(now())
+  parsedText      String?
+  skills          String[]   @default([])
+  experienceYears Float?
+  experience      Json?      // [{title, company, duration, description}]
+  education       Json?      // [{degree, institution, year}]
+  certifications  String[]   @default([])
+  technologies    String[]   @default([])
+  jobTitle        String?    // detected current/target title
+  lastUpdated     DateTime   @updatedAt
+  isParsed        Boolean    @default(false)
+  parseError      String?
+  atsScores       ATSScore[]
+  user            User       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model ATSScore {
+  id                 String          @id @default(uuid())
+  resumeId           String
+  jobId              String
+  overallScore       Float           // 0-100
+  technicalScore     Float
+  experienceScore    Float
+  educationScore     Float
+  certificationScore Float
+  keywordScore       Float
+  matchedSkills      String[]        @default([])
+  missingSkills      String[]        @default([])
+  breakdown          Json            // detailed score explanation
+  calculatedAt       DateTime        @default(now())
+  resume             CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@unique([resumeId, jobId])
+  @@index([jobId])
+  @@index([resumeId])
+}
+
+// ─── Notifications ──────────────────────────────────────────────
+
+model Notification {
+  id         String           @id @default(uuid())
+  senderId   String?
+  receiverId String
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false)
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  sender     User?            @relation("NotificationSender", fields: [senderId], references: [id])
+  receiver   User             @relation("NotificationReceiver", fields: [receiverId], references: [id])
+}
+
+// ─── Enums ──────────────────────────────────────────────────────
 
 enum Role {
   SEEKER
   COMPANY
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum WorkStatus {
+  EMPLOYED
+  UNEMPLOYED
 }
 
 enum JobType {
@@ -124,22 +195,17 @@ enum JobType {
 
 enum JobStatus {
   ACTIVE
+  INACTIVE
   CLOSED
   DRAFT
-  INACTIVE
 }
 
 enum ApplicationStatus {
   PENDING
   REVIEWING
   SHORTLISTED
-  REJECTED
   INTERVIEW
-}
-
-enum AuthProvider {
-  LOCAL
-  GOOGLE
+  REJECTED
 }
 
 enum NotificationType {
@@ -149,9 +215,4 @@ enum NotificationType {
   APPLICATION_REJECTED
   STATUS_UPDATE
   SYSTEM
-}
-
-enum WorkStatus {
-  EMPLOYED
-  UNEMPLOYED
 }

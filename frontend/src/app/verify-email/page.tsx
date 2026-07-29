@@ -20,8 +20,13 @@ export default function VerifyEmailPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
+    // If email param is missing, redirect to register
+    if (!email) {
+      router.push('/register');
+      return;
+    }
     inputRefs.current[0]?.focus();
-  }, []);
+  }, [email, router]);
 
   function handleChange(index: number, value: string) {
     if (value.length > 1) return;
@@ -62,11 +67,19 @@ export default function VerifyEmailPage() {
   }
 
   async function handleResend() {
+    if (!email) {
+      setError('Email is missing.');
+      return;
+    }
     setResending(true);
+    setError('');
     try {
       await api.post('/auth/resend-verification', { email });
       setResent(true);
       setTimeout(() => setResent(false), 30000);
+    } catch (err: any) {
+      // FIX: Added try...catch to handle unhandledRejection
+      setError(err.message || 'Failed to resend code');
     } finally {
       setResending(false);
     }
@@ -87,17 +100,18 @@ export default function VerifyEmailPage() {
             <h2 className="text-xl font-semibold text-black">Verify your email</h2>
             <p className="text-black/60 mt-1 text-xs">
               Enter the 6-digit code sent to<br />
-              <strong className="text-black">{email}</strong>
+              <strong className="text-black">{email || 'your email'}</strong>
             </p>
           </div>
 
-          <div className="space-y-4 ">
-            <div className='flex justify-center items-center'>
-            {error && (
-              <div className="p-3 w-58  bg-red-50 border border-red-200 rounded text-sm text-red-600 text-center">
-                {error}
-              </div>
-            )}</div>
+          <div className="space-y-4">
+            <div className="flex justify-center items-center">
+              {error && (
+                <div className="p-3 w-58 bg-red-50 border border-red-200 rounded text-sm text-red-600 text-center">
+                  {error}
+                </div>
+              )}
+            </div>
 
             {/* Code inputs */}
             <div className="flex gap-2 justify-center">
@@ -115,19 +129,22 @@ export default function VerifyEmailPage() {
                 />
               ))}
             </div>
-                <div className='flex justify-center items-center'>
-            <Button 
-              onClick={handleSubmit} 
-              variant="gradient" 
-              className="w-64  h-10 mt-2" 
-              disabled={loading}
-            >
-              {loading ? 'Verifying...' : 'Verify email'}
-            </Button></div>
+
+            <div className="flex justify-center items-center">
+              <Button 
+                onClick={handleSubmit} 
+                variant="gradient" 
+                className="w-64 h-10 mt-2" 
+                disabled={loading}
+              >
+                {loading ? 'Verifying...' : 'Verify email'}
+              </Button>
+            </div>
 
             <p className="text-center text-sm text-gray-600">
               Didn&apos;t receive it?{' '}
               <button
+                type="button"
                 onClick={handleResend}
                 disabled={resending || resent}
                 className="text-[#0F9DE4] font-semibold hover:underline disabled:opacity-50"
