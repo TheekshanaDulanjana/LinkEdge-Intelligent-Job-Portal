@@ -41,7 +41,7 @@ export default function LoginFormSection() {
       const { user, accessToken } = res.data.data;
       setAuth(user, accessToken);
       router.push(
-        user.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
+        user.role === 'SEEKER' ? '/seeker/profile' : '/company/profile'
       );
     } catch (err: any) {
       setServerError(err.message || 'Login failed');

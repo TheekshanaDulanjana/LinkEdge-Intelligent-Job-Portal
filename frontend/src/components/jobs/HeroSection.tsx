@@ -8,6 +8,7 @@ interface HeroSectionProps {
   location: string;
   setLocation: (val: string) => void;
   handleSearch: () => void;
+  
 }
 
 export default function HeroSection({ search, setSearch, location, setLocation, handleSearch }: HeroSectionProps) {

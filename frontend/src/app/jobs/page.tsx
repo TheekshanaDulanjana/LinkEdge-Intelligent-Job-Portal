@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { jobApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import HeroSection from '@/components/jobs/HeroSection';
 import SidebarFilters from '@/components/jobs/SidebarFilters';
 import JobCard from '@/components/jobs/JobCard';
 import CTAAccount from '@/components/jobs/CTAAccount';
+import { Button } from '@/components/ui/button'; // Adjust path if needed
+import { Sparkles } from 'lucide-react'; // Standard AI icon
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -57,13 +60,35 @@ export default function JobsPage() {
 
       <div className="max-w-7xl mx-auto px-6 mt-12 flex flex-col md:flex-row gap-10">
         {/* Left Side: Filters and CTA */}
-        <div className="w-full md:w-80 flex-shrink-0">
+        <div className="w-full md:w-80 flex-shrink-0 flex flex-col gap-6">
           <SidebarFilters />
           <CTAAccount />
         </div>
 
         {/* Right Side: Job Grid */}
         <div className="flex-1">
+          {/* TOP ACTION BAR: Standard UX Placement for Premium Features */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-purple-50/80 border border-indigo-100/80 shadow-sm">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {loading ? 'Searching jobs...' : `${total} Available Jobs`}
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Apply automatically using your ATS matched profile
+              </p>
+            </div>
+
+            <Link href="/seeker/smart-apply">
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto cursor-pointer bg-white border-indigo-200 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-200 shadow-sm font-medium gap-2 rounded-xl border-2"
+              >
+                <Sparkles className="w-4 h-4 text-indigo-500 group-hover:text-white" />
+                <span>Smart Apply (AI)</span>
+              </Button>
+            </Link>
+          </div>
+
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[1, 2, 3, 4].map((i) => (
