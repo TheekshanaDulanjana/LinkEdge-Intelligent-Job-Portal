@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -10,7 +10,7 @@ const router = Router();
 const prisma = new PrismaClient();
 const ATS_URL = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
 
-// ── Inline JWT middleware (auth-service owns the secret directly) ────────────
+// ── Inline JWT middleware ──────────────────────────────────────────────────
 function auth(req: any, res: Response, next: NextFunction): void {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
@@ -147,7 +147,6 @@ router.post(
       });
     } catch (e: any) {
       console.error('[resume/upload]', e?.message ?? e);
-      // Multer file-filter errors come through here
       const msg =
         e?.message?.includes('Only PDF') ? e.message : 'Upload failed. Please try again.';
       res.status(400).json({ success: false, message: msg });
@@ -195,6 +194,37 @@ router.get('/me', auth, seekerOnly, async (req: any, res: Response) => {
   }
 });
 
+// ── GET /api/v1/auth/resume/me/file ──────────────────────────────────────────
+router.get('/me/file', auth, seekerOnly, async (req: any, res: Response) => {
+  try {
+    const resume = await prisma.candidateResume.findUnique({
+      where: { candidateId: req.user.userId },
+      select: { filePath: true, originalName: true, mimeType: true },
+    });
+
+    if (!resume || !resume.filePath) {
+      res.status(404).json({ success: false, message: 'Resume file not found' });
+      return;
+    }
+
+    const absolutePath = path.resolve(resume.filePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      res.status(404).json({ success: false, message: 'File does not exist on server storage' });
+      return;
+    }
+
+    res.setHeader('Content-Type', resume.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${resume.originalName}"`);
+
+    const fileStream = fs.createReadStream(absolutePath);
+    fileStream.pipe(res);
+  } catch (e: any) {
+    console.error('[resume/me/file GET]', e?.message ?? e);
+    res.status(500).json({ success: false, message: 'Failed to retrieve resume file' });
+  }
+});
+
 // ── DELETE /api/v1/auth/resume/me ────────────────────────────────────────────
 router.delete('/me', auth, seekerOnly, async (req: any, res: Response) => {
   try {
@@ -208,12 +238,10 @@ router.delete('/me', auth, seekerOnly, async (req: any, res: Response) => {
       return;
     }
 
-    // Delete file from disk
     if (resume.filePath) {
       try { fs.unlinkSync(resume.filePath); } catch { /* already gone */ }
     }
 
-    // Delete DB record — cascades to ATSScore automatically
     await prisma.candidateResume.delete({ where: { candidateId: req.user.userId } });
 
     res.json({ success: true, message: 'Resume deleted successfully' });

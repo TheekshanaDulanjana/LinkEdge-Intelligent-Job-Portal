@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthGuard from '@/components/AuthGuard';
+import api from '@/lib/api';
 
 import {
   ArrowLeft,
@@ -28,6 +29,14 @@ import {
   Zap,
   TrendingUp
 } from 'lucide-react';
+
+interface SavedResume {
+  id: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+  uploadedDate: string;
+}
 
 interface CourseRecommendation {
   title: string;
@@ -59,16 +68,52 @@ interface AnalysisResult {
 
 type Step = 'upload' | 'analyzing' | 'results';
 
+function formatSize(bytes: number): string {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function SmartApplyContent() {
   const { isAuthenticated } = useAuthStore();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>('upload');
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [savedResume, setSavedResume] = useState<SavedResume | null>(null);
+  const [useProfileCv, setUseProfileCv] = useState<boolean>(true);
+  
   const [desiredRole, setDesiredRole] = useState('');
   const [additionalInputs, setAdditionalInputs] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState('');
+  const [loadingResume, setLoadingResume] = useState(false);
+  const [fetchingFile, setFetchingFile] = useState(false);
+
+  // Fetch saved profile resume on mount
+  useEffect(() => {
+    async function fetchSavedResume() {
+      if (!isAuthenticated) return;
+      setLoadingResume(true);
+      try {
+        const res = await api.get('/auth/resume/me').catch(() => null);
+        if (res?.data?.hasResume) {
+          setSavedResume(res.data.data);
+          setUseProfileCv(true);
+        } else {
+          setSavedResume(null);
+          setUseProfileCv(false);
+        }
+      } catch (err) {
+        setSavedResume(null);
+        setUseProfileCv(false);
+      } finally {
+        setLoadingResume(false);
+      }
+    }
+    fetchSavedResume();
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     router.push('/login');
@@ -76,22 +121,60 @@ function SmartApplyContent() {
   }
 
   async function handleAnalyze() {
-    if (!cvFile) { setError('Please upload your CV'); return; }
-    if (!desiredRole.trim()) { setError('Please enter your desired role'); return; }
+    if (!desiredRole.trim()) {
+      setError('Please enter your desired role');
+      return;
+    }
 
     setError('');
+    let finalCvFile: File | null = cvFile;
+
+    // Retrieve file blob if using profile CV
+    if (useProfileCv && savedResume) {
+      setFetchingFile(true);
+      try {
+        const response = await api.get('/auth/resume/me/file', {
+          responseType: 'arraybuffer',
+        });
+
+        if (response?.data) {
+          const blob = new Blob([response.data], {
+            type: savedResume.mimeType || 'application/pdf',
+          });
+
+          finalCvFile = new File([blob], savedResume.originalName, {
+            type: savedResume.mimeType || 'application/pdf',
+          });
+        }
+      } catch (err: any) {
+        console.error('Failed to retrieve profile CV file:', err);
+        setError('Could not fetch your profile CV file. Please upload a CV manually.');
+        setFetchingFile(false);
+        return;
+      } finally {
+        setFetchingFile(false);
+      }
+    }
+
+    if (!finalCvFile) {
+      setError('Please upload or select a CV');
+      return;
+    }
+
     setStep('analyzing');
 
     try {
       const formData = new FormData();
-      formData.append('cv_file', cvFile);
+      formData.append('cv_file', finalCvFile, finalCvFile.name);
       formData.append('desired_role', desiredRole);
-      formData.append('additional_inputs', additionalInputs);
+      formData.append('additional_inputs', additionalInputs || '');
 
       const token = localStorage.getItem('accessToken');
       const response = await fetch('http://localhost:8001/api/v1/ai/analyze', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`
+        },
         body: formData,
       });
 
@@ -120,8 +203,6 @@ function SmartApplyContent() {
             
             {/* LEFT SIDE: 50% Width Panel */}
             <div className="relative bg-[#0968D1] text-white p-8 lg:p-12 flex flex-col justify-between overflow-hidden">
-              
-              {/* Background Image using direct path */}
               <div className="absolute inset-0 z-0">
                 <Image
                   src="/test.png"
@@ -130,8 +211,7 @@ function SmartApplyContent() {
                   className="object-cover object-center"
                   priority
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0025B8]/60 to-transparent 
-                " />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0025B8]/60 to-transparent" />
               </div>
 
               {/* Top Left Back Button */}
@@ -212,36 +292,98 @@ function SmartApplyContent() {
                 )}
 
                 <div className="space-y-6">
-                  <div>
-                    <Label className="text-xs font-bold text-slate-700 mb-2 block">Upload your CV</Label>
-                    <div className="mt-1 border-2 border-dashed border-[#0968D1]/30 rounded-2xl p-6 text-center bg-sky-50/20 hover:bg-sky-50/50 hover:border-[#0968D1] transition-all cursor-pointer group">
-                      <input
-                        type="file"
-                        accept=".pdf,.doc,.docx"
-                        onChange={(e) => setCvFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="cv-upload"
-                      />
-                      <label htmlFor="cv-upload" className="cursor-pointer block">
-                        {cvFile ? (
-                          <div className="flex flex-col items-center">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 border border-emerald-200">
-                              <FileText className="w-5 h-5" />
+                  {/* CV Selection Options */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-700 block">Upload or Select CV</Label>
+                    
+                    {loadingResume ? (
+                      <div className="p-4 border border-slate-200 rounded-2xl bg-slate-50 text-xs text-slate-400 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#0968D1]" />
+                        Checking for saved CV...
+                      </div>
+                    ) : (
+                      <>
+                        {savedResume && (
+                          <div
+                            onClick={() => {
+                              setUseProfileCv(true);
+                              setCvFile(null);
+                            }}
+                            className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                              useProfileCv
+                                ? 'border-[#0968D1] bg-sky-50/40 ring-1 ring-[#0968D1]'
+                                : 'border-slate-200 bg-slate-50/30 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2 bg-sky-100 rounded-xl text-[#0968D1] flex-shrink-0">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-800 truncate">
+                                  {savedResume.originalName}
+                                </p>
+                                <p className="text-[10px] text-slate-400">
+                                  Profile CV • {formatSize(savedResume.fileSize)}
+                                </p>
+                              </div>
                             </div>
-                            <p className="font-bold text-slate-900 text-xs">{cvFile.name}</p>
-                            <p className="text-[11px] text-[#0968D1] mt-1 font-semibold">Click to change file</p>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center">
-                            <div className="w-10 h-10 rounded-xl bg-sky-100/70 text-[#0968D1] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                              <UploadCloud className="w-5 h-5" />
-                            </div>
-                            <p className="font-semibold text-slate-800 text-xs">Click to upload your CV</p>
-                            <p className="text-[11px] text-slate-400 mt-1">PDF or Word document up to 5MB</p>
+                            {useProfileCv && (
+                              <CheckCircle2 className="w-4 h-4 text-[#0968D1] flex-shrink-0" />
+                            )}
                           </div>
                         )}
-                      </label>
-                    </div>
+
+                        <div>
+                          {savedResume && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUseProfileCv(!useProfileCv);
+                                if (useProfileCv) setCvFile(null);
+                              }}
+                              className="text-[11px] font-semibold text-[#0968D1] hover:underline my-2 block cursor-pointer"
+                            >
+                              {useProfileCv ? '+ Upload a different CV' : '← Use profile CV'}
+                            </button>
+                          )}
+
+                          {(!savedResume || !useProfileCv) && (
+                            <div className="mt-1 border-2 border-dashed border-[#0968D1]/30 rounded-2xl p-6 text-center bg-sky-50/20 hover:bg-sky-50/50 hover:border-[#0968D1] transition-all cursor-pointer group">
+                              <input
+                                type="file"
+                                accept=".pdf,.doc,.docx,.txt"
+                                onChange={(e) => {
+                                  setCvFile(e.target.files?.[0] || null);
+                                  setUseProfileCv(false);
+                                }}
+                                className="hidden"
+                                id="cv-upload"
+                              />
+                              <label htmlFor="cv-upload" className="cursor-pointer block">
+                                {cvFile ? (
+                                  <div className="flex flex-col items-center">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2 border border-emerald-200">
+                                      <FileText className="w-5 h-5" />
+                                    </div>
+                                    <p className="font-bold text-slate-900 text-xs">{cvFile.name}</p>
+                                    <p className="text-[11px] text-[#0968D1] mt-1 font-semibold">Click to change file</p>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center">
+                                    <div className="w-10 h-10 rounded-xl bg-sky-100/70 text-[#0968D1] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                      <UploadCloud className="w-5 h-5" />
+                                    </div>
+                                    <p className="font-semibold text-slate-800 text-xs">Click to upload your CV</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">PDF, DOC, DOCX or TXT up to 10MB</p>
+                                  </div>
+                                )}
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div>
@@ -268,8 +410,20 @@ function SmartApplyContent() {
               </div>
 
               <div className="mt-8 pt-4 border-t border-slate-100">
-                <Button variant="gradient" className="w-full h-12 text-sm font-semibold" onClick={handleAnalyze}>
-                  Analyze my CV
+                <Button 
+                  variant="gradient" 
+                  className="w-full h-12 text-sm font-semibold flex items-center justify-center gap-2" 
+                  onClick={handleAnalyze}
+                  disabled={fetchingFile}
+                >
+                  {fetchingFile ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading CV...
+                    </>
+                  ) : (
+                    'Analyze my CV'
+                  )}
                 </Button>
               </div>
             </div>

@@ -64,20 +64,32 @@ model Company {
 // ─── Jobs ───────────────────────────────────────────────────────
 
 model JobPosting {
-  id           String        @id @default(uuid())
-  companyId    String
-  title        String
-  description  String
-  requirements String
-  location     String
-  jobType      JobType       @default(FULL_TIME)
-  salaryMin    Int?
-  salaryMax    Int?
-  deadline     DateTime
-  status       JobStatus     @default(ACTIVE)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  applications Application[]
+  id               String            @id @default(uuid())
+  companyId        String
+  title            String
+  department       String?           // NEW
+  experienceLevel  String?           // NEW
+  description      String
+  requirements     String
+  responsibilities String[]          @default([]) // NEW
+  skills           String[]          @default([]) // NEW
+  locationType     LocationType      @default(REMOTE) // NEW
+  location         String
+  jobType          JobType           @default(FULL_TIME)
+  salaryMin        Int?
+  salaryMax        Int?
+  deadline         DateTime
+  status           JobStatus         @default(ACTIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  applications     Application[]
+}
+
+// Add this enum if you want location types separated
+enum LocationType {
+  REMOTE
+  ON_SITE
+  HYBRID
 }
 
 // ─── Applications ───────────────────────────────────────────────

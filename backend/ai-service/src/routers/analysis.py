@@ -35,10 +35,8 @@ async def analyze_cv(
     print(f"[{request_id}] CV analysis request received")
 
     # ── Validate and sanitize inputs ──────────────────────────────
-    file_size = 0
     file_bytes = await cv_file.read()
     file_size = len(file_bytes)
-    await cv_file.seek(0)  # Reset for saving
 
     is_valid, file_error = validate_cv_file(cv_file.filename or "", file_size)
     if not is_valid:
@@ -54,16 +52,16 @@ async def analyze_cv(
         )
 
     # ── Save file securely ────────────────────────────────────────
-    # Use only the basename — never trust the original filename path
     safe_filename = f"cv_{request_id}_{Path(cv_file.filename or 'upload').name}"
-    # Strip any path components from the name
     safe_filename = Path(safe_filename).name
     temp_path = UPLOAD_DIR / safe_filename
 
     try:
+        # shutil.copyfileobj වෙනුවට file_bytes කෙලින්ම write කරන්න
         with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(cv_file.file, buffer)
-    except Exception:
+            buffer.write(file_bytes)
+    except Exception as e:
+        print(f"[{request_id}] File save error: {e}")
         raise HTTPException(
             status_code=500, detail="Could not process uploaded file."
         )
@@ -134,7 +132,6 @@ async def analyze_cv(
         raise HTTPException(
             status_code=500,
             detail="Analysis failed. Please try again."
-            # Never expose internal error details to the client
         )
     finally:
         # Always clean up temp file
