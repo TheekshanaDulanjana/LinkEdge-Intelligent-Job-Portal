@@ -4,6 +4,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 import resumeRoutes from './routes/resume.routes';
+import candidateRoutes from './routes/candidate.routes';
 
 dotenv.config();
 
@@ -41,9 +42,6 @@ app.use(
   })
 );
 
-//resume
-app.use('/api/v1/auth/resume', resumeRoutes);
-
 // -- Static Files --
 // Serves uploaded images from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -66,6 +64,8 @@ app.get('/health', (req, res) => {
 
 // -- Routes --
 app.use('/api/v1/auth', authLimiter, authRoutes);
+app.use('/api/v1/auth/resume', resumeRoutes);
+app.use('/api/v1/auth/candidate', candidateRoutes);
 
 // -- 404 handler --
 app.use((req, res) => {

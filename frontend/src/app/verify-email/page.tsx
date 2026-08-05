@@ -56,7 +56,7 @@ export default function VerifyEmailPage() {
       const res = await api.post('/auth/verify-email', { email, code: fullCode });
       const { accessToken, user } = res.data.data;
       setAuth(user, accessToken);
-      router.push(user.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard');
+      router.push(user.role === 'SEEKER' ? '/seeker/profile' : '/company/dashboard');
     } catch (err: any) {
       setError(err.message || 'Invalid code');
       setCode(['', '', '', '', '', '']);

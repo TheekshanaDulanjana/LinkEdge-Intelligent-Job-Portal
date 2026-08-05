@@ -93,6 +93,139 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ─── GET /api/v1/jobs/company/summary — KPI cards for Jobs page ───────────────
+// MUST be declared before /:id so Express doesn't treat "company" as a job id
+router.get(
+  '/company/summary',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const company = await prisma.company.findFirst({ where: { userId: req.user.userId } });
+      if (!company) {
+        res.status(404).json({ success: false, message: 'Company profile not found' });
+        return;
+      }
+
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endToday    = new Date(startToday.getTime() + 24 * 60 * 60 * 1000);
+
+      const jobs = await prisma.jobPosting.findMany({
+        where: { companyId: company.id }, select: { id: true },
+      });
+      const jobIds = jobs.map(j => j.id);
+
+      const [
+        totalActiveJobs, newJobsThisWeek,
+        totalApplications, newAppsThisWeek,
+        interviewsToday, nextInterview,
+      ] = await Promise.all([
+        prisma.jobPosting.count({ where: { companyId: company.id, status: 'ACTIVE' } }),
+        prisma.jobPosting.count({ where: { companyId: company.id, createdAt: { gte: weekAgo } } }),
+        prisma.application.count({ where: { jobId: { in: jobIds } } }),
+        prisma.application.count({ where: { jobId: { in: jobIds }, createdAt: { gte: weekAgo } } }),
+        prisma.application.count({
+          where: { jobId: { in: jobIds }, status: 'INTERVIEW', interviewDate: { gte: startToday, lt: endToday } },
+        }),
+        prisma.application.findFirst({
+          where: { jobId: { in: jobIds }, status: 'INTERVIEW', interviewDate: { gte: now } },
+          orderBy: { interviewDate: 'asc' },
+          select: { interviewDate: true, interviewTime: true },
+        }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          totalActiveJobs,
+          newJobsThisWeek,
+          totalApplications,
+          newAppsThisWeek,
+          interviewsToday,
+          nextInterviewTime: nextInterview?.interviewTime ?? null,
+        },
+      });
+    } catch (e) { next(e); }
+  }
+);
+
+// ─── GET /api/v1/jobs/company/all — Full Jobs table (search/sort/filter/paginate) ──
+router.get(
+  '/company/all',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const company = await prisma.company.findFirst({
+        where: { userId: req.user.userId },
+      });
+      if (!company) {
+        res.status(404).json({ success: false, message: 'Company profile not found' });
+        return;
+      }
+
+      const {
+        page = '1', limit = '10', search, status, jobType,
+        sortBy = 'createdAt', sortOrder = 'desc',
+      } = req.query;
+
+      const where: any = { companyId: company.id };
+
+      if (search) {
+        where.OR = [
+          { title:    { contains: search as string, mode: 'insensitive' } },
+          { location: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+      if (status && status !== 'ALL')  where.status  = status;
+      if (jobType && jobType !== 'ALL') where.jobType = jobType;
+
+      const validSortFields = ['createdAt', 'title', 'deadline', 'status'];
+      const orderField = validSortFields.includes(sortBy as string) ? sortBy as string : 'createdAt';
+
+      const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+      const [jobs, total] = await Promise.all([
+        prisma.jobPosting.findMany({
+          where,
+          skip,
+          take:    parseInt(limit as string),
+          orderBy: { [orderField]: sortOrder === 'asc' ? 'asc' : 'desc' },
+          select: {
+            id: true, title: true, location: true, jobType: true,
+            status: true, deadline: true, createdAt: true, salaryMin: true, salaryMax: true,
+            _count: { select: { applications: true } },
+          },
+        }),
+        prisma.jobPosting.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          jobs: jobs.map(j => ({
+            id: j.id,
+            title: j.title,
+            location: j.location,
+            jobType: j.jobType,
+            status: j.status,
+            deadline: j.deadline,
+            createdAt: j.createdAt,
+            salaryMin: j.salaryMin,
+            salaryMax: j.salaryMax,
+            applicationCount: j._count.applications,
+          })),
+          total,
+          page: parseInt(page as string),
+          totalPages: Math.ceil(total / parseInt(limit as string)),
+        },
+      });
+    } catch (e) { next(e); }
+  }
+);
+
 // ─── GET /api/v1/jobs/company/my-jobs ─────────────────────────────────────
 router.get(
   '/company/my-jobs',

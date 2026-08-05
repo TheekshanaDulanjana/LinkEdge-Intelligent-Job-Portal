@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 const SECTIONS = [
   {
     tag: "Got Talent?",
-    title: "Why Job Seekers Love LinkEdge?",
+    title: "Why Job Seekers Love SkillSync?",
     features: [
       { icon: Search, t: "Smart Matching", d: "Stop searching and start discovering. Our AI reads your CV to find the best jobs for your specific skills." },
       { icon: GraduationCap, t: "Skill Gap Analysis", d: "We show you exactly what is missing from your profile and suggest the right courses to help you qualify for your dream role." },
@@ -17,7 +17,7 @@ const SECTIONS = [
   },
   {
     tag: "Need Talent?",
-    title: "Why Recruiters Love LinkEdge?",
+    title: "Why Recruiters Love SkillSync?",
     className: "md:pl-12",
     features: [
       { icon: BarChart3, t: "Automated Ranking", d: "Save hours of manual work. Our system automatically ranks every applicant from highest to lowest suitability based on your JD." },

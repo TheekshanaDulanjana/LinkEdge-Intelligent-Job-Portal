@@ -34,8 +34,6 @@ router.get('/my-applications', authenticate, requireSeeker, applicationControlle
 router.get('/job/:jobId', authenticate, requireCompany, applicationController.getJobApplications);
 router.get('/rejection-reasons', authenticate, requireCompany, applicationController.getRejectionReasons);
 router.patch('/:id/status', authenticate, requireCompany, applicationController.updateStatus);
-router.patch('/:id/reject', authenticate, requireCompany, applicationController.rejectApplication);
-router.patch('/:id/schedule-interview', authenticate, requireCompany, applicationController.scheduleInterview);
 router.get('/:id/download-cv', authenticate, requireCompany, applicationController.downloadCv);
 
 // Notifications

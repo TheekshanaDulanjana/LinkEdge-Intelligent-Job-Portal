@@ -7,6 +7,10 @@ import path from 'path';
 import applicationRoutes from './routes/application.routes';
 import notificationRoutes from './routes/notification.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import candidatesRoutes from './routes/candidates.routes';
+import analyticsRoutes from './routes/analytics.routes';
+import calendarRoutes from './routes/calendar.routes';
+import jobApplicantsRoutes from './routes/jobApplicants.routes';
 
 dotenv.config();
 
@@ -29,6 +33,10 @@ app.get('/health', (req, res) => {
 // Route registrations
 app.use('/api/v1/applications', applicationRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/applications', candidatesRoutes);
+app.use('/api/v1/applications', analyticsRoutes);
+app.use('/api/v1/applications', calendarRoutes);
+app.use('/api/v1/applications', jobApplicantsRoutes);
 
 // Dashboard routes mounted under /api/v1/applications/company
 app.use('/api/v1/applications/company', dashboardRoutes);

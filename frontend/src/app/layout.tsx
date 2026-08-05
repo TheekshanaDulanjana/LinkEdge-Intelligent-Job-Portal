@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "LinkEdge - AI-Powered Job Matching Platform",
+  title: "SkillSync - AI-Powered Job Matching Platform",
   description: "Find your dream job or hire top talent with our AI-powered platform",
 };
 

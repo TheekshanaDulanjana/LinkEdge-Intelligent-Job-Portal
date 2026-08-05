@@ -30,7 +30,7 @@ export default function HeroSection() {
             <div>
               {/* Tag */}
               <div className="mb-4 inline-block rounded-full bg-white/16 border border-white/20 tracking-widest px-4 py-1 text-xs text-white backdrop-blur-md">
-                LINKEDGE - AI POWERED JOB PORTAL
+                SkillSync - AI POWERED JOB PORTAL
               </div>
 
               {/* Heading */}
@@ -42,7 +42,7 @@ export default function HeroSection() {
               {/* Description */}
               <p className="mt-6 max-w-lg text-white text-base">
                 Experience a recruitment portal that does more than just list jobs.
-                LinkEdge analyzes your potential, recommends paths for growth, and
+                SkillSync analyzes your potential, recommends paths for growth, and
                 streamlines hiring with AI-powered insights.
               </p>
 

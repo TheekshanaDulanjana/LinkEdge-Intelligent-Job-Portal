@@ -72,8 +72,8 @@ function createApiInstance(baseURL: string): AxiosInstance {
   return instance;
 }
 
-// Auth service (default export)
-const api = createApiInstance(
+// Auth service
+export const authApi = createApiInstance(
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1'
 );
 
@@ -92,4 +92,4 @@ export const atsApi = createApiInstance(
   process.env.NEXT_PUBLIC_ATS_SERVICE_URL || 'http://localhost:8003/api/v1'
 );
 
-export default api;
+export default authApi;

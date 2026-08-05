@@ -1,5 +1,5 @@
 import * as nodemailer from 'nodemailer';
-import { emailTemplates } from './emailTemplates';  
+import { emailTemplates } from './emailTemplates';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -48,6 +48,18 @@ export const emailService = {
   ) {
     const { subject, html } = emailTemplates.interviewInvite(
       seekerName, jobTitle, companyName, date, time, venue
+    );
+    await sendEmail(to, subject, html);
+  },
+
+  async sendShortlisted(
+    to: string,
+    seekerName: string,
+    jobTitle: string,
+    companyName: string
+  ) {
+    const { subject, html } = emailTemplates.shortlisted(
+      seekerName, jobTitle, companyName
     );
     await sendEmail(to, subject, html);
   },

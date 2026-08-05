@@ -41,7 +41,7 @@ export default function LoginHero() {
           </h1>
           <p className="text-sm max-w-lg mb-8 text-left">
             Step into a recruitment ecosystem that understands your 
-            potential. LinkEdge uses advanced AI to match your 
+            potential. SkillSync uses advanced AI to match your 
             skills with the right roles, provides personalized 
             growth paths, and automates your journey to the top.
           </p>

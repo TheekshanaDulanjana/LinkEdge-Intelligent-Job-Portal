@@ -13,7 +13,7 @@ app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS }));
 app.use(express.json({ limit: '10kb' }));
 
-// Internal key middleware — only services can call this
+// Internal key middleware - only services can call this
 app.use((req, res, next) => {
   const key = req.headers['x-service-key'];
   if (key !== process.env.INTERNAL_SERVICE_KEY) {
@@ -42,6 +42,12 @@ app.post('/send/password-reset', async (req, res) => {
 app.post('/send/interview-invite', async (req, res) => {
   const { to, seekerName, jobTitle, companyName, date, time, venue } = req.body;
   await emailService.sendInterviewInvite(to, seekerName, jobTitle, companyName, date, time, venue);
+  res.json({ success: true });
+});
+
+app.post('/send/shortlisted', async (req, res) => {
+  const { to, seekerName, jobTitle, companyName } = req.body;
+  await emailService.sendShortlisted(to, seekerName, jobTitle, companyName);
   res.json({ success: true });
 });
 

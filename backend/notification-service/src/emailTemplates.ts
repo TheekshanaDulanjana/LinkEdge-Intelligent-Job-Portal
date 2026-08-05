@@ -1,7 +1,6 @@
 export const emailTemplates = {
-
   verificationCode: (name: string, code: string) => ({
-    subject: 'Verify your email — Intelligent Job Portal',
+    subject: 'Verify your email - Intelligent Job Portal',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:24px;margin-bottom:8px;">Verify your email</h1>
@@ -16,7 +15,7 @@ export const emailTemplates = {
   }),
 
   passwordReset: (name: string, resetLink: string) => ({
-    subject: 'Reset your password — Intelligent Job Portal',
+    subject: 'Reset your password - Intelligent Job Portal',
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:24px;">Reset your password</h1>
@@ -37,7 +36,7 @@ export const emailTemplates = {
     time: string,
     venue: string
   ) => ({
-    subject: `Interview Invitation — ${jobTitle} at ${companyName}`,
+    subject: `Interview Invitation - ${jobTitle} at ${companyName}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:22px;">You've been invited for an interview!</h1>
@@ -55,6 +54,22 @@ export const emailTemplates = {
     `,
   }),
 
+  shortlisted: (
+    seekerName: string,
+    jobTitle: string,
+    companyName: string
+  ) => ({
+    subject: `Great news! You've been shortlisted - ${jobTitle}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
+        <h1 style="color:#1e293b;font-size:22px;">You've been shortlisted!</h1>
+        <p style="color:#64748b;">Hi ${seekerName}, great news - <strong>${companyName}</strong> has shortlisted your application for the <strong>${jobTitle}</strong> position.</p>
+        <p style="color:#64748b;">We'll be in touch soon with next steps. In the meantime, log in to the portal to keep your profile up to date.</p>
+        <p style="color:#94a3b8;font-size:13px;">Best of luck!</p>
+      </div>
+    `,
+  }),
+
   rejectionNotice: (
     seekerName: string,
     jobTitle: string,
@@ -62,7 +77,7 @@ export const emailTemplates = {
     reason: string,
     aiMessage: string
   ) => ({
-    subject: `Application Update — ${jobTitle} at ${companyName}`,
+    subject: `Application Update - ${jobTitle} at ${companyName}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:22px;">Application Status Update</h1>
@@ -82,7 +97,7 @@ export const emailTemplates = {
     seekerName: string,
     jobTitle: string
   ) => ({
-    subject: `New Application — ${jobTitle}`,
+    subject: `New Application - ${jobTitle}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:22px;">New Application Received</h1>
