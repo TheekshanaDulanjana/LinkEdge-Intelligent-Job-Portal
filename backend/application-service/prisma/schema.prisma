@@ -8,11 +8,14 @@ datasource db {
 }
 
 // ─── User & Auth ────────────────────────────────────────────────
+// NOTE: application-service does not own User/JobSeeker/Company data —
+// declared here only so Prisma can resolve relations. Kept in sync
+// with auth-service field-for-field.
 
 model User {
   id                    String           @id @default(uuid())
   email                 String           @unique
-  passwordHash          String?          // Nullable — Google users have no password
+  passwordHash          String?
   role                  Role             @default(SEEKER)
   isEmailVerified       Boolean          @default(false)
   googleId              String?          @unique
@@ -27,7 +30,7 @@ model User {
   company               Company?
   sentNotifications     Notification[]   @relation("NotificationSender")
   receivedNotifications Notification[]   @relation("NotificationReceiver")
-  resume                CandidateResume? // NEW — one-to-one optional
+  resume                CandidateResume?
 }
 
 model JobSeeker {
@@ -64,20 +67,31 @@ model Company {
 // ─── Jobs ───────────────────────────────────────────────────────
 
 model JobPosting {
-  id           String        @id @default(uuid())
-  companyId    String
-  title        String
-  description  String
-  requirements String
-  location     String
-  jobType      JobType       @default(FULL_TIME)
-  salaryMin    Int?
-  salaryMax    Int?
-  deadline     DateTime
-  status       JobStatus     @default(ACTIVE)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  applications Application[]
+  id               String            @id @default(uuid())
+  companyId        String
+  title            String
+  department       String?
+  experienceLevel  String?
+  description      String
+  requirements     String
+  responsibilities String[]          @default([])
+  skills           String[]          @default([])
+  locationType     LocationType      @default(REMOTE)
+  location         String
+  jobType          JobType           @default(FULL_TIME)
+  salaryMin        Int?
+  salaryMax        Int?
+  deadline         DateTime
+  status           JobStatus         @default(ACTIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  applications     Application[]
+}
+
+enum LocationType {
+  REMOTE
+  ON_SITE
+  HYBRID
 }
 
 // ─── Applications ───────────────────────────────────────────────
@@ -97,59 +111,63 @@ model Application {
   interviewVenue    String?
   practiceExpiresAt DateTime?
   aiScore           Float?
-  atsScore          Float?            // NEW — cached score at time of application
-  atsBreakdown      Json?             // NEW — score breakdown snapshot
+  atsScore          Float?
+  atsBreakdown      Json?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   job               JobPosting        @relation(fields: [jobId], references: [id])
 }
 
 // ─── Resume & ATS ───────────────────────────────────────────────
+// NOTE: application-service does not own resume data — declared here
+// only so Prisma can resolve relations (candidates.routes, jobApplicants
+// controller read from this table). Kept in sync with auth-service.
 
 model CandidateResume {
   id              String     @id @default(uuid())
-  candidateId     String     @unique
-  filePath        String
-  originalName    String
-  fileSize        Int
-  mimeType        String
-  uploadedDate    DateTime   @default(now())
-  parsedText      String?
+  candidateId     String     @unique @map("candidate_id")
+  filePath        String     @map("file_path")
+  originalName    String     @map("original_name")
+  fileSize        Int        @map("file_size")
+  mimeType        String     @map("mime_type")
+  uploadedDate    DateTime   @default(now()) @map("uploaded_date")
+  parsedText      String?    @map("parsed_text")
   skills          String[]   @default([])
-  experienceYears Float?
-  experience      Json?      // [{title, company, duration, description}]
-  education       Json?      // [{degree, institution, year}]
+  experienceYears Float?     @map("experience_years")
+  experience      Json?
+  education       Json?
   certifications  String[]   @default([])
   technologies    String[]   @default([])
-  jobTitle        String?    // detected current/target title
-  lastUpdated     DateTime   @updatedAt
-  isParsed        Boolean    @default(false)
-  parseError      String?
+  jobTitle        String?    @map("job_title")
+  isParsed        Boolean    @default(false) @map("is_parsed")
+  parseError      String?    @map("parse_error")
+  lastUpdated     DateTime   @updatedAt @map("last_updated")
   atsScores       ATSScore[]
   user            User       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
-  @@index([candidateId])
+  @@map("candidate_resumes")
 }
 
 model ATSScore {
   id                 String          @id @default(uuid())
-  resumeId           String
-  jobId              String
-  overallScore       Float           // 0-100
-  technicalScore     Float
-  experienceScore    Float
-  educationScore     Float
-  certificationScore Float
-  keywordScore       Float
-  matchedSkills      String[]        @default([])
-  missingSkills      String[]        @default([])
-  breakdown          Json            // detailed score explanation
-  calculatedAt       DateTime        @default(now())
+  resumeId           String          @map("resume_id")
+  jobId              String          @map("job_id")
+  overallScore       Float           @map("overall_score")
+  technicalScore     Float           @map("technical_score")
+  experienceScore    Float           @map("experience_score")
+  educationScore     Float           @map("education_score")
+  certificationScore Float           @map("certification_score")
+  keywordScore       Float           @map("keyword_score")
+  matchedSkills      String[]        @default([]) @map("matched_skills")
+  missingSkills      String[]        @default([]) @map("missing_skills")
+  breakdown          Json
+  calculatedAt       DateTime        @default(now()) @map("calculated_at")
   resume             CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 
   @@unique([resumeId, jobId])
   @@index([jobId])
   @@index([resumeId])
+  @@map("ats_scores")
 }
 
 // ─── Calendar ───────────────────────────────────────────────────
@@ -164,12 +182,19 @@ model CalendarEvent {
   endTime       DateTime
   location      String?
   color         String?           @default("indigo")
-  applicationId String?           // optional link back to an Application (interview auto-sync)
+  applicationId String?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
   @@index([companyId])
   @@index([startTime])
+}
+
+enum CalendarEventType {
+  INTERVIEW
+  MEETING
+  DEADLINE
+  REMINDER
 }
 
 // ─── Notifications ──────────────────────────────────────────────
@@ -189,13 +214,6 @@ model Notification {
 }
 
 // ─── Enums ──────────────────────────────────────────────────────
-
-enum CalendarEventType {
-  INTERVIEW
-  MEETING
-  DEADLINE
-  REMINDER
-}
 
 enum Role {
   SEEKER

@@ -38,7 +38,7 @@ export default function CompanyDashboardPage() {
         actions={
           <>
             <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
-              <Upload className="w-4 h-4" /> Import CSV
+              <Upload className="w-4 h-4" /> Export CSV
             </button>
             <Link href="/company/post-job" className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
               <Plus className="w-4 h-4" /> Post New Job

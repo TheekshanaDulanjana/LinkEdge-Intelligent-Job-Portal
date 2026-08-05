@@ -27,7 +27,7 @@ model User {
   company               Company?
   sentNotifications     Notification[]   @relation("NotificationSender")
   receivedNotifications Notification[]   @relation("NotificationReceiver")
-  resume                CandidateResume? // NEW — one-to-one optional
+  resume                CandidateResume?
 }
 
 model JobSeeker {
@@ -62,18 +62,22 @@ model Company {
 }
 
 // ─── Jobs ───────────────────────────────────────────────────────
+// NOTE: auth-service does not own JobPosting/Application data — these
+// models are declared here only so Prisma can resolve relations that
+// reference them from CandidateResume/ATSScore. They are kept in sync
+// with job-service / application-service field-for-field.
 
 model JobPosting {
   id               String            @id @default(uuid())
   companyId        String
   title            String
-  department       String?           // NEW
-  experienceLevel  String?           // NEW
+  department       String?
+  experienceLevel  String?
   description      String
   requirements     String
-  responsibilities String[]          @default([]) // NEW
-  skills           String[]          @default([]) // NEW
-  locationType     LocationType      @default(REMOTE) // NEW
+  responsibilities String[]          @default([])
+  skills           String[]          @default([])
+  locationType     LocationType      @default(REMOTE)
   location         String
   jobType          JobType           @default(FULL_TIME)
   salaryMin        Int?
@@ -85,7 +89,6 @@ model JobPosting {
   applications     Application[]
 }
 
-// Add this enum if you want location types separated
 enum LocationType {
   REMOTE
   ON_SITE
@@ -109,8 +112,8 @@ model Application {
   interviewVenue    String?
   practiceExpiresAt DateTime?
   aiScore           Float?
-  atsScore          Float?            // NEW — cached score at time of application
-  atsBreakdown      Json?             // NEW — score breakdown snapshot
+  atsScore          Float?
+  atsBreakdown      Json?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   job               JobPosting        @relation(fields: [jobId], references: [id])
@@ -119,26 +122,26 @@ model Application {
 // ─── Resume & ATS ───────────────────────────────────────────────
 
 model CandidateResume {
-  id              String    @id @default(uuid())
-  candidateId     String    @unique @map("candidate_id")
-  filePath        String    @map("file_path")
-  originalName    String    @map("original_name")
-  fileSize        Int       @map("file_size")
-  mimeType        String    @map("mime_type")
-  uploadedDate    DateTime  @default(now()) @map("uploaded_date")
-  parsedText      String?   @map("parsed_text")
-  skills          String[]  @default([])
-  experienceYears Float?    @map("experience_years")
+  id              String     @id @default(uuid())
+  candidateId     String     @unique @map("candidate_id")
+  filePath        String     @map("file_path")
+  originalName    String     @map("original_name")
+  fileSize        Int        @map("file_size")
+  mimeType        String     @map("mime_type")
+  uploadedDate    DateTime   @default(now()) @map("uploaded_date")
+  parsedText      String?    @map("parsed_text")
+  skills          String[]   @default([])
+  experienceYears Float?     @map("experience_years")
   experience      Json?
   education       Json?
-  certifications  String[]  @default([])
-  technologies    String[]  @default([])
-  jobTitle        String?   @map("job_title")
-  isParsed        Boolean   @default(false) @map("is_parsed")
-  parseError      String?   @map("parse_error")
-  lastUpdated     DateTime  @updatedAt @map("last_updated")
-  user            User      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  certifications  String[]   @default([])
+  technologies    String[]   @default([])
+  jobTitle        String?    @map("job_title")
+  isParsed        Boolean    @default(false) @map("is_parsed")
+  parseError      String?    @map("parse_error")
+  lastUpdated     DateTime   @updatedAt @map("last_updated")
   atsScores       ATSScore[]
+  user            User       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
   @@map("candidate_resumes")
 }
@@ -163,6 +166,34 @@ model ATSScore {
   @@index([jobId])
   @@index([resumeId])
   @@map("ats_scores")
+}
+
+// ─── Calendar ───────────────────────────────────────────────────
+// Owned by application-service — declared here for schema consistency only.
+
+model CalendarEvent {
+  id            String            @id @default(uuid())
+  companyId     String
+  title         String
+  description   String?
+  eventType     CalendarEventType @default(MEETING)
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  color         String?           @default("indigo")
+  applicationId String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([companyId])
+  @@index([startTime])
+}
+
+enum CalendarEventType {
+  INTERVIEW
+  MEETING
+  DEADLINE
+  REMINDER
 }
 
 // ─── Notifications ──────────────────────────────────────────────

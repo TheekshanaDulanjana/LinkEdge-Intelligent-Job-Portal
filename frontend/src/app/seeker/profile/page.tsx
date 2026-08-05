@@ -22,13 +22,17 @@ import {
   Plus,
   ExternalLink,
   X,
-  CheckCircle2,
+  Briefcase,
+  AlertCircle,
+  Video,
 } from 'lucide-react';
 
 interface Application {
   id: string;
   status: string;
   createdAt: string;
+  rejectionReason?: string;
+  rejectionMessage?: string;
   interviewDate?: string;
   interviewTime?: string;
   interviewVenue?: string;
@@ -57,6 +61,14 @@ const INTEREST_OPTIONS = [
   'Backend Dev',
 ];
 
+const statusColors: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-700 border-amber-200',
+  REVIEWING: 'bg-blue-100 text-blue-700 border-blue-200',
+  SHORTLISTED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  INTERVIEW: 'bg-purple-100 text-purple-700 border-purple-200',
+  REJECTED: 'bg-rose-100 text-rose-700 border-rose-200',
+};
+
 type PortfolioPlatform = 'websiteUrl' | 'githubUrl' | 'behanceUrl';
 
 function CombinedProfileContent() {
@@ -83,6 +95,9 @@ function CombinedProfileContent() {
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
+  // Practice eligibility map
+  const [practiceEligibility, setPracticeEligibility] = useState<Record<string, any>>({});
+
   // Portfolio Links Modal State
   const [activePlatform, setActivePlatform] = useState<PortfolioPlatform | null>(null);
   const [tempLinkValue, setTempLinkValue] = useState('');
@@ -95,7 +110,7 @@ function CombinedProfileContent() {
           applicationApi.get('/applications/my-applications').catch(() => ({ data: { data: [] } })),
         ]);
 
-        const p = profileRes.data.data.profile;
+        const p = profileRes.data?.data?.profile;
         setProfile({
           fullName: p?.fullName || 'John Smith',
           phone: p?.phone || '+94 71 123 4567',
@@ -110,9 +125,23 @@ function CombinedProfileContent() {
         });
         if (p?.profileImageUrl) setImagePreview(p.profileImageUrl);
 
-        const apps: Application[] = appsRes.data.data || [];
+        const apps: Application[] = appsRes.data?.data || [];
         setApplications(apps);
-      } catch (err) {
+
+        // Fetch interview practice eligibility for INTERVIEW status apps
+        const checks: Record<string, any> = {};
+        for (const app of apps) {
+          if (app.status === 'INTERVIEW') {
+            try {
+              const r = await fetch(`http://localhost:8002/api/v1/interview/can-practice/${app.id}`);
+              checks[app.id] = await r.json();
+            } catch {
+              checks[app.id] = { can_practice: false, reason: 'Service unavailable' };
+            }
+          }
+        }
+        setPracticeEligibility(checks);
+      } catch {
         setError('Failed to load profile details');
       } finally {
         setLoading(false);
@@ -156,13 +185,11 @@ function CombinedProfileContent() {
     }
   }
 
-  // Open Portfolio Modal
   const openLinkModal = (platform: PortfolioPlatform) => {
     setActivePlatform(platform);
     setTempLinkValue(profile[platform] || '');
   };
 
-  // Save Portfolio Link
   const handleSaveLink = () => {
     if (!activePlatform) return;
     setProfile((prev) => ({
@@ -171,7 +198,7 @@ function CombinedProfileContent() {
     }));
     setActivePlatform(null);
     setTempLinkValue('');
-    setSuccess('Portfolio link updated. Click "Save Preferences" or "Save Profile" to keep changes.');
+    setSuccess('Portfolio link updated. Click "Save Preferences" to commit changes.');
     setTimeout(() => setSuccess(''), 4000);
   };
 
@@ -182,8 +209,6 @@ function CombinedProfileContent() {
       case 'behanceUrl': return 'Behance';
     }
   };
-
-  const interviewApps = applications.filter((app) => app.status === 'INTERVIEW');
 
   if (loading) {
     return (
@@ -198,8 +223,9 @@ function CombinedProfileContent() {
       <ProfileHeroSection />
 
       <main className="flex-1 py-10 px-4 sm:px-6 md:px-8">
-        <div className="max-w-7xl mx-auto bg-white border border-gray-200/80 rounded-3xl p-6 sm:p-8 md:p-10 shadow-sm space-y-6">
+        <div className="max-w-7xl mx-auto bg-white border border-gray-200/80 rounded-3xl p-6 sm:p-8 md:p-10 shadow-sm space-y-8">
           
+          {/* Header */}
           <div className="flex justify-between items-center pb-2 border-b border-gray-100">
             <h2 className="text-xl font-bold text-gray-900 tracking-tight">Candidate Profile</h2>
             <Link
@@ -222,7 +248,7 @@ function CombinedProfileContent() {
             </div>
           )}
 
-          {/* Profile Card Header */}
+          {/* Profile Card */}
           <div className="bg-[#F8FAFC] rounded-2xl border border-gray-200/60 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-5 w-full md:w-auto">
               <div className="relative shrink-0">
@@ -271,7 +297,7 @@ function CombinedProfileContent() {
             </div>
           </div>
 
-          {/* Inline Edit Drawer */}
+          {/* Edit Form Drawer */}
           {isEditing && (
             <div className="bg-[#F8FAFC] rounded-2xl border border-gray-200 p-6 space-y-4">
               <h3 className="text-sm font-semibold text-gray-900 border-b pb-2">Edit Basic Information</h3>
@@ -299,67 +325,174 @@ function CombinedProfileContent() {
             </div>
           )}
 
-          {/* Interview Banner Section */}
-          {interviewApps.length > 0 ? (
-            interviewApps.map((app) => (
-              <div key={app.id} className="bg-[#F0F7FF] rounded-2xl border border-[#D0E5FF] p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-xl bg-[#0084FF]/10 text-[#0084FF] flex items-center justify-center shrink-0">
-                    <Calendar className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm">Interview Invitation Received</h3>
-                    <p className="text-xs text-gray-600 mt-0.5">
-                      {app.job.companyName || 'Glamer Media'} has invited you for a {app.job.title} role.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
-                  <Link href={`/seeker/interview/${app.id}`} className="w-full md:w-auto">
-                    <Button className="w-full md:w-auto bg-[#0084FF] hover:bg-[#0073E6] text-white text-xs font-semibold px-4 py-2 rounded-xl uppercase">
-                      View Details & Schedule
-                    </Button>
-                  </Link>
-                  <Button variant="outline" className="border-[#0084FF] text-[#0084FF] hover:bg-blue-50 text-xs font-semibold px-4 py-2 rounded-xl uppercase">
-                    Decline
-                  </Button>
-                </div>
+          {/* Applications Section */}
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-[#0084FF]" />
+                  My Applications
+                  <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-blue-50 text-[#0084FF] text-[11px] font-bold">
+                    {applications.length}
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">Track every application and its current stage</p>
               </div>
-            ))
-          ) : (
-            <div className="bg-[#F8FAFC] rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-gray-200/60 text-gray-500 flex items-center justify-center shrink-0">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">No Active Interview Invitations</p>
-                  <p className="text-xs text-gray-500">You currently have no pending interview sessions scheduled.</p>
-                </div>
-              </div>
-              <Link href="/jobs" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto bg-[#0084FF] hover:bg-[#0073E6] text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all">
-                  Browse Available Jobs
+              <Link href="/jobs">
+                <Button size="sm" variant="outline" className="text-xs text-[#0084FF] border-[#0084FF] hover:bg-blue-50">
+                  Browse More Jobs
                 </Button>
               </Link>
             </div>
-          )}
 
-          {/* Lower Grid Content */}
+            {applications.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-10 text-center">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-3">
+                  <Briefcase className="w-5 h-5 text-[#0084FF]" />
+                </div>
+                <p className="text-sm font-semibold text-gray-800">No applications yet</p>
+                <p className="text-xs text-gray-400 mt-1 mb-4">Once you apply for a role, it'll show up here.</p>
+                <Link href="/jobs">
+                  <Button size="sm" className="bg-[#0084FF] hover:bg-[#0073E6] text-white text-xs">
+                    Find Opportunities
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {applications.map((app) => {
+                  const eligibility = practiceEligibility[app.id];
+
+                  const STATUS_META: Record<string, { dot: string; text: string; bg: string; label: string }> = {
+                    PENDING:     { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-100',   label: 'Pending' },
+                    REVIEWING:   { dot: 'bg-[#0084FF]',   text: 'text-[#0084FF]',   bg: 'bg-blue-50 border-blue-100',     label: 'Reviewing' },
+                    SHORTLISTED: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100', label: 'Shortlisted' },
+                    INTERVIEW:   { dot: 'bg-violet-500',  text: 'text-violet-700',  bg: 'bg-violet-50 border-violet-100', label: 'Interview' },
+                    REJECTED:    { dot: 'bg-gray-400',    text: 'text-gray-600',    bg: 'bg-gray-50 border-gray-200',     label: 'Not selected' },
+                  };
+                  const meta = STATUS_META[app.status] ?? STATUS_META.PENDING;
+
+                  return (
+                    <div
+                      key={app.id}
+                      className="bg-white rounded-2xl border border-gray-200/80 hover:border-[#0084FF]/30 hover:shadow-sm transition-all overflow-hidden"
+                    >
+                      {/* Top row: role + status */}
+                      <div className="flex items-start justify-between gap-4 p-5 pb-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Briefcase className="w-4 h-4 text-[#0084FF]" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-gray-900 text-sm truncate">{app.job?.title || 'Position Title'}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {app.job?.companyName ? `${app.job.companyName} · ` : ''}{app.job?.location || 'Location'}
+                            </p>
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              Applied {new Date(app.createdAt).toLocaleDateString('en-GB', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-full border whitespace-nowrap flex-shrink-0 ${meta.bg} ${meta.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                          {meta.label}
+                        </span>
+                      </div>
+
+                      {/* Interview details */}
+                      {app.status === 'INTERVIEW' && app.interviewDate && (
+                        <div className="mx-5 mb-4 bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+                          <div className="flex items-center gap-2 text-[#0084FF] font-semibold text-xs mb-2">
+                            <Calendar className="w-3.5 h-3.5" />
+                            Interview scheduled
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600">
+                            <p>
+                              <span className="text-gray-400">Date & time </span>
+                              <span className="font-medium text-gray-800">
+                                {new Date(app.interviewDate).toLocaleDateString('en-GB', {
+                                  weekday: 'short', day: '2-digit', month: 'short',
+                                })} · {app.interviewTime}
+                              </span>
+                            </p>
+                            {app.interviewVenue && (
+                              <p>
+                                <span className="text-gray-400">Venue </span>
+                                <span className="font-medium text-gray-800">{app.interviewVenue}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Rejection feedback */}
+                      {app.status === 'REJECTED' && (app.rejectionReason || app.rejectionMessage) && (
+                        <div className="mx-5 mb-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 mb-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-gray-400" />
+                            Feedback on this application
+                          </div>
+                          {app.rejectionReason && (
+                            <p className="text-xs font-semibold text-gray-800 mb-1">{app.rejectionReason}</p>
+                          )}
+                          {app.rejectionMessage && (
+                            <p className="text-xs text-gray-500 leading-relaxed">{app.rejectionMessage}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Practice interview CTA */}
+                      {app.status === 'INTERVIEW' && (
+                        <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-t border-gray-100 bg-gray-50/50">
+                          {eligibility?.can_practice ? (
+                            <div className="flex items-center gap-3">
+                              <Link href={`/seeker/interview/${app.id}`}>
+                                <Button size="sm" className="bg-[#0084FF] hover:bg-[#0073E6] text-white text-xs font-semibold flex items-center gap-1.5">
+                                  <Video className="w-3.5 h-3.5" />
+                                  Practice interview
+                                </Button>
+                              </Link>
+                              {eligibility.expires_at && (
+                                <span className="text-[11px] text-gray-400">
+                                  Available until {new Date(eligibility.expires_at).toLocaleString('en-GB', {
+                                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Button size="sm" disabled className="opacity-40 cursor-not-allowed text-xs">
+                                Practice interview
+                              </Button>
+                              <span className="text-[11px] text-gray-400">
+                                {eligibility?.reason || 'Practice window unavailable'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Grid for Resume, Links, and Preferences */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
             
-            {/* Resume & Portfolio Section */}
+            {/* Resume & Portfolio */}
             <div className="lg:col-span-2 bg-[#F8FAFC] rounded-2xl border border-gray-200/60 p-6 space-y-5">
-              <div className="flex justify-between items-center">
-                <h3 className="text-base font-bold text-gray-900">Resume & Portfolio</h3>
-              </div>
+              <h3 className="text-base font-bold text-gray-900">Resume & Portfolio</h3>
 
               <ResumeManager />
 
-              {/* Portfolio Cards Grid */}
+              {/* Links Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                
-                {/* Personal Website */}
                 <div
                   onClick={() => openLinkModal('websiteUrl')}
                   className={`border rounded-xl p-3.5 text-center transition-all cursor-pointer group relative ${
@@ -379,13 +512,11 @@ function CombinedProfileContent() {
                     </p>
                   ) : (
                     <p className="text-[10px] text-gray-400 group-hover:text-[#0084FF] mt-1 flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" />
-                      Click to add link
+                      <Plus className="w-2.5 h-2.5" /> Add Link
                     </p>
                   )}
                 </div>
 
-                {/* Github */}
                 <div
                   onClick={() => openLinkModal('githubUrl')}
                   className={`border rounded-xl p-3.5 text-center transition-all cursor-pointer group relative ${
@@ -405,13 +536,11 @@ function CombinedProfileContent() {
                     </p>
                   ) : (
                     <p className="text-[10px] text-gray-400 group-hover:text-[#0084FF] mt-1 flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" />
-                      Click to add link
+                      <Plus className="w-2.5 h-2.5" /> Add Link
                     </p>
                   )}
                 </div>
 
-                {/* Behance */}
                 <div
                   onClick={() => openLinkModal('behanceUrl')}
                   className={`border rounded-xl p-3.5 text-center transition-all cursor-pointer group relative ${
@@ -431,18 +560,15 @@ function CombinedProfileContent() {
                     </p>
                   ) : (
                     <p className="text-[10px] text-gray-400 group-hover:text-[#0084FF] mt-1 flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" />
-                      Click to add link
+                      <Plus className="w-2.5 h-2.5" /> Add Link
                     </p>
                   )}
                 </div>
-
               </div>
             </div>
 
             {/* Sidebar Preferences */}
             <div className="space-y-6">
-              
               <div className="bg-[#F8FAFC] rounded-2xl border border-gray-200/60 p-6 space-y-4">
                 <h3 className="text-base font-bold text-gray-900">Career Preferences</h3>
 
@@ -515,6 +641,7 @@ function CombinedProfileContent() {
                 </Button>
               </div>
 
+              {/* Privacy */}
               <div className="bg-[#F8FAFC] rounded-2xl border border-gray-200/60 p-6 space-y-4">
                 <h3 className="text-base font-bold text-gray-900">Account & Privacy</h3>
 
@@ -557,7 +684,7 @@ function CombinedProfileContent() {
         </div>
       </main>
 
-      {/* Portfolio Link Input Modal */}
+      {/* Modal */}
       {activePlatform && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-slate-100">

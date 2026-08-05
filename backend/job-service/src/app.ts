@@ -419,8 +419,14 @@ router.delete(
         return;
       }
 
-      await prisma.jobPosting.delete({ where: { id: req.params.id } });
-      res.json({ success: true, message: 'Job deleted successfully' });
+      // Applications reference this job via a foreign key — delete them first,
+      // then delete the job, in a single transaction so it's all-or-nothing.
+      await prisma.$transaction([
+        prisma.application.deleteMany({ where: { jobId: req.params.id } }),
+        prisma.jobPosting.delete({ where: { id: req.params.id } }),
+      ]);
+
+      res.json({ success: true, message: 'Job and all its applications deleted successfully' });
     } catch (e) { next(e); }
   }
 );

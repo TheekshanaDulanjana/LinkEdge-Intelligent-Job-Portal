@@ -224,9 +224,6 @@ export async function scheduleInterview(req: any, res: Response) {
       }).catch(e => console.warn('interview email failed:', e.message));
     }
 
-    // No separate CalendarEvent write needed — Calendar page auto-pulls
-    // any Application with status=INTERVIEW and interviewDate set.
-
     res.json({ success: true, data: updated });
   } catch (e) {
     console.error('[schedule-interview]', e);
@@ -265,7 +262,7 @@ export async function rejectCandidate(req: any, res: Response) {
           job_title:        application.job.title,
           company_name:     company.companyName,
           cv_text:          application.cvTextSnapshot ?? '',
-          job_description:  application.job.description,
+          job_description:  `${application.job.description}\n\nRequirements:\n${application.job.requirements}`,
         },
         { timeout: 20000 }
       );

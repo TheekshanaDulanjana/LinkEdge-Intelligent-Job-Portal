@@ -1,7 +1,7 @@
 import os
 import re
 import google.generativeai as genai
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -9,83 +9,81 @@ router = APIRouter()
 
 
 class RejectionRequest(BaseModel):
-    reason_title: str          # selected by admin from dropdown
-    candidate_name: str
-    job_title: str
-    company_name: str
-    cv_text: str               # actual CV text — makes message personalised
-    job_description: str       # actual JD — makes context accurate
+    reason_title:     str    # Company selects this from dropdown
+    candidate_name:   str
+    job_title:        str
+    company_name:     str
+    cv_text:          str    # Candidate's actual CV content
+    job_description:  str    # Job posting description + requirements
 
 
 class RejectionResponse(BaseModel):
-    ai_message: str
-    generated: bool            # always True here (not stored, always fresh)
+    ai_message: str          # The generated paragraph explaining the specific gap
+    generated:  bool
 
 
 def get_model():
     return genai.GenerativeModel(
         model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        generation_config=genai.GenerationConfig(temperature=0.45, max_output_tokens=500)
+        generation_config=genai.GenerationConfig(temperature=0.4, max_output_tokens=400)
     )
 
 
 @router.post("/generate-rejection-message", response_model=RejectionResponse)
 async def generate_rejection_message(req: RejectionRequest):
     """
-    Generates a personalised rejection message.
+    Company selects a rejection reason TITLE from a dropdown.
+    This agent compares the candidate's actual CV against the job posting
+    and generates ONE short, specific paragraph explaining the gap that
+    relates to the selected reason title.
 
-    IMPORTANT — Module 07 compliance:
-    - Message is generated dynamically every time — NOT stored
-    - Uses latest CV data and latest JD for personalisation
-    - Admin selects category; AI writes the professional explanation
-    - References actual skills/experience from the candidate's CV
+    The title itself is NOT generated here — only the explanatory paragraph.
+    Frontend/email shows: [Reason Title] + [This AI-generated paragraph]
     """
     model = get_model()
 
-    # Truncate inputs to avoid token limits
-    cv_snippet = req.cv_text[:3000] if req.cv_text else "CV not available"
-    jd_snippet = req.job_description[:2000] if req.job_description else ""
+    cv_snippet = (req.cv_text or "")[:3000]
+    jd_snippet = (req.job_description or "")[:2000]
 
-    prompt = f"""You are a professional HR communications specialist writing a respectful rejection notice.
+    prompt = f"""You are writing a short, respectful explanation for a job application rejection.
 
-REJECTION CATEGORY: {req.reason_title}
-CANDIDATE NAME: {req.candidate_name}
-POSITION: {req.job_title} at {req.company_name}
+REJECTION REASON SELECTED BY THE EMPLOYER: "{req.reason_title}"
 
-CANDIDATE CV (excerpt):
+CANDIDATE'S ACTUAL CV CONTENT:
 {cv_snippet}
 
-JOB DESCRIPTION (excerpt):
+JOB POSTING (description + requirements):
 {jd_snippet}
 
-Write a single paragraph (4-6 sentences) rejection explanation that:
-1. Acknowledges a specific strength from the candidate's actual CV
-2. Explains why they were not selected, directly referencing the rejection category: "{req.reason_title}"
-3. Mentions a specific technical gap (comparing CV skills against job requirements)
-4. Ends with a genuinely encouraging statement and invitation to apply for future roles
+TASK:
+Write ONE short paragraph (3-4 sentences, maximum 70 words) that explains SPECIFICALLY why this candidate's profile falls short in relation to the reason "{req.reason_title}".
 
-STRICT RULES:
-- Reference REAL skills from the CV — do not be generic
-- Do NOT start with "Dear" or any salutation — start directly with the explanation
-- Do NOT include phrases like "We regret" or "Unfortunately" — be professional but positive
-- Do NOT use markdown, bullet points, or formatting — plain prose paragraph only
-- Maximum 120 words
-- Must feel human-written and specific to THIS candidate"""
+Rules:
+- Compare the candidate's ACTUAL skills/experience (from their CV) against what the job ACTUALLY requires.
+- Be specific — mention real skills, technologies, or experience gaps found by comparing the two texts. Do not invent details not present in the CV or job posting.
+- Do NOT repeat the reason title verbatim as a sentence — explain the underlying gap instead.
+- Tone: professional, respectful, and constructive — not harsh.
+- Do NOT include a greeting, sign-off, or the candidate's name.
+- Do NOT use markdown, bullet points, or bold text — plain prose only.
+- Output ONLY the paragraph text, nothing else.
+
+Example (for reason "Missing required technical skills"):
+"The role requires hands-on experience with Kubernetes and CI/CD pipelines, which are not reflected in your current CV. While your background in Python development is strong, the position calls for infrastructure and deployment experience that your profile does not yet demonstrate."
+"""
 
     try:
         response = model.generate_content(prompt)
         message = response.text.strip()
-        # Clean any accidental markdown
+        # Strip any accidental markdown formatting
         message = re.sub(r'\*\*|__|`|#{1,6}\s', '', message).strip()
         return RejectionResponse(ai_message=message, generated=True)
 
     except Exception as e:
         print(f"AI rejection generation failed: {e}")
-        # Fallback to category-specific template (still references reason)
         fallback = (
-            f"Thank you for applying for the {req.job_title} position at {req.company_name}. "
-            f"After carefully reviewing your application, we have decided not to proceed at this time. "
-            f"The primary reason is: {req.reason_title}. "
-            f"We appreciate the time you invested and encourage you to apply for future opportunities that may be a better fit."
+            f"After reviewing your application for the {req.job_title} role, "
+            f"we found that your current profile does not fully align with our "
+            f"requirements in relation to: {req.reason_title.lower()}. "
+            f"We encourage you to apply for future roles that better match your experience."
         )
         return RejectionResponse(ai_message=fallback, generated=False)

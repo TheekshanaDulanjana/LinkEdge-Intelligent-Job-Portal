@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Briefcase, Users, BarChart3,
   Calendar, Settings, ChevronLeft, ChevronRight, LogOut, Menu, X,
@@ -20,9 +21,18 @@ const NAV_ITEMS = [
 export default function Sidebar({
   companyName, logoUrl,
 }: { companyName: string; logoUrl?: string | null }) {
+  const router = useRouter();
   const pathname = usePathname();
+  const { logout } = useAuthStore();
+
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  function handleLogout() {
+    logout();
+    setMobileOpen(false);
+    router.push('/');
+  }
 
   const content = (
     <div className="flex flex-col h-full bg-white border-r border-gray-200">
@@ -77,7 +87,7 @@ export default function Sidebar({
       {/* Logout */}
       <div className="px-3 pb-4 border-t border-gray-100 pt-3">
         <button
-          onClick={() => { /* wire to your existing logout */ }}
+          onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 w-full transition-colors"
         >
           <LogOut className="w-[18px] h-[18px]" strokeWidth={2} />

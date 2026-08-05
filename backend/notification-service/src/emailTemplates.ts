@@ -77,17 +77,17 @@ export const emailTemplates = {
     reason: string,
     aiMessage: string
   ) => ({
-    subject: `Application Update - ${jobTitle} at ${companyName}`,
+    subject: `Application Update — ${jobTitle} at ${companyName}`,
     html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
         <h1 style="color:#1e293b;font-size:22px;">Application Status Update</h1>
         <p style="color:#64748b;">Hi ${seekerName}, thank you for applying for <strong>${jobTitle}</strong> at <strong>${companyName}</strong>.</p>
         <p style="color:#64748b;">After careful consideration, we will not be moving forward with your application at this time.</p>
-        <div style="background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:0 8px 8px 0;margin:20px 0;">
-          <p style="color:#92400e;font-weight:600;margin:0 0 8px;">Reason: ${reason}</p>
-          <p style="color:#92400e;margin:0;font-size:14px;">${aiMessage}</p>
+        <div style="background:#fff7ed;border-left:4px solid #f97316;padding:16px 20px;border-radius:0 8px 8px 0;margin:20px 0;">
+          <p style="color:#9a3412;font-weight:700;font-size:15px;margin:0 0 10px;">${reason}</p>
+          <p style="color:#7c4a1e;margin:0;font-size:14px;line-height:1.6;">${aiMessage}</p>
         </div>
-        <p style="color:#64748b;">We encourage you to address these areas and apply again in the future. Your profile shows real potential.</p>
+        <p style="color:#64748b;">We encourage you to continue developing in this area and to apply again for future roles that may be a better fit. Your profile shows real potential.</p>
       </div>
     `,
   }),

@@ -343,4 +343,48 @@ export const authService = {
       audience: 'job-portal-client',
     }) as { userId: string; email: string; role: string };
   },
+
+  // ── Account Deletion ─────────────────────────────────────────────
+
+async deleteAccount(userId: string, password?: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+
+  if (!user) throw new AppError('User not found.', 404, 'NOT_FOUND');
+
+  if (user.passwordHash) {
+    if (!password) {
+      throw new AppError('Password is required to delete your account.', 400, 'PASSWORD_REQUIRED');
+    }
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) {
+      logger.security('Failed account deletion attempt — wrong password', { userId });
+      throw new AppError('Incorrect password.', 401, 'INVALID_PASSWORD');
+    }
+  }
+
+  if (user.role === 'COMPANY') {
+    const company = await prisma.company.findUnique({ where: { userId } });
+    if (company) {
+      // Applications reference JobPosting, JobPosting references Company —
+      // must delete bottom-up before the User row can be removed.
+      const jobs = await prisma.jobPosting.findMany({
+        where: { companyId: company.id },
+        select: { id: true },
+      });
+      const jobIds = jobs.map(j => j.id);
+
+      await prisma.$transaction([
+        prisma.application.deleteMany({ where: { jobId: { in: jobIds } } }),
+        prisma.jobPosting.deleteMany({ where: { companyId: company.id } }),
+      ]);
+    }
+  }
+
+  // Cascading deletes (Company/JobSeeker/CandidateResume/Notification rows
+  // tied directly to User) are handled by onDelete: Cascade in schema.prisma.
+  await prisma.user.delete({ where: { id: userId } });
+
+  logger.security('Account deleted', { userId });
+  return { message: 'Account deleted successfully.' };
+},
 };

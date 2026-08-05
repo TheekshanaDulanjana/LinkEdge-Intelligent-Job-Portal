@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { applicationApi } from '@/lib/api';
+import api, { applicationApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 
 interface Notification {
@@ -50,7 +50,7 @@ export default function Header() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    applicationApi.get('/auth/me').then((res) => {
+    api.get('/auth/me').then((res) => {
       const profile = res.data.data.profile;
       const imgUrl = profile?.profileImageUrl || profile?.logoUrl || '';
       if (imgUrl) {

@@ -135,6 +135,14 @@ router.get('/me', authenticate, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.delete('/account', authenticate, async (req: any, res, next) => {
+  try {
+    const { password } = req.body;
+    const result = await authService.deleteAccount(req.user.userId, password);
+    res.json({ success: true, ...result });
+  } catch (e) { next(e); }
+});
+
 // -- Profile Update Routes --
 
 router.patch(

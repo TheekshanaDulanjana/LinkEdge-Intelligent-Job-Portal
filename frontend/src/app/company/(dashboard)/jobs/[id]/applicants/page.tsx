@@ -80,7 +80,7 @@ export default function JobApplicantsPage() {
   return (
     <div>
       <PageHeader
-        title={jobTitle ? `Applicants — ${jobTitle}` : 'Applicants'}
+        title={jobTitle ? `Applicants - ${jobTitle}` : 'Applicants'}
         description="Review candidates, run AI ranking, and manage the hiring pipeline for this role."
         actions={
           <button
