@@ -1,68 +1,95 @@
-import axios from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import { secureStorage } from './secureStorage';
 
-/* =========================================================
-   AUTH SERVICE API (Port 3001)
-   ========================================================= */
+const REQUEST_TIMEOUT = 30000; // 30 seconds
 
-// All requests automatically go to your auth-service
-const api = axios.create({
-  baseURL: 'http://localhost:3001/api/v1',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-// Attach JWT token before every request
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Safe UUID generator fallback for non-secure / older browser contexts
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
   }
-  return config;
-});
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
-// Handle 401 errors (Unauthorized)
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+// Factory function to create API instances with shared interceptors
+function createApiInstance(baseURL: string): AxiosInstance {
+  const instance = axios.create({
+    baseURL,
+    timeout: REQUEST_TIMEOUT,
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: false,
+  });
+
+  // Interceptor to attach token and request ID to every outgoing request
+  instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+    const token = secureStorage.getAccessToken();
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return Promise.reject(error);
-  }
-);
 
-export default api;
-
-
-/* =========================================================
-   JOB SERVICE API (Port 3002)
-   ========================================================= */
-
-export const jobApi = axios.create({
-  baseURL: 'http://localhost:3002/api/v1',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-
-/* =========================================================
-   APPLICATION SERVICE API (Port 3003)
-   ========================================================= */
-
-export const applicationApi = axios.create({
-  baseURL: 'http://localhost:3003/api/v1',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-
-/* =========================================================
-   COMMON INTERCEPTOR (Attach Token to All Services)
-   ========================================================= */
-
-[jobApi, applicationApi].forEach((instance) => {
-  instance.interceptors.request.use((config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Add request ID for tracing across microservices
+    config.headers['X-Request-Id'] = generateUUID();
     return config;
   });
-});
+
+  // Interceptor to handle global response errors
+  instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      // Clear token and redirect on unauthorized error (401)
+      if (error.response?.status === 401) {
+        secureStorage.clear();
+
+        if (
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/login') &&
+          !window.location.pathname.startsWith('/register')
+        ) {
+          window.location.href = '/login';
+        }
+      }
+
+      // Preserve full response details while standardizing error structure
+      const safeError = {
+        name: 'ApiError',
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          'Something went wrong. Please try again.',
+        statusCode: error.response?.status || 500,
+        requestId: error.response?.headers?.['x-request-id'],
+        response: error.response, // Attached so components can inspect error.response directly
+      };
+
+      return Promise.reject(safeError);
+    }
+  );
+
+  return instance;
+}
+
+// Auth service
+export const authApi = createApiInstance(
+  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1'
+);
+
+// Job service
+export const jobApi = createApiInstance(
+  process.env.NEXT_PUBLIC_JOB_SERVICE_URL || 'http://localhost:3002/api/v1'
+);
+
+// Application service
+export const applicationApi = createApiInstance(
+  process.env.NEXT_PUBLIC_APPLICATION_SERVICE_URL || 'http://localhost:3003/api/v1'
+);
+
+// ATS service
+export const atsApi = createApiInstance(
+  process.env.NEXT_PUBLIC_ATS_SERVICE_URL || 'http://localhost:8003/api/v1'
+);
+
+export default authApi;

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { secureStorage } from '@/lib/secureStorage';
 
 interface User {
   id: string;
@@ -22,28 +23,20 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
 
   setAuth: (user, accessToken) => {
-    // Save to localStorage so it survives page refresh
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('user', JSON.stringify(user));
+    secureStorage.setTokens(accessToken, user);
     set({ user, accessToken, isAuthenticated: true });
   },
 
   logout: () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('user');
+    secureStorage.clear();
     set({ user: null, accessToken: null, isAuthenticated: false });
   },
 
-  // Call this on app startup to restore session
   loadFromStorage: () => {
-    const token = localStorage.getItem('accessToken');
-    const userStr = localStorage.getItem('user');
-    if (token && userStr) {
-      set({
-        accessToken: token,
-        user: JSON.parse(userStr),
-        isAuthenticated: true,
-      });
+    const token = secureStorage.getAccessToken();
+    const user = secureStorage.getUser<User>();
+    if (token && user) {
+      set({ accessToken: token, user, isAuthenticated: true });
     }
   },
 }));

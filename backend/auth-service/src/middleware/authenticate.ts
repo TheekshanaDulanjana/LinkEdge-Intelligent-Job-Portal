@@ -26,8 +26,8 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   const token = authHeader.split(' ')[1]; // Extract token after "Bearer "
 
   try {
-    const payload = authService.verifyAccessToken(token);
-    req.user = payload; // Attach user info to request
+    const payload = authService.verifyAccessToken(token) as JwtPayload; 
+    req.user = payload;
     next();
   } catch {
     res.status(401).json({

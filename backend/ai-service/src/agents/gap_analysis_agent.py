@@ -1,59 +1,116 @@
+import os
 import json
 import re
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
+from google.genai import Client
 from src.models.state import CVAnalysisState
 
-# Initialize Gemini
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", max_output_tokens=3000)
+
+# Create the new Gemini client (UNCHANGED)
+client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+
+def clean_json_response(raw: str) -> str:
+    raw = raw.strip()
+    raw = re.sub(r"^```json\s*", "", raw)
+    raw = re.sub(r"^```\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return raw.strip()
+
 
 def gap_analysis_agent(state: CVAnalysisState) -> CVAnalysisState:
-    print(">> Gap analysis agent running...")
+    """
+    Agent 2: Gap Analysis Agent
+    Now includes course URLs for frontend clickable navigation
+    """
+    print(">> [Agent 2] Gap analysis agent started")
 
-    skills_list = ", ".join(state["extracted_skills"]) if state["extracted_skills"] else "None found"
+    # If parsing completely failed, skip this agent
+    if not state.get("extracted_skills") and state.get("error"):
+        print("   Skipping, parsing failed upstream")
+        return {
+            **state,
+            "matching_skills": [],
+            "missing_skills": [],
+            "gap_summary": "Could not complete gap analysis because CV parsing failed.",
+            "course_suggestions": [],
+            "current_step": "gap_analysis_skipped",
+        }
 
-    prompt = f"""
-You are a career coach and skills gap analyst. Analyze the candidate's 
-current skills against the requirements for their desired role.
+    skills_text = (
+        ", ".join(state["extracted_skills"])
+        if state["extracted_skills"]
+        else "No skills were extracted from the CV"
+    )
+
+    prompt = f"""You are a senior career coach and technical recruiter with 15 years of experience.
+
+Analyze this candidate's profile against their desired role and produce a detailed skills gap analysis.
 
 CANDIDATE PROFILE:
-* Skills from CV: {skills_list}
-* Work experience: {state["extracted_experience"]}
-* Education: {state["extracted_education"]}
-* Additional interests or skills mentioned: {state["additional_skills"]}
+- Current skills: {skills_text}
+- Work experience: {state.get("extracted_experience", "Not available")}
+- Education: {state.get("extracted_education", "Not available")}
+- Additional context: {state.get("additional_skills", "None provided")}
 
 DESIRED ROLE: {state["desired_role"]}
 
-Perform a thorough gap analysis. Return ONLY a valid JSON object with no 
-markdown, no code blocks, and no explanation.
+Return ONLY a valid JSON object. No markdown, no code blocks, no explanation.
+Start directly with {{ and end with }}.
 
 {{
-    "matching_skills": ["skills they already have that are relevant to the role"],
-    "missing_skills": ["important skills needed for the role that they lack"],
-    "gap_summary": "A clear 2 to 3 sentence explanation of where they stand and what they need to focus on",
+    "matching_skills": [
+        "List skills the candidate already has that are relevant to the desired role"
+    ],
+    "missing_skills": [
+        "List the most important skills needed for the role that the candidate lacks"
+    ],
+    "gap_summary": "Write 2 to 3 encouraging but honest sentences explaining where the candidate stands and what they should focus on to reach their goal",
     "course_suggestions": [
         {{
-            "title": "Course or certification name",
-            "platform": "Platform name (e.g. Coursera, Udemy, YouTube)",
-            "reason": "Why this specific course helps bridge their gap"
+            "title": "Specific course or certification name",
+            "platform": "Platform name (Coursera, Udemy, YouTube, Google, Microsoft Learn, etc.)",
+            "reason": "One sentence explaining exactly how this course helps bridge their specific gap",
+            "url": "Real working URL (search page or platform link)"
         }}
     ]
 }}
 
 Rules:
-* List at least 3 matching skills if any exist
-* List the top 5 to 7 most important missing skills
-* Suggest exactly 4 courses
-* Be encouraging but honest in the gap_summary
-"""
+- matching_skills: include 3 to 6 relevant skills they already have
+- missing_skills: list the 5 to 7 most critical gaps, ordered by importance
+- course_suggestions: provide exactly 4 specific, real courses
+
+CRITICAL URL rules:
+- url must be real and working
+- Coursera: https://www.coursera.org/search?query=COURSE+NAME
+- Udemy: https://www.udemy.com/courses/search/?q=COURSE+NAME
+- YouTube: https://www.youtube.com/results?search_query=COURSE+NAME
+- Google: https://grow.google/certificates/
+- freeCodeCamp: https://www.freecodecamp.org/learn
+- Microsoft Learn: https://learn.microsoft.com/en-us/training/
+- AWS: https://aws.amazon.com/training/
+- Replace spaces with +
+- DO NOT invent fake URLs
+
+- gap_summary: be motivating, acknowledge what they have, then guide improvement
+- Be specific to the actual desired role, not generic"""
 
     try:
-        response = llm.invoke([HumanMessage(content=prompt)])
-        raw = response.content.strip()
-        raw = re.sub(r"```json\s*", "", raw)
-        raw = re.sub(r"```\s*", "", raw)
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            contents=prompt,
+            config={
+                "temperature": 0.2,
+                "max_output_tokens": 3000,
+            }
+        )
 
+        raw = clean_json_response(response.text)
         data = json.loads(raw)
+
+        print(f"   Matching skills: {len(data.get('matching_skills', []))}")
+        print(f"   Missing skills: {len(data.get('missing_skills', []))}")
+        print(f"   Course suggestions: {len(data.get('course_suggestions', []))}")
 
         return {
             **state,
@@ -64,14 +121,26 @@ Rules:
             "current_step": "gap_analysis_complete",
         }
 
+    except json.JSONDecodeError as e:
+        print(f"   JSON parse error: {e}")
+        return {
+            **state,
+            "matching_skills": state.get("extracted_skills", [])[:3],
+            "missing_skills": [],
+            "gap_summary": "Gap analysis encountered a formatting issue. Please try again.",
+            "course_suggestions": [],
+            "current_step": "gap_analysis_failed",
+            "error": f"Gap analysis JSON error: {str(e)}",
+        }
+
     except Exception as e:
-        print(f"Gap analysis agent error: {e}")
+        print(f"   Gap analysis error: {e}")
         return {
             **state,
             "matching_skills": [],
             "missing_skills": [],
-            "gap_summary": "Could not complete gap analysis.",
+            "gap_summary": "Gap analysis could not be completed.",
             "course_suggestions": [],
-            "error": f"Gap analysis failed: {str(e)}",
             "current_step": "gap_analysis_failed",
+            "error": f"Gap analysis failed: {str(e)}",
         }
