@@ -55,3 +55,19 @@ export function requireCompany(
   }
   next();
 }
+
+// Added the missing function below
+export function requireSeeker(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  if (req.user?.role !== 'SEEKER') {
+    res.status(403).json({
+      success: false,
+      message: 'Only job seekers can do this',
+    });
+    return;
+  }
+  next();
+}

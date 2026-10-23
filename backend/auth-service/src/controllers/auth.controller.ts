@@ -53,7 +53,7 @@ export const authController = {
 
   async login(req: Request, res: Response) {
     try {
-      const result = await authService.login(req.body);
+      const result = await authService.login(req.body.email, req.body.password);
       res.status(200).json({
         success: true,
         message: 'Login successful',
