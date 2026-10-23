@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import api, { applicationApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Notification {
   id: string;
@@ -28,9 +29,34 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
+  // References to handle outside clicks correctly
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Check screen width for mobile view
+  useEffect(() => {
+    function checkScreen() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    checkScreen();
+    window.addEventListener('resize', checkScreen);
+    return () => window.removeEventListener('resize', checkScreen);
+  }, []);
+
+  useEffect(() => {
+    function handleScroll() {
+      if (window.scrollY > 20) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    }
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   async function fetchUnreadCount() {
     try {
@@ -119,155 +145,244 @@ export default function Header() {
   const hideOn = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
   if (hideOn.some((p) => pathname?.startsWith(p))) return null;
 
+  const navLinks = [
+    { name: 'Home', href: '/' },
+    { name: 'Discover', href: '/jobs' },
+    { name: 'Overview', href: '/overview' },
+    { name: 'For Job Seekers', href: '/seeker' },
+    { name: 'For Companies', href: '/companies' },
+  ];
+
+  const useColoredTheme = isMobile || isScrolled;
+
+  // Apply sm:pt-12 only on Home page when NOT scrolled, otherwise sm:pt-4
+  const isHomePage = pathname === '/';
+  const topPaddingClass = (isHomePage && !isScrolled) ? 'pt-2 sm:pt-12' : 'pt-2 sm:pt-4';
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
+    <header className={`fixed top-0 left-0 right-0 z-50 ${topPaddingClass} transition-all duration-300 ${useColoredTheme ? 'bg-white shadow-md py-2' : 'bg-transparent'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-24">
+        <div className="flex justify-between items-center h-16 sm:h-20">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center">
-            <img src="/linkedge.png" alt="LinkEdge.ai" className="h-6 w-auto" />
+          <Link href="/" className="flex items-center gap-2 group">
+            <img 
+              src={useColoredTheme ? "/linkedgeColored.png" : "/linkedge.png"} 
+              alt="LinkEdge.ai" 
+              className="h-6 sm:h-9 w-auto transition-transform group-hover:scale-105" 
+            />
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            <Link href="/jobs" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">Discover</Link>
-            <Link href="/overview" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">Overview</Link>
-            <Link href="/seeker" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">For Job Seekers</Link>
-            <Link href="/companies" className="text-xs font-base text-white uppercase tracking-widest hover:opacity-80">For Companies</Link>
+          <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-xs uppercase tracking-widest transition-all ${
+                    isActive
+                      ? (useColoredTheme ? 'text-[#0F9DE4] font-bold underline underline-offset-4 decoration-2' : 'text-cyan-300 font-bold underline underline-offset-4 decoration-2')
+                      : (useColoredTheme ? 'text-gray-700 font-medium hover:text-[#0F9DE4]' : 'text-white/90 font-medium hover:text-cyan-300')
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Right Side */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
 
             {!isAuthenticated ? (
-              <>
+              <div className="hidden sm:flex items-center gap-3">
                 <Link href="/login">
-                 <Button 
+                  <Button 
                     variant="gradient"
                     size="sm"
-                    className="border-white border-2 w-24 cursor-pointer hover:scale-105"
+                    className="border-white border-2 w-20 sm:w-24 cursor-pointer hover:scale-105 shadow-md"
                   >
                     Login
                   </Button>
-
                 </Link>
 
                 <Link href="/register">
-                                  <Button 
+                  <Button 
                     variant="outline"
                     size="sm"
                     border={true}
                     hasBg={false}
-                    className="text-white border-white w-24 cursor-pointer hover:scale-105"
+                    className={`${useColoredTheme ? 'text-[#0025B8] border-[#0025B8] hover:bg-gray-100' : 'text-white border-white hover:bg-white/10'} bg-transparent w-20 sm:w-24 cursor-pointer hover:scale-105 shadow-sm`}
                   >
                     Register
                   </Button>
-                 
                 </Link>
-              </>
+              </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
 
-                {/* Notification */}
+                {/* Notification Bell Icon */}
                 <div className="relative" ref={notifRef}>
                   <button
                     onClick={handleBellClick}
-                    className="relative p-2 text-white hover:bg-white/10 rounded-full"
+                    className={`relative p-2 rounded-full transition-colors ${useColoredTheme ? 'text-[#0025B8] hover:bg-gray-100' : 'text-white hover:bg-white/10'}`}
                   >
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                     </svg>
 
                     {unreadCount > 0 && (
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                      <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow">
                         {unreadCount > 9 ? '9+' : unreadCount}
                       </span>
                     )}
                   </button>
 
-                  {showNotifications && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border overflow-hidden text-gray-900">
-                      <div className="flex justify-between px-4 py-3 border-b">
-                        <p className="font-semibold text-sm">Notifications</p>
-                        {unreadCount > 0 && (
-                          <button onClick={markAllRead} className="text-xs text-blue-600">
-                            Mark all read
-                          </button>
-                        )}
-                      </div>
+                  <AnimatePresence>
+                    {showNotifications && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-72 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden text-gray-900 z-50"
+                      >
+                        <div className="flex justify-between items-center px-4 py-3 border-b bg-slate-50">
+                          <p className="font-semibold text-sm text-gray-800">Notifications</p>
+                          {unreadCount > 0 && (
+                            <button onClick={markAllRead} className="text-xs text-[#0F9DE4] hover:underline font-medium">
+                              Mark all read
+                            </button>
+                          )}
+                        </div>
 
-                      <div className="max-h-80 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="py-6 text-center text-gray-400">No notifications</div>
-                        ) : (
-                          notifications.map((n) => (
-                            <div key={n.id}
-                              onClick={() => markRead(n.id)}
-                              className={`px-4 py-3 cursor-pointer ${!n.isRead ? 'bg-blue-50' : ''}`}
-                            >
-                              <p className="text-sm font-medium">{n.title}</p>
-                              <p className="text-xs text-gray-500">{n.message}</p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                          {notifications.length === 0 ? (
+                            <div className="py-8 text-center text-gray-400 text-sm">No notifications yet</div>
+                          ) : (
+                            notifications.map((n) => (
+                              <div key={n.id}
+                                onClick={() => markRead(n.id)}
+                                className={`px-4 py-3 cursor-pointer transition-colors ${!n.isRead ? 'bg-sky-50/70 hover:bg-sky-100/50' : 'hover:bg-gray-50'}`}
+                              >
+                                <p className="text-sm font-semibold text-gray-800">{n.title}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{n.message}</p>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* Profile */}
+                {/* Profile Dropdown */}
                 <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center p-1 rounded-full border border-white/30 hover:bg-white/10"
+                    className={`flex items-center p-0.5 rounded-full border-2 transition-all shadow-sm ${useColoredTheme ? 'border-[#0025B8]/40 hover:border-[#0F9DE4]' : 'border-white/40 hover:border-cyan-300'}`}
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden bg-gradient-to-tr from-[#0025B8] to-[#0F9DE4]">
                       {profileImageUrl ? (
-                        <img src={profileImageUrl} className="w-full h-full object-cover" />
+                        <img src={profileImageUrl} className="w-full h-full object-cover" alt="Profile" />
                       ) : (
-                        <div className="flex items-center justify-center h-full text-white">
+                        <div className="flex items-center justify-center h-full text-white font-semibold text-sm">
                           {user?.email?.[0]?.toUpperCase() || 'U'}
                         </div>
                       )}
                     </div>
                   </button>
 
-                  {showUserMenu && (
-                    <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg py-1">
-                      <Link href={dashboardPath} className="block px-4 py-2 text-sm hover:bg-gray-50">Dashboard</Link>
-                      <Link href={profilePath} className="block px-4 py-2 text-sm hover:bg-gray-50">Profile</Link>
-                      <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                        Sign out
-                      </button>
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {showUserMenu && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl py-2 border border-gray-100 z-50"
+                      >
+                        <div className="px-4 py-2 border-b border-gray-100 mb-1">
+                          <p className="text-xs text-gray-400 font-medium">Signed in as</p>
+                          <p className="text-sm font-bold text-gray-800 truncate">{user?.email}</p>
+                        </div>
+                        <Link href={dashboardPath} onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors">Dashboard</Link>
+                        <Link href={profilePath} onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors">Profile Settings</Link>
+                        <div className="border-t border-gray-100 my-1" />
+                        <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+                          Sign out
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
               </div>
             )}
 
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
+            {/* Mobile Menu Button / Hamburger Icon */}
+            <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden text-white"
+              className={`md:hidden p-2 rounded-xl transition-colors focus:outline-none ${useColoredTheme ? 'text-[#0025B8] hover:bg-gray-100' : 'text-white hover:bg-white/10'}`}
+              aria-label="Toggle Menu"
             >
-              ☰
-            </Button>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {mobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-blue-900/95 backdrop-blur-md rounded-b-2xl py-3 px-4 space-y-2">
-            <Link href="/discover" className="block text-white">Discover</Link>
-            <Link href="/overview" className="block text-white">Overview</Link>
-            <Link href="/seeker" className="block text-white">For Job Seekers</Link>
-            <Link href="/companies" className="block text-white">For Companies</Link>
-          </div>
-        )}
+        {/* Mobile Dropdown Drawer */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden bg-[#001b87] rounded-3xl border border-white/20 py-6 px-6 shadow-2xl mb-4 space-y-4 text-center overflow-hidden"
+            >
+              <div className="flex flex-col space-y-3 pb-4 border-b border-white/10">
+                {navLinks.map((link) => {
+                  const isActive = pathname === link.href;
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`text-sm uppercase tracking-wider py-1.5 ${
+                        isActive ? 'text-cyan-300 font-bold' : 'text-white font-medium hover:text-cyan-300'
+                      }`}
+                    >
+                      {link.name}
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {!isAuthenticated && (
+                <div className="flex flex-col gap-3 pt-2 w-full">
+                  <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="w-full">
+                    <Button variant="gradient" size="md" className="w-full border-2 border-white">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="w-full">
+                    <Button variant="outline" size="md" border={true} hasBg={false} className="w-full text-white bg-transparent border-white">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </header>
   );

@@ -10,6 +10,27 @@ const prisma = new PrismaClient();
 
 const ATS_URL = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
 
+
+
+// ─── GET /api/v1/jobs/portal-stats — Hero section stats (public) ─────────────
+// MUST be declared before /:id, otherwise "portal-stats" is treated as a job id
+router.get('/portal-stats', async (_req, res, next) => {
+  try {
+    const [activeJobs, topCompanies, candidates] = await Promise.all([
+      prisma.jobPosting.count({ where: { status: 'ACTIVE' } }),
+      prisma.company.count(),
+      prisma.user.count({ where: { role: 'SEEKER' } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: { activeJobs, topCompanies, candidates },
+    });
+  } catch (e) { next(e); }
+});
+
+
+
 // ─── GET /api/v1/jobs — Public job board, enriched with ATS scores ────────────
 router.get('/', async (req, res, next) => {
   try {

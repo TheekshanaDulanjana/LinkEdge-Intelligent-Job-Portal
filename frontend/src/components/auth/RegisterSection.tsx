@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-
 import GoogleAuthButton from '@/components/GoogleAuthButton';
+import { motion } from 'framer-motion';
 
 const seekerSchema = z.object({
   fullName: z.string().min(2, 'Name is required'),
@@ -40,12 +40,22 @@ const companySchema = z.object({
 type SeekerForm = z.infer<typeof seekerSchema>;
 type CompanyForm = z.infer<typeof companySchema>;
 
-export default function RegisterPage() {
-  const router = useRouter();
-  const [role, setRole] = useState<'SEEKER' | 'COMPANY'>('SEEKER');
+export default function RegisterFormSection() {
+  const searchParams = useSearchParams();
+  const initialRole = searchParams.get('role')?.toUpperCase() === 'COMPANY' ? 'COMPANY' : 'SEEKER';
+
+  const [role, setRole] = useState<'SEEKER' | 'COMPANY'>(initialRole);
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+
+  // Sync role state if URL query params change dynamically
+  useEffect(() => {
+    const roleParam = searchParams.get('role')?.toUpperCase();
+    if (roleParam === 'COMPANY' || roleParam === 'SEEKER') {
+      setRole(roleParam);
+    }
+  }, [searchParams]);
 
   const seekerForm = useForm<SeekerForm>({ resolver: zodResolver(seekerSchema) });
   const companyForm = useForm<CompanyForm>({ resolver: zodResolver(companySchema) });
@@ -72,7 +82,7 @@ export default function RegisterPage() {
 
   if (registeredEmail) {
     return (
-      <div className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[24px] items-center w-full max-w-lg mx-auto bg-white p-8 mt-10">
+      <div className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[24px] items-center w-full max-w-lg mx-auto bg-white p-8 shadow-xl mt-10">
         <div className="w-full max-w-sm text-center">
             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-[#0F9DE4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -84,7 +94,7 @@ export default function RegisterPage() {
               We sent a verification code to <strong>{registeredEmail}</strong>.
             </p>
             <Link href={`/verify-email?email=${encodeURIComponent(registeredEmail)}`}>
-              <Button variant="gradient" className="w-full h-12">Enter verification code</Button>
+              <Button variant="gradient" className="w-full h-12 cursor-pointer">Enter verification code</Button>
             </Link>
         </div>
       </div>
@@ -92,29 +102,38 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[24px] items-center w-full lg:w-1/2 bg-white p-8">
-      <div className="w-full max-w-sm space-y-8">
+    <motion.div 
+      initial={{ opacity: 0, x: 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className="flex flex-col justify-center border-2 border-[#0F9DE4] rounded-[24px] items-center w-full lg:w-1/2 bg-white p-6 sm:p-8 shadow-xl"
+    >
+      <div className="w-full max-w-sm space-y-6 sm:space-y-8">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-black">Create An Account</h2>
           <p className="text-black/60 mt-1 text-sm">Join the Intelligent Job Portal</p>
         </div>
 
-        {/* Role Toggle */}
-        <div className="flex p-1 bg-[#0F9DE4]/5 shadow-sm rounded-full w-full">
+        {/* Role Toggle & Direct URL Links */}
+        <div className="flex p-1 bg-[#0F9DE4]/10 shadow-sm rounded-full w-full">
+          <Link href="/register?role=seeker" className="flex-1 flex">
             <button 
-                type="button"
-                onClick={() => setRole('SEEKER')}
-                className={`flex-1 py-2 text-xs cursor-pointer font-medium rounded-full transition-all ${role === 'SEEKER' ? 'bg-gradient-to-r from-[#0F9DE4] to-[#0025B8] cursor-pointer text-white' : 'text-gray-400'}`}
+              type="button"
+              onClick={() => setRole('SEEKER')}
+              className={`w-full py-2 text-xs cursor-pointer font-medium rounded-full transition-all ${role === 'SEEKER' ? 'bg-gradient-to-r from-[#0F9DE4] to-[#0025B8] text-white shadow-md' : 'text-gray-500 hover:text-black'}`}
             >
-                Job Seeker
+              Job Seeker
             </button>
+          </Link>
+          <Link href="/register?role=company" className="flex-1 flex">
             <button 
-                type="button"
-                onClick={() => setRole('COMPANY')}
-                className={`flex-1 py-2 cursor-pointer text-xs font-medium rounded-full transition-all ${role === 'COMPANY' ? 'bg-gradient-to-r from-[#0F9DE4] to-[#0025B8] text-white' : 'text-gray-400'}`}
+              type="button"
+              onClick={() => setRole('COMPANY')}
+              className={`w-full py-2 cursor-pointer text-xs font-medium rounded-full transition-all ${role === 'COMPANY' ? 'bg-gradient-to-r from-[#0F9DE4] to-[#0025B8] text-white shadow-md' : 'text-gray-500 hover:text-black'}`}
             >
-                Company
+              Company
             </button>
+          </Link>
         </div>
 
         {serverError && (
@@ -136,7 +155,7 @@ export default function RegisterPage() {
                 <Input placeholder="+94 71 123 4567" {...seekerForm.register('phone')} className="h-10" />
               </div>
             </div>
-              
+
             <div className="space-y-2">
               <Label>Email</Label>
               <Input type="email" placeholder="johndoe@example.com" {...seekerForm.register('email')} className="h-10" />
@@ -151,17 +170,17 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input type="password" placeholder="Create a password" {...seekerForm.register('password')} className="h-10" />
+                <Input type="password" placeholder="Create password" {...seekerForm.register('password')} className="h-10" />
                 {seekerForm.formState.errors.password && <p className="text-xs text-red-500">{seekerForm.formState.errors.password.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Confirm Password</Label>
-                <Input type="password" placeholder="Confirm your password" {...seekerForm.register('confirmPassword')} className="h-10" />
+                <Input type="password" placeholder="Confirm password" {...seekerForm.register('confirmPassword')} className="h-10" />
                 {seekerForm.formState.errors.confirmPassword && <p className="text-xs text-red-500">{seekerForm.formState.errors.confirmPassword.message}</p>}
               </div>
             </div>
 
-            <Button type="submit" variant="gradient" className="w-full h-12 mt-4" disabled={loading}>
+            <Button type="submit" variant="gradient" className="w-full h-12 mt-4 cursor-pointer" disabled={loading}>
               {loading ? 'Creating account...' : 'Sign Up'}
             </Button>
           </form>
@@ -206,17 +225,17 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input type="password" placeholder="Create a password" {...companyForm.register('password')} className="h-10" />
+                <Input type="password" placeholder="Create password" {...companyForm.register('password')} className="h-10" />
                 {companyForm.formState.errors.password && <p className="text-xs text-red-500">{companyForm.formState.errors.password.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Confirm Password</Label>
-                <Input type="password" placeholder="Confirm your password" {...companyForm.register('confirmPassword')} className="h-10" />
+                <Input type="password" placeholder="Confirm password" {...companyForm.register('confirmPassword')} className="h-10" />
                 {companyForm.formState.errors.confirmPassword && <p className="text-xs text-red-500">{companyForm.formState.errors.confirmPassword.message}</p>}
               </div>
             </div>
 
-            <Button type="submit" variant="gradient" className="w-full h-12 mt-4" disabled={loading}>
+            <Button type="submit" variant="gradient" className="w-full h-12 mt-4 cursor-pointer" disabled={loading}>
               {loading ? 'Creating account...' : 'Sign Up'}
             </Button>
           </form>
@@ -225,7 +244,7 @@ export default function RegisterPage() {
         {/* Separator */}
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-black/50" />
+            <span className="w-full border-t border-black/20" />
           </div>
           <div className="relative flex justify-center text-xs">
             <span className="bg-white px-2 text-black/50">or continue with Google</span>
@@ -241,6 +260,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
-    </div>
+    </motion.div>
   );
 }

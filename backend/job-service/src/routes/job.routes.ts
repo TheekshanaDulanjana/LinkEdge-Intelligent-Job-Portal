@@ -8,6 +8,29 @@ const prisma  = new PrismaClient();
 
 const ATS_URL = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
 
+// ─── GET /api/v1/jobs/portal-stats — Hero section stats (public) ─────────────
+// MUST be declared before /:id
+router.get('/portal-stats', async (_req, res, next) => {
+  try {
+    const [activeJobs, topCompanies] = await Promise.all([
+      prisma.jobPosting.count({ where: { status: 'ACTIVE' } }),
+      prisma.company.count(),
+    ]);
+
+    let candidates = 0;
+    try {
+      candidates = await prisma.user.count({ where: { role: 'SEEKER' } });
+    } catch (err: any) {
+      console.warn('[portal-stats] candidate count failed:', err?.message);
+    }
+
+    res.json({
+      success: true,
+      data: { activeJobs, topCompanies, candidates },
+    });
+  } catch (e) { next(e); }
+});
+
 // ─── GET /api/v1/jobs — Public job board, enriched with ATS scores ────────────
 router.get('/', async (req, res, next) => {
   try {
@@ -70,9 +93,9 @@ router.get('/', async (req, res, next) => {
 
     const result = enriched.map((job) => ({
       ...job,
-      atsScore:      atsScores[job.id]?.overall_score  ?? null,
-      atsColor:      atsScores[job.id]?.score_color    ?? null,
-      atsLabel:      atsScores[job.id]?.score_label    ?? null,
+      atsScore:      atsScores[job.id]?.overall_score    ?? null,
+      atsColor:      atsScores[job.id]?.score_color      ?? null,
+      atsLabel:      atsScores[job.id]?.score_label      ?? null,
       matchedSkills: atsScores[job.id]?.matched_skills ?? [],
       missingSkills: atsScores[job.id]?.missing_skills ?? [],
     }));

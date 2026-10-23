@@ -81,7 +81,7 @@ export function JobCard({ title, company, score, date, tags }: JobCardProps) {
       {/* 🔥 AI Score */}
       <div className={`flex items-center gap-2 rounded-full pr-3 w-fit border ${scoreStyle.bg} ${scoreStyle.border}`}>
         <span className={`${scoreStyle.badge} text-white text-[10px] font-bold px-3 py-1 rounded-full`}>
-          AI Match Score
+          Matching Score
         </span>
         <span className={`${scoreStyle.text} text-xs font-semibold`}>
           {score}%

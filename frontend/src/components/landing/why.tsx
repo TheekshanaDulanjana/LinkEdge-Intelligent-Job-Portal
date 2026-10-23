@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Search, GraduationCap, Mic, BarChart3, ShieldCheck, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const SECTIONS = [
   {
-    tag: "Got Talent?",
-    title: "Why Job Seekers Love SkillSync?",
+    tag: "GOT TALENT?",
+    title: "Why Job Seekers Love SkillSync",
+    learnMoreUrl: "/seeker",
+    registerUrl: "/register?role=seeker",
     features: [
       { icon: Search, t: "Smart Matching", d: "Stop searching and start discovering. Our AI reads your CV to find the best jobs for your specific skills." },
       { icon: GraduationCap, t: "Skill Gap Analysis", d: "We show you exactly what is missing from your profile and suggest the right courses to help you qualify for your dream role." },
@@ -16,9 +19,11 @@ const SECTIONS = [
     ]
   },
   {
-    tag: "Need Talent?",
-    title: "Why Recruiters Love SkillSync?",
-    className: "md:pl-12",
+    tag: "NEED TALENT?",
+    title: "Why Recruiters Love SkillSync",
+    learnMoreUrl: "/companies",
+    registerUrl: "/register?role=company",
+    className: "md:pl-10 lg:pl-16",
     features: [
       { icon: BarChart3, t: "Automated Ranking", d: "Save hours of manual work. Our system automatically ranks every applicant from highest to lowest suitability based on your JD." },
       { icon: ShieldCheck, t: "Quality Over Quantity", d: "We don't just send you resumes; we send you candidates who are actually prepared for the role." },
@@ -29,75 +34,90 @@ const SECTIONS = [
 
 export default function LinkEdgeLanding() {
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 py-16">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 relative items-stretch">
 
-        {/* Center Divider */}
-        <div className="hidden md:block absolute left-1/2 inset-y-0 w-px border-l border-dashed border-[#0F9DE4]" />
+        {/* Center Animated Divider for Desktop */}
+        <div className="hidden md:block absolute left-1/2 inset-y-0 w-px border-l-2 border-dashed border-[#0F9DE4]/30 -translate-x-1/2" />
 
         {SECTIONS.map((sec, i) => (
-          <div key={i} className={`space-y-10 ${sec.className || ""}`}>
-
-            {/* Header */}
-            <header className="space-y-2">
-              <h3 className="text-xs font-semibold tracking-widest text-[#0F9DE4] uppercase">
-                {sec.tag}
-              </h3>
-              <h2 className="text-xl md:text-2xl font-bold text-black">
-                {sec.title}
-              </h2>
-            </header>
-
-            {/* Features */}
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: i * 0.2 }}
+            className={`flex flex-col justify-between space-y-8 bg-white/60 backdrop-blur-sm p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-xl hover:shadow-2xl transition-shadow ${sec.className || ""}`}
+          >
+            {/* Top Section */}
             <div className="space-y-8">
-              {sec.features.map((f, j) => (
-                <div key={j} className="flex gap-6 items-start">
-                  <div className="flex-shrink-0 size-10 rounded-full bg-[#0F9DE4]/10 flex items-center justify-center">
-                    <f.icon className="size-5 text-[#0F9DE4]" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-base font-semibold text-slate-900">
-                      {f.t}
-                    </h4>
-                    <p className="text-slate-600 text-xs md:text-xs leading-relaxed">
-                      {f.d}
-                    </p>
-                  </div>
-                </div>
-              ))}
+              {/* Header */}
+              <header className="space-y-2">
+                <span className="inline-block text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3 py-1 rounded-full border border-sky-100">
+                  {sec.tag}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+                  {sec.title}
+                </h2>
+              </header>
+
+              {/* Features List */}
+              <div className="space-y-6">
+                {sec.features.map((f, j) => (
+                  <motion.div 
+                    key={j} 
+                    whileHover={{ x: 4 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                    className="flex gap-4 sm:gap-5 items-start p-3 rounded-2xl hover:bg-white/80 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-[#0F9DE4]/10 flex items-center justify-center shadow-inner">
+                      <f.icon className="w-5 h-5 text-[#0F9DE4]" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-base font-semibold text-gray-900">
+                        {f.t}
+                      </h4>
+                      <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
+                        {f.d}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex flex-wrap gap-4 pt-4">
-
-              {/* Learn More */}
-              <Link href={i === 0 ? "/seeker-details" : "/company-details"}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  border={true}
-                  hasBg={false}
-                  className="text-[#0F9DE4] border-[#0F9DE4] w-24 cursor-pointer hover:scale-105"
-                >
-                  Learn more
-                </Button>
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-gray-100 w-full">
+              <Link href={sec.learnMoreUrl} className="flex-1 sm:flex-none">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    border={true}
+                    hasBg={false}
+                    className="text-[#0F9DE4] border-[#0F9DE4] w-full sm:w-28 cursor-pointer hover:bg-sky-50 transition-all font-medium h-10 rounded-full"
+                  >
+                    Learn more
+                  </Button>
+                </motion.div>
               </Link>
 
-              {/* Register */}
-              <Link href="/register">
-                <Button
-                  variant="gradient"
-                  size="sm"
-                  className="cursor-pointer w-24 hover:scale-105"
-                >
-                  Register
-                </Button>
+              <Link href={sec.registerUrl} className="flex-1 sm:flex-none">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full">
+                  <Button
+                    variant="gradient"
+                    size="sm"
+                    className="cursor-pointer w-full sm:w-28 shadow-md hover:shadow-lg transition-all font-medium h-10 rounded-full"
+                  >
+                    Register
+                  </Button>
+                </motion.div>
               </Link>
-
             </div>
 
-          </div>
+          </motion.div>
         ))}
+
       </div>
     </section>
   );

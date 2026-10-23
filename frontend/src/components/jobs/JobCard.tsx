@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 interface JobCardProps {
   id: string;
@@ -34,7 +35,7 @@ function ATSScoreBadge({ score, color }: { score: number; color: string }) {
 
   return (
     <div className={`inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full border text-xs font-semibold ${c.bg}`}>
-      <span>AI Match Score</span>
+      <span>Matching Score</span>
       <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
         <div className={`h-full ${c.fill}`} style={{ width: `${Math.min(score, 100)}%` }} />
       </div>
@@ -61,69 +62,67 @@ export default function JobCard({
   const isPastDeadline = new Date(deadline) < new Date();
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all relative flex flex-col justify-between">
+    <motion.div 
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      className="bg-white/90 backdrop-blur-xl rounded-[24px] border border-sky-100 p-6 shadow-lg hover:shadow-2xl transition-all relative flex flex-col justify-between group"
+    >
       <div>
-        {/* Header */}
+        {/* Header (Save icon removed completely) */}
         <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3.5 min-w-0">
             {company?.logoUrl ? (
               <img
                 src={company.logoUrl.startsWith('http') ? company.logoUrl : `http://localhost:3001${company.logoUrl}`}
                 alt={company.companyName}
-                className="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 flex-shrink-0"
+                className="w-12 h-12 rounded-2xl object-cover bg-sky-50 border border-sky-100 flex-shrink-0 shadow-sm"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-base shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] flex items-center justify-center flex-shrink-0 text-white font-bold text-base shadow-md">
                 {company?.companyName?.[0]?.toUpperCase() || 'C'}
               </div>
             )}
 
             <div className="min-w-0">
-              <span className="text-[10px] uppercase tracking-wider text-blue-600 font-bold block">
+              <span className="text-[10px] uppercase tracking-wider text-[#0F9DE4] font-bold block">
                 WE ARE HIRING
               </span>
 
               {company && (
                 <Link
                   href={`/company/${company.id}/profile`}
-                  className="text-base font-bold text-gray-900 hover:text-blue-600 transition-colors block leading-snug truncate"
+                  className="text-base font-bold text-slate-900 hover:text-[#0F9DE4] transition-colors block leading-snug truncate"
                 >
                   {company.companyName}
                 </Link>
               )}
 
-              <span className="text-xs text-gray-400 block mt-0.5">
+              <span className="text-xs text-slate-400 block mt-0.5 font-medium">
                 {location}
               </span>
             </div>
           </div>
-
-          <button type="button" className="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-50 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-          </button>
         </div>
 
         {/* Job Title */}
-        <h2 className="text-xl font-bold text-gray-900 mb-3 leading-snug">
-          <Link href={`/jobs/${id}`} className="hover:text-blue-600 transition-colors">
+        <h2 className="text-xl font-bold text-slate-900 mb-3 leading-snug">
+          <Link href={`/jobs/${id}`} className="hover:text-[#0F9DE4] transition-colors">
             {title}
           </Link>
         </h2>
 
         {/* Chips */}
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1 rounded-md capitalize">
+          <span className="bg-sky-50 text-[#0025B8] text-xs font-semibold px-3 py-1 rounded-full border border-sky-100 capitalize">
             {jobType.replace('_', '-').toLowerCase()}
           </span>
 
-          <span className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1 rounded-md">
+          <span className="bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1 rounded-full border border-slate-200">
             {isPastDeadline ? 'Closed' : `Closes ${new Date(deadline).toLocaleDateString()}`}
           </span>
 
           {salaryMin && (
-            <span className="bg-emerald-50 text-emerald-700 text-xs font-medium px-3 py-1 rounded-md">
+            <span className="bg-emerald-50 text-emerald-700 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-100">
               LKR {salaryMin.toLocaleString()} {salaryMax ? `– ${salaryMax.toLocaleString()}` : ''}
             </span>
           )}
@@ -138,25 +137,25 @@ export default function JobCard({
 
         {/* Skill Match Pills */}
         {atsScore !== null && atsScore !== undefined && (matchedSkills.length > 0 || missingSkills.length > 0) && (
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 mb-4 text-xs space-y-2">
+          <div className="bg-slate-50/80 border border-slate-100 rounded-2xl p-3.5 mb-4 text-xs space-y-2">
             {matchedSkills.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {matchedSkills.slice(0, 4).map((s) => (
-                  <span key={s} className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-medium text-[11px]">
+                  <span key={s} className="bg-emerald-100/70 text-emerald-800 px-2.5 py-0.5 rounded-lg font-semibold text-[11px] border border-emerald-200/50">
                     ✓ {s}
                   </span>
                 ))}
                 {matchedSkills.length > 4 && (
-                  <span className="text-gray-400 text-[11px] font-medium align-self-center">
+                  <span className="text-slate-400 text-[11px] font-medium self-center pl-1">
                     +{matchedSkills.length - 4} more
                   </span>
                 )}
               </div>
             )}
             {missingSkills.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {missingSkills.slice(0, 3).map((s) => (
-                  <span key={s} className="bg-green-100 text-green-800 px-2 py-0.5 rounded-md font-medium text-[11px]">
+                  <span key={s} className="bg-green-100 text-green-800 px-2.5 py-0.5 rounded-lg font-semibold text-[11px] border border-green-200/50">
                     ✕ {s}
                   </span>
                 ))}
@@ -167,26 +166,29 @@ export default function JobCard({
 
         {atsScore === null && (
           <Link href="/seeker/profile" className="block mb-4">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-600 font-medium hover:bg-blue-100 transition-colors">
-              Upload CV to check your ATS Match Score →
+            <div className="bg-sky-50 border border-sky-100 rounded-2xl px-4 py-2.5 text-xs text-[#0025B8] font-semibold hover:bg-sky-100/70 transition-colors shadow-sm flex items-center justify-between">
+              <span>Upload CV to check your ATS Match Score</span>
+              <span>→</span>
             </div>
           </Link>
         )}
       </div>
 
       <div>
-        <hr className="border-gray-100 my-4" />
+        <hr className="border-slate-100 my-4" />
 
         <Link href={`/jobs/${id}`} className="block">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             disabled={isPastDeadline}
             onClick={onApply}
-            className="w-full py-2.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full py-3 text-sm font-semibold bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] hover:opacity-95 text-white rounded-full transition-all shadow-md hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
             {isPastDeadline ? 'Applications Closed' : 'Apply Now'}
-          </button>
+          </motion.button>
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }

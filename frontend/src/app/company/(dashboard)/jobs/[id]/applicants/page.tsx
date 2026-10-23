@@ -121,7 +121,7 @@ export default function JobApplicantsPage() {
               <tr className="text-left text-xs text-gray-400 border-b border-gray-100 bg-gray-50/50">
                 <th className="px-5 py-3 font-medium">Candidate</th>
                 <th className="px-5 py-3 font-medium">Applied On</th>
-                <th className="px-5 py-3 font-medium">AI Match Score</th>
+                <th className="px-5 py-3 font-medium">Matching Score</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
               </tr>

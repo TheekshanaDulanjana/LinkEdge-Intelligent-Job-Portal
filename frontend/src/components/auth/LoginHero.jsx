@@ -1,10 +1,18 @@
+'use client';
+
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
 export default function LoginHero() {
   return (
-    <div className="relative hidden lg:flex flex-col rounded-[24px] justify-center items-start p-12 text-white w-1/2 overflow-hidden ">
+    <motion.div 
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.6, ease: 'easeOut' }}
+      className="relative hidden lg:flex flex-col rounded-[24px] justify-center items-start p-8 xl:p-12 text-white w-full lg:w-1/2 overflow-hidden shadow-2xl"
+    >
       {/* Background with Grid */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0025B8] to-[#0F9DE4]">
         <div
@@ -21,9 +29,8 @@ export default function LoginHero() {
         />
       </div>
 
-      {/* Content Wrapper - Controls the vertical and horizontal flow */}
-      <div className="relative z-10 flex flex-col items-start gap-10 w-full">
-        
+      {/* Content Wrapper */}
+      <div className="relative z-10 flex flex-col items-start gap-8 xl:gap-10 w-full">
         {/* Logo, Title, and Description */}
         <div className="flex flex-col items-start">
           <Link href="/">
@@ -32,21 +39,18 @@ export default function LoginHero() {
               alt="LinkEdge Logo" 
               width={180} 
               height={40}
-              className="mb-24" 
+              className="mb-16 xl:mb-24" 
             />
           </Link>
 
-          <h1 className="text-4xl font-bold leading-tight mb-6 text-left">
+          <h1 className="text-3xl xl:text-4xl font-bold leading-tight mb-4 xl:mb-6 text-left">
             Your Career Journey<br />
             Continues Here!
           </h1>
-          <p className="text-sm max-w-lg mb-8 text-left">
-           Welcome back to your personalized career hub.
-            Log in to track your applications, explore new
-             AI-recommended paths, and see where your 
-             skills can take you today.
+          <p className="text-sm max-w-lg mb-6 xl:mb-8 text-left text-white/90 leading-relaxed">
+            Welcome back to your personalized career hub. Log in to track your applications, explore new AI-recommended paths, and see where your skills can take you today.
           </p>
-          
+
           <div className="flex gap-4">
             <Link href="/learn-more">
               <Button
@@ -54,7 +58,7 @@ export default function LoginHero() {
                 size="sm"
                 border={true}
                 hasBg={false}
-                className="text-white bg-transparent backdrop-blur-xs w-[120px] border-white cursor-pointer hover:scale-105"
+                className="text-white bg-transparent backdrop-blur-xs w-[120px] border-white cursor-pointer hover:scale-105 transition-transform"
               >
                 Learn More
               </Button>
@@ -64,7 +68,7 @@ export default function LoginHero() {
               <Button
                 variant="gradient"
                 size="sm"
-                className="border-2 border-white w-[120px] cursor-pointer hover:scale-105"
+                className="border-2 border-white w-[120px] cursor-pointer hover:scale-105 transition-transform"
               >
                 Register
               </Button>
@@ -72,13 +76,13 @@ export default function LoginHero() {
           </div>
         </div>
 
-        {/* Career Path Card - Positioned below the content, aligned left */}
-        <div className="relative z-30 bg-white rounded-[16px] p-5 shadow-xl max-w-xl">
-          <h4 className="text-black font-semibold mb-3">
+        {/* Career Path Card */}
+        <div className="relative z-30 bg-white/95 backdrop-blur-md rounded-[16px] p-4 xl:p-5 shadow-2xl max-w-xl w-full">
+          <h4 className="text-black font-semibold mb-3 text-sm xl:text-base">
             Career Paths
           </h4>
 
-          <div className="flex flex-wrap justify-start gap-3">
+          <div className="flex flex-wrap justify-start gap-2 xl:gap-3">
             {[
               "Software Engineer",
               "AI/ML Engineer",
@@ -105,7 +109,7 @@ export default function LoginHero() {
                     borderRadius: "6px",
                   }}
                 />
-                <span className="relative z-10 text-gray-700">
+                <span className="relative z-10 text-gray-700 font-medium">
                   {item}
                 </span>
               </span>
@@ -113,6 +117,6 @@ export default function LoginHero() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

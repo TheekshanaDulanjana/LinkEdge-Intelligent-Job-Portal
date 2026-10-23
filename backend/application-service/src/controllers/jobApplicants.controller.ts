@@ -4,6 +4,7 @@ import axios from 'axios';
 
 const prisma = new PrismaClient();
 const AI_URL    = process.env.AI_SERVICE_URL || 'http://localhost:8001';
+const ATS_URL   = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
 const NOTIF_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3004';
 const AUTH_URL  = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
 const SERVICE_KEY = process.env.INTERNAL_SERVICE_KEY as string;
@@ -82,48 +83,56 @@ export async function smartRankApplicants(req: any, res: Response) {
       return;
     }
 
-    // Payload shape must match ai-service's RankingRequest Pydantic model exactly
-    const aiRes = await axios.post(
-      `${AI_URL}/api/v1/ai/rank-candidates`,
+    // Deterministic ATS ranking — replaces the old ai-service ranking agent.
+    const atsRes = await axios.post(
+      `${ATS_URL}/api/v1/matching/rank-applicants`,
       {
-        job_id:           job.id,
-        job_title:        job.title,
-        job_description:  job.description,
-        job_requirements: job.requirements,
-        applications: applications.map(a => ({
-          id:        a.id,
-          seekerId:  a.seekerId,
-          cvUrl:     a.cvUrl,
-        })),
+        job_id:            job.id,
+        job_title:         job.title,
+        job_description:   job.description,
+        job_requirements:  job.requirements,
+        candidate_ids:     applications.map(a => a.seekerId),
       },
       { timeout: 60000 }
     );
 
-    // Response shape: { ranked_candidates: [{ application_id, seeker_id, score, strengths, weaknesses, recommendation }], ranking_summary, total_ranked }
+    // Response shape: { ranked, total, candidates: [{ candidate_id, has_resume, overall_score, score_label, score_color, matched_skills, missing_skills, breakdown }] }
     const ranked: Array<{
-      application_id: string;
-      seeker_id: string;
-      score: number;
-      strengths: string[];
-      weaknesses: string[];
-      recommendation: string;
-    }> = aiRes.data?.ranked_candidates ?? [];
+      candidate_id:   string;
+      has_resume:     boolean;
+      overall_score?: number;
+      score_label?:   string;
+      score_color?:   string;
+      matched_skills: string[];
+      missing_skills: string[];
+      breakdown?:     any;
+    }> = atsRes.data?.candidates ?? [];
+
+    // Map seekerId -> application id so we update the right row
+    const applicationBySeekerId = new Map(applications.map(a => [a.seekerId, a.id]));
+
+    const scored = ranked.filter(r => r.has_resume && r.overall_score != null);
 
     await Promise.all(
-      ranked.map(r =>
-        prisma.application.update({
-          where: { id: r.application_id },
+      scored.map(r => {
+        const applicationId = applicationBySeekerId.get(r.candidate_id);
+        if (!applicationId) return Promise.resolve();
+        return prisma.application.update({
+          where: { id: applicationId },
           data: {
-            aiScore: r.score,
+            aiScore:  r.overall_score,
+            atsScore: r.overall_score,
             atsBreakdown: {
-              strengths: r.strengths ?? [],
-              weaknesses: r.weaknesses ?? [],
-              recommendation: r.recommendation ?? '',
-              rankedAt: new Date().toISOString(),
+              matchedSkills: r.matched_skills ?? [],
+              missingSkills: r.missing_skills ?? [],
+              scoreLabel:    r.score_label ?? null,
+              scoreColor:    r.score_color ?? null,
+              breakdown:     r.breakdown ?? null,
+              rankedAt:      new Date().toISOString(),
             },
           },
-        }).catch(e => console.warn('rank update failed for', r.application_id, e.message))
-      )
+        }).catch(e => console.warn('rank update failed for', applicationId, e.message));
+      })
     );
 
     const updated = await prisma.application.findMany({
@@ -131,11 +140,10 @@ export async function smartRankApplicants(req: any, res: Response) {
       orderBy: [{ aiScore: 'desc' }, { createdAt: 'asc' }],
     });
 
-    res.json({ success: true, data: { ranked: ranked.length, applicants: updated } });
+    res.json({ success: true, data: { ranked: scored.length, applicants: updated } });
   } catch (e: any) {
-    // Surface the actual FastAPI validation error to the terminal for debugging
     if (e.response?.data) {
-      console.error('[smart-rank] AI service error:', JSON.stringify(e.response.data));
+      console.error('[smart-rank] ATS service error:', JSON.stringify(e.response.data));
     } else {
       console.error('[smart-rank]', e.message);
     }
@@ -254,21 +262,21 @@ export async function rejectCandidate(req: any, res: Response) {
 
     let aiMessage = `Thank you for applying for ${application.job.title}. After careful review, we have decided not to proceed at this time.`;
     try {
-      const aiRes = await axios.post(
-        `${AI_URL}/api/v1/ai/generate-rejection-message`,
+      const atsRes = await axios.post(
+        `${ATS_URL}/api/v1/matching/rejection-explanation`,
         {
-          reason_title:     reasonTitle,
-          candidate_name:   contact?.name ?? 'Candidate',
+          candidate_id:     application.seekerId,
+          job_id:           application.job.id,
           job_title:        application.job.title,
-          company_name:     company.companyName,
-          cv_text:          application.cvTextSnapshot ?? '',
-          job_description:  `${application.job.description}\n\nRequirements:\n${application.job.requirements}`,
+          job_description:  application.job.description,
+          job_requirements: application.job.requirements,
+          reason_title:     reasonTitle,
         },
         { timeout: 20000 }
       );
-      aiMessage = aiRes.data?.ai_message ?? aiMessage;
+      aiMessage = atsRes.data?.explanation ?? aiMessage;
     } catch (e: any) {
-      console.warn('[reject] AI message generation failed, using fallback:', e.message);
+      console.warn('[reject] ATS explanation generation failed, using fallback:', e.message);
     }
 
     const updated = await prisma.application.update({

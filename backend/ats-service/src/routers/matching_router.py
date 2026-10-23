@@ -1,19 +1,14 @@
-"""
-Endpoints:
-    POST /api/v1/ats/score        — score one candidate against one job
-    POST /api/v1/ats/batch-score  — score one candidate against many jobs
-"""
-
 import os
 import json
 import uuid
-from typing   import Any, Optional
+from typing   import Any, Optional, List
 from fastapi  import APIRouter
 from pydantic import BaseModel
 
 from src.database.db              import get_connection
 from src.extractors.job_extractor import extract_job_requirements
 from src.matching.ats_engine      import ats_engine
+from src.matching.rejection_templates import generate_rejection_explanation
 from src.models.schemas           import ParsedResume, BatchJob
 
 router = APIRouter()
@@ -22,11 +17,11 @@ router = APIRouter()
 # ── Request bodies ─────────────────────────────────────────────────────────────
 
 class ScoreRequest(BaseModel):
-    candidate_id:     str
-    job_id:           str
-    job_title:        str
-    job_description:  str
-    job_requirements: str
+    candidate_id:       str
+    job_id:             str
+    job_title:          str
+    job_description:    str
+    job_requirements:   str
 
 
 class BatchScoreRequest(BaseModel):
@@ -105,11 +100,11 @@ def _get_cached_score(
         if not row:
             return None
         return {
-            "cached":        True,
+            "cached":         True,
             "overall_score": float(row[0]),
-            "breakdown":     _safe_json(row[8]),
-            "score_color":   _score_color(float(row[0])),
-            "score_label":   _score_label(float(row[0])),
+            "breakdown":      _safe_json(row[8]),
+            "score_color":    _score_color(float(row[0])),
+            "score_label":    _score_label(float(row[0])),
             "matched_skills": row[6] or [],
             "missing_skills": row[7] or [],
             "calculated_at": row[9].isoformat() if row[9] else None,
@@ -129,13 +124,13 @@ def _cache_score(resume_id: str, job_id: str, result) -> None:
                    overall_score, technical_score, experience_score,
                    education_score, certification_score, keyword_score,
                    matched_skills, missing_skills, breakdown, calculated_at
-               ) VALUES (
+                ) VALUES (
                    %s, %s, %s,
                    %s, %s, %s,
                    %s, %s, %s,
                    %s, %s, %s, NOW()
-               )
-               ON CONFLICT (resume_id, job_id) DO UPDATE SET
+                )
+                ON CONFLICT (resume_id, job_id) DO UPDATE SET
                    overall_score       = EXCLUDED.overall_score,
                    technical_score     = EXCLUDED.technical_score,
                    experience_score    = EXCLUDED.experience_score,
@@ -274,3 +269,142 @@ async def batch_score(request: BatchScoreRequest):
             scores[job_id] = {"overall_score": None, "error": str(exc)}
 
     return {"has_resume": True, "scores": scores}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NEW — Deterministic candidate ranking (replaces the old AI ranking agent)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RankApplicantsRequest(BaseModel):
+    job_id:             str
+    job_title:          str
+    job_description:    str
+    job_requirements:   str
+    candidate_ids:      List[str]
+
+
+class RankedCandidate(BaseModel):
+    candidate_id:       str
+    has_resume:         bool
+    overall_score:      Optional[float] = None
+    score_label:        Optional[str]   = None
+    score_color:        Optional[str]   = None
+    matched_skills:     List[str]       = []
+    missing_skills:     List[str]       = []
+    breakdown:          Optional[dict]  = None
+
+
+@router.post("/rank-applicants")
+async def rank_applicants(request: RankApplicantsRequest):
+    """
+    Deterministic candidate ranking for a job posting.
+    Scores every applicant's resume against the job using the same
+    weighted ATS algorithm (40% skills / 25% experience / 15% education /
+    10% certifications / 10% keyword TF-IDF) used everywhere else in the
+    platform. No AI/LLM is involved — fully explainable and reproducible.
+    """
+    job_reqs = extract_job_requirements(
+        request.job_title, request.job_description, request.job_requirements
+    )
+
+    results: List[RankedCandidate] = []
+
+    for candidate_id in request.candidate_ids:
+        resume_id, parsed_resume = _get_parsed_resume(candidate_id)
+
+        if not parsed_resume:
+            results.append(RankedCandidate(candidate_id=candidate_id, has_resume=False))
+            continue
+
+        cached = _get_cached_score(resume_id, request.job_id)
+        if cached:
+            results.append(RankedCandidate(
+                candidate_id   = candidate_id,
+                has_resume     = True,
+                overall_score  = cached["overall_score"],
+                score_color    = cached["score_color"],
+                score_label    = cached["score_label"],
+                matched_skills = cached.get("matched_skills", []),
+                missing_skills = cached.get("missing_skills", []),
+                breakdown      = cached["breakdown"],
+            ))
+            continue
+
+        result = ats_engine.calculate(parsed_resume, job_reqs)
+        _cache_score(resume_id, request.job_id, result)
+
+        results.append(RankedCandidate(
+            candidate_id   = candidate_id,
+            has_resume     = True,
+            overall_score  = result.overall_score,
+            score_color    = result.score_color,
+            score_label    = result.score_label,
+            matched_skills = result.breakdown.matched_skills,
+            missing_skills = result.breakdown.missing_skills,
+            breakdown      = result.breakdown.dict(),
+        ))
+
+    # Deterministic sort — highest score first, candidates with no resume sort last
+    results.sort(key=lambda r: (r.overall_score is None, -(r.overall_score or 0)))
+
+    return {
+        "ranked":      len([r for r in results if r.has_resume]),
+        "total":       len(results),
+        "candidates": [r.dict() for r in results],
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NEW — Deterministic rejection explanation (replaces the old AI rejection agent)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RejectionExplanationRequest(BaseModel):
+    candidate_id:       str
+    job_id:             str
+    job_title:          str
+    job_description:    str
+    job_requirements:   str
+    reason_title:       str
+
+
+@router.post("/rejection-explanation")
+async def rejection_explanation(request: RejectionExplanationRequest):
+    """
+    Deterministic, template-based rejection explanation.
+    Uses the same cached/computed ATS breakdown that drives the candidate's
+    match score, so the explanation is always consistent with the score the
+    candidate was given. No LLM is called.
+    """
+    resume_id, parsed_resume = _get_parsed_resume(request.candidate_id)
+
+    if not parsed_resume:
+        fallback = (
+            f"Thank you for applying for the {request.job_title} position. "
+            f"After reviewing your application, we have decided not to proceed "
+            f"at this time."
+        )
+        return {"has_resume": False, "overall_score": None, "explanation": fallback}
+
+    cached = _get_cached_score(resume_id, request.job_id)
+    if cached:
+        breakdown      = cached["breakdown"]
+        overall_score = cached["overall_score"]
+    else:
+        job_reqs = extract_job_requirements(
+            request.job_title, request.job_description, request.job_requirements
+        )
+        result = ats_engine.calculate(parsed_resume, job_reqs)
+        _cache_score(resume_id, request.job_id, result)
+        breakdown      = result.breakdown.dict()
+        overall_score = result.overall_score
+
+    explanation = generate_rejection_explanation(
+        request.reason_title, breakdown, request.job_title
+    )
+
+    return {
+        "has_resume":    True,
+        "overall_score": overall_score,
+        "explanation":   explanation,
+        "breakdown":     breakdown,
+    }
