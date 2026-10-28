@@ -34,7 +34,10 @@ router.get('/portal-stats', async (_req, res, next) => {
 // ─── GET /api/v1/jobs — Public job board, enriched with ATS scores ────────────
 router.get('/', async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, search, location, jobType, seekerId } = req.query;
+    const {
+      page = 1, limit = 10, search, location, jobType, seekerId,
+      department, experienceLevel, locationType,
+    } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = { status: 'ACTIVE' };
@@ -44,8 +47,11 @@ router.get('/', async (req, res, next) => {
         { description: { contains: search as string, mode: 'insensitive' } },
       ];
     }
-    if (location) where.location = { contains: location as string, mode: 'insensitive' };
-    if (jobType)  where.jobType  = jobType;
+    if (location)        where.location        = { contains: location as string, mode: 'insensitive' };
+    if (jobType)          where.jobType          = jobType;
+    if (department)       where.department       = department;
+    if (experienceLevel)  where.experienceLevel  = experienceLevel;
+    if (locationType)     where.locationType     = locationType;
 
     const [jobs, total] = await Promise.all([
       prisma.jobPosting.findMany({
@@ -341,12 +347,18 @@ router.post(
       const {
         title,
         description,
-        requirements,
+        requirements,       // legacy flat text (optional now — auto-derived below if missing)
+        requirementsList,   // NEW: array of requirement lines from the form
         location,
         jobType,
         salaryMin,
         salaryMax,
         deadline,
+        department,
+        experienceLevel,
+        locationType,
+        responsibilities,
+        skills,
       } = req.body;
 
       // Find company ID using the authenticated user ID
@@ -362,17 +374,34 @@ router.post(
         return;
       }
 
+      const cleanRequirementsList = Array.isArray(requirementsList)
+        ? requirementsList.filter((r: string) => r && r.trim() !== '')
+        : [];
+
+      // Keep the legacy flat `requirements` string populated too — ats-service
+      // still reads this field for matching, so we derive it from the new list
+      // when the frontend sends requirementsList instead of a flat string.
+      const flatRequirements = cleanRequirementsList.length > 0
+        ? cleanRequirementsList.join('. ')
+        : (requirements || '');
+
       const newJob = await prisma.jobPosting.create({
         data: {
           companyId: company.id,
           title,
           description,
-          requirements,
+          requirements:      flatRequirements,
+          requirementsList:  cleanRequirementsList,
           location,
           jobType,
           salaryMin: salaryMin ? Number(salaryMin) : null,
           salaryMax: salaryMax ? Number(salaryMax) : null,
           deadline: new Date(deadline),
+          department:        department ?? null,
+          experienceLevel:   experienceLevel ?? null,
+          locationType:      locationType ?? 'REMOTE',
+          responsibilities:  Array.isArray(responsibilities) ? responsibilities : [],
+          skills:            Array.isArray(skills) ? skills : [],
         },
       });
 

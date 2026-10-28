@@ -16,6 +16,14 @@ interface HeroSectionProps {
 }
 
 export default function HeroSection({ search, setSearch, location, setLocation, handleSearch, total }: HeroSectionProps) {
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearch();
+    }
+  }
+
   return (
     <div className="relative w-full bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] px-4 py-20 md:py-28 text-center text-white overflow-hidden shadow-xl">
       
@@ -76,6 +84,7 @@ export default function HeroSection({ search, setSearch, location, setLocation, 
               placeholder="Job Title"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
               className="border-none text-gray-900 focus-visible:ring-0 placeholder:text-gray-400 bg-transparent shadow-none"
             />
           </div>
@@ -86,6 +95,7 @@ export default function HeroSection({ search, setSearch, location, setLocation, 
               placeholder="Location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+              onKeyDown={handleKeyDown}
               className="border-none text-gray-900 focus-visible:ring-0 placeholder:text-gray-400 bg-transparent shadow-none"
             />
           </div>

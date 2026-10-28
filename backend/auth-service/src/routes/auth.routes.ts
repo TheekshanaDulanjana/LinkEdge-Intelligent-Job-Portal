@@ -145,13 +145,17 @@ router.delete('/account', authenticate, async (req: any, res, next) => {
 
 // -- Profile Update Routes --
 
+// අලුත්
 router.patch(
   '/seeker/profile',
   authenticate,
   profileUpload.single('profileImage'),
   async (req: any, res, next) => {
     try {
-      const { fullName, phone, location, interestArea, workStatus, professionalSummary } = req.body;
+      const {
+        fullName, phone, location, interestArea, workStatus, professionalSummary,
+        websiteUrl, githubUrl, behanceUrl, workStyle,
+      } = req.body;
       const updateData: Record<string, any> = {};
 
       if (fullName) updateData.fullName = fullName;
@@ -160,6 +164,12 @@ router.patch(
       if (interestArea) updateData.interestArea = interestArea;
       if (workStatus) updateData.workStatus = workStatus;
       if (professionalSummary) updateData.professionalSummary = professionalSummary;
+      if (websiteUrl !== undefined) updateData.websiteUrl = websiteUrl || null;
+      if (githubUrl !== undefined) updateData.githubUrl = githubUrl || null;
+      if (behanceUrl !== undefined) updateData.behanceUrl = behanceUrl || null;
+      if (workStyle && ['REMOTE', 'HYBRID', 'ON_SITE'].includes(workStyle)) {
+        updateData.workStyle = workStyle;
+      }
       if (req.file) updateData.profileImageUrl = `/uploads/profiles/${req.file.filename}`;
 
       const seeker = await prisma.jobSeeker.update({

@@ -66,7 +66,6 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/auth/resume', resumeRoutes);
 app.use('/api/v1/auth/candidate', candidateRoutes);
-
 // -- 404 handler --
 app.use((req, res) => {
   res.status(404).json({

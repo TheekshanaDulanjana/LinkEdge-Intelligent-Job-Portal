@@ -31,6 +31,10 @@ export interface CandidateProfile {
     interestArea: string | null;
     workStatus: string;
     professionalSummary: string | null;
+    websiteUrl?: string | null;
+    githubUrl?: string | null;
+    behanceUrl?: string | null;
+    workStyle?: string | null;
   };
   resume: {
     originalName: string;
@@ -40,7 +44,7 @@ export interface CandidateProfile {
     technologies: string[];
     certifications: string[];
     experienceYears: number | null;
-    experience: Array<{ title?: string; company?: string; duration?: string }>;
+    experience: Array<{ title?: string; company?: string; duration?: string; description?: string }>;
     education: Array<{ degree?: string; institution?: string; year?: string }>;
     jobTitle: string | null;
     isParsed: boolean;
@@ -65,6 +69,15 @@ export async function fetchCandidates(params: { search?: string; stage?: string;
 export async function fetchCandidateProfile(seekerId: string): Promise<CandidateProfile> {
   const res = await authApi.get(`/auth/candidate/${seekerId}/profile`);
   return res.data.data;
+}
+
+// NEW — fetches the candidate's actual CV file as a Blob, for inline preview
+export async function fetchCandidateCvFile(seekerId: string): Promise<Blob> {
+  const res = await authApi.get(`/auth/candidate/${seekerId}/resume/file`, {
+    responseType: 'arraybuffer',
+  });
+  const contentType = res.headers?.['content-type'] || 'application/pdf';
+  return new Blob([res.data], { type: contentType });
 }
 
 export async function updateCandidateStage(applicationId: string, status: string) {

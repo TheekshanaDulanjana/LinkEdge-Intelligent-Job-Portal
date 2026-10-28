@@ -74,6 +74,7 @@ model JobPosting {
   experienceLevel  String?
   description      String
   requirements     String
+  requirementsList String[]          @default([])
   responsibilities String[]          @default([])
   skills           String[]          @default([])
   locationType     LocationType      @default(REMOTE)

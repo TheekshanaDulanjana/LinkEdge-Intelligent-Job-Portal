@@ -41,6 +41,10 @@ model JobSeeker {
   interestArea        String?
   workStatus          WorkStatus @default(UNEMPLOYED)
   professionalSummary String?
+  websiteUrl          String?
+  githubUrl           String?
+  behanceUrl          String?
+  workStyle           String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 }
@@ -75,6 +79,7 @@ model JobPosting {
   experienceLevel  String?
   description      String
   requirements     String
+  requirementsList String[] @default([])
   responsibilities String[]          @default([])
   skills           String[]          @default([])
   locationType     LocationType      @default(REMOTE)

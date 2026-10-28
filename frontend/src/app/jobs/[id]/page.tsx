@@ -13,6 +13,7 @@ import {
   MapPin, 
   Clock, 
   CheckCircle2, 
+  ClipboardCheck,
   Award, 
   Sparkles,
   ArrowLeft
@@ -34,6 +35,7 @@ interface Job {
   locationType?: string;
   description: string;
   requirements: string;
+  requirementsList?: string[];
   responsibilities?: string[];
   skills?: string[];
   location: string;
@@ -145,11 +147,17 @@ export default function JobDetailPage() {
 
   const responsibilitiesList = (job.responsibilities && job.responsibilities.length > 0)
     ? job.responsibilities
+    : [];
+
+  const requirementsList = (job.requirementsList && job.requirementsList.length > 0)
+    ? job.requirementsList
     : (job.requirements && job.requirements.includes('\n'))
       ? job.requirements.split('\n').filter(line => line.trim().length > 0)
-      : (job.requirements) 
-        ? [job.requirements] 
-        : [];
+      : (job.requirements && job.requirements.includes('. '))
+        ? job.requirements.split('. ').filter(line => line.trim().length > 0)
+        : (job.requirements)
+          ? [job.requirements]
+          : [];
 
   return (
     <div className="min-h-screen bg-slate-50/60 py-12 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
@@ -215,6 +223,16 @@ export default function JobDetailPage() {
                       {job.locationType.replace('_', '-')}
                     </span>
                   )}
+                  {job.department && (
+                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full text-xs font-semibold shadow-xs">
+                      {job.department}
+                    </span>
+                  )}
+                  {job.experienceLevel && (
+                    <span className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-full text-xs font-semibold shadow-xs">
+                      {job.experienceLevel}
+                    </span>
+                  )}
                   <span className="px-3 py-1 bg-white border border-slate-200 text-slate-700 rounded-full text-xs font-semibold shadow-xs">
                     {isPast ? 'Closed' : `Closes in ${daysLeft} days`}
                   </span>
@@ -239,6 +257,7 @@ export default function JobDetailPage() {
               </p>
             </section>
 
+            {/* 01. Responsibilities */}
             <section className="space-y-3">
               <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide border-l-4 border-[#0F9DE4] pl-3">
                 Key Responsibilities
@@ -256,6 +275,44 @@ export default function JobDetailPage() {
                 <p className="text-xs text-slate-400 italic pl-1">No specific responsibilities listed for this position.</p>
               )}
             </section>
+
+            {/* 02. Requirements */}
+            <section className="space-y-3">
+              <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide border-l-4 border-[#0F9DE4] pl-3">
+                Requirements
+              </h3>
+              {requirementsList.length > 0 ? (
+                <ul className="space-y-2.5 pl-1">
+                  {requirementsList.map((req, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
+                      <ClipboardCheck className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <span>{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-400 italic pl-1">No specific requirements listed for this position.</p>
+              )}
+            </section>
+
+            {/* 03. Required Skills */}
+            {job.skills && job.skills.length > 0 && (
+              <section className="space-y-3">
+                <h3 className="text-base font-bold text-slate-900 uppercase tracking-wide border-l-4 border-[#0F9DE4] pl-3">
+                  Required Skills
+                </h3>
+                <div className="flex flex-wrap gap-2 pl-1">
+                  {job.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="px-3 py-1.5 bg-sky-50 border border-sky-100 text-[#0025B8] rounded-xl text-xs font-semibold shadow-xs"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Application Action Button */}
             <div className="pt-8 border-t border-slate-100">

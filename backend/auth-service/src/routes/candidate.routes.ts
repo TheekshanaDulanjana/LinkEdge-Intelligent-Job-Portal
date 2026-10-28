@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -27,8 +29,6 @@ function companyOnly(req: any, res: Response, next: any): void {
   next();
 }
 
-// Internal service-to-service auth — used for calls FROM other backend services,
-// not from the browser. Verifies a shared secret key instead of a user JWT.
 function requireServiceKey(req: any, res: Response, next: any): void {
   const key = req.headers['x-service-key'];
   if (!key || key !== process.env.INTERNAL_SERVICE_KEY) {
@@ -39,7 +39,6 @@ function requireServiceKey(req: any, res: Response, next: any): void {
 }
 
 // POST /api/v1/auth/candidate/skills-distribution
-// Aggregates skills across a given list of seekerIds (company-facing, browser call)
 router.post('/skills-distribution', auth, companyOnly, async (req: any, res: Response) => {
   try {
     const { seekerIds } = req.body as { seekerIds: string[] };
@@ -73,7 +72,6 @@ router.post('/skills-distribution', auth, companyOnly, async (req: any, res: Res
 });
 
 // GET /api/v1/auth/candidate/:seekerId/profile
-// Company-facing: full candidate profile used by Candidates page detail panel (browser call)
 router.get('/:seekerId/profile', auth, companyOnly, async (req: any, res: Response) => {
   try {
     const { seekerId } = req.params;
@@ -89,6 +87,10 @@ router.get('/:seekerId/profile', auth, companyOnly, async (req: any, res: Respon
           interestArea: true,
           workStatus: true,
           professionalSummary: true,
+          websiteUrl: true,
+          githubUrl: true,
+          behanceUrl: true,
+          workStyle: true,
         },
       }),
       prisma.candidateResume.findUnique({
@@ -127,8 +129,55 @@ router.get('/:seekerId/profile', auth, companyOnly, async (req: any, res: Respon
   }
 });
 
-// GET /api/v1/auth/candidate/:seekerId/contact
-// Internal service-to-service call FROM application-service — uses service key, not user JWT
+// GET /api/v1/auth/candidate/:seekerId/resume/file
+// Company-facing CV preview — only allowed if this candidate has actually
+// applied to one of this company's job postings (prevents arbitrary access).
+router.get('/:seekerId/resume/file', auth, companyOnly, async (req: any, res: Response) => {
+  try {
+    const { seekerId } = req.params;
+
+    const company = await prisma.company.findFirst({ where: { userId: req.user.userId } });
+    if (!company) {
+      res.status(404).json({ success: false, message: 'Company profile not found' });
+      return;
+    }
+
+    const hasApplied = await prisma.application.findFirst({
+      where: { seekerId, job: { companyId: company.id } },
+      select: { id: true },
+    });
+
+    if (!hasApplied) {
+      res.status(403).json({ success: false, message: "Not authorized to view this candidate's CV" });
+      return;
+    }
+
+    const resume = await prisma.candidateResume.findUnique({
+      where: { candidateId: seekerId },
+      select: { filePath: true, originalName: true, mimeType: true },
+    });
+
+    if (!resume || !resume.filePath) {
+      res.status(404).json({ success: false, message: 'Resume file not found' });
+      return;
+    }
+
+    const absolutePath = path.resolve(resume.filePath);
+    if (!fs.existsSync(absolutePath)) {
+      res.status(404).json({ success: false, message: 'File does not exist on server storage' });
+      return;
+    }
+
+    res.setHeader('Content-Type', resume.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${resume.originalName}"`);
+    fs.createReadStream(absolutePath).pipe(res);
+  } catch (e) {
+    console.error('[candidate/resume/file]', e);
+    res.status(500).json({ success: false, message: 'Failed to retrieve resume file' });
+  }
+});
+
+// GET /api/v1/auth/candidate/:seekerId/contact — internal service-to-service
 router.get('/:seekerId/contact', requireServiceKey, async (req: any, res: Response) => {
   try {
     const [user, jobSeeker] = await Promise.all([
@@ -143,10 +192,7 @@ router.get('/:seekerId/contact', requireServiceKey, async (req: any, res: Respon
 
     res.json({
       success: true,
-      data: {
-        email: user.email,
-        name: jobSeeker?.fullName ?? 'Candidate',
-      },
+      data: { email: user.email, name: jobSeeker?.fullName ?? 'Candidate' },
     });
   } catch (e) {
     console.error('[candidate/contact]', e);

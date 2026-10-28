@@ -226,7 +226,9 @@ def _extract_education(education_text: str) -> list[dict]:
 
 
 def _extract_experience_entries(exp_text: str) -> list[dict]:
-    """Parse work experience section into structured job entries."""
+    """Parse work experience section into structured job entries, each with
+    a title, company, duration, and a short description built from the
+    bullet/summary lines that follow it."""
     _JOB_KWS = [
         "engineer", "developer", "architect", "manager", "director",
         "analyst", "designer", "consultant", "lead", "senior", "junior",
@@ -234,17 +236,23 @@ def _extract_experience_entries(exp_text: str) -> list[dict]:
         "coordinator", "head", "chief", "staff", "principal", "associate",
         "president",
     ]
-    entries: list[dict] = []
-    current: dict       = {}
+    entries: list[dict]    = []
+    current: dict          = {}
+    desc_lines: list[str]  = []
+
+    def _flush():
+        if current:
+            current["description"] = " ".join(desc_lines).strip()[:280]
+            entries.append(current)
 
     for line in exp_text.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
         if _DATE_RANGE_RE.search(stripped):
-            if current:
-                entries.append(current)
+            _flush()
             current = {"duration": stripped, "title": "", "company": ""}
+            desc_lines = []
             continue
         lw = stripped.lower()
         if any(kw in lw for kw in _JOB_KWS) and len(stripped) < 100:
@@ -252,12 +260,15 @@ def _extract_experience_entries(exp_text: str) -> list[dict]:
                 current["title"] = stripped
             elif not current:
                 current = {"title": stripped, "company": "", "duration": ""}
+                desc_lines = []
+            else:
+                desc_lines.append(stripped)
         elif current and not current.get("company") and len(stripped) < 100:
             current["company"] = stripped
+        elif current:
+            desc_lines.append(stripped)
 
-    if current:
-        entries.append(current)
-
+    _flush()
     return entries
 
 
