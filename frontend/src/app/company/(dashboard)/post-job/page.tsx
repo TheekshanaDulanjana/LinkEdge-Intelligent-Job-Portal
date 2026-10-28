@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { motion, AnimatePresence } from 'framer-motion';
 import api, { jobApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,9 @@ import {
   Link as LinkIcon, 
   List, 
   Eye, 
-  Send 
+  Send,
+  Sparkles,
+  Briefcase
 } from 'lucide-react';
 
 const schema = z.object({
@@ -45,8 +48,22 @@ function PostJobPageContent() {
   const [companyLogo, setCompanyLogo] = useState<string>('');
 
   const [responsibilities, setResponsibilities] = useState<string[]>(['']);
+  const [requirementsList, setRequirementsList] = useState<string[]>(['']);
   const [skills, setSkills] = useState<string[]>(['React', 'TypeScript', 'Node.js', 'Next.js']);
   const [skillInput, setSkillInput] = useState('');
+
+  // Footer eka hide kirima me page ekedi
+  useEffect(() => {
+    const footerElement = document.querySelector('footer');
+    if (footerElement) {
+      footerElement.style.display = 'none';
+    }
+    return () => {
+      if (footerElement) {
+        footerElement.style.display = '';
+      }
+    };
+  }, []);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -92,6 +109,7 @@ function PostJobPageContent() {
     setValue('description', newText);
   };
 
+  // ── Responsibilities list handlers ──────────────────────────────
   const handleAddResponsibility = () => {
     setResponsibilities([...responsibilities, '']);
   };
@@ -106,6 +124,22 @@ function PostJobPageContent() {
     setResponsibilities(updated);
   };
 
+  // ── Requirements list handlers (mirrors Responsibilities) ───────
+  const handleAddRequirement = () => {
+    setRequirementsList([...requirementsList, '']);
+  };
+
+  const handleRemoveRequirement = (index: number) => {
+    setRequirementsList(requirementsList.filter((_, i) => i !== index));
+  };
+
+  const handleRequirementChange = (index: number, value: string) => {
+    const updated = [...requirementsList];
+    updated[index] = value;
+    setRequirementsList(updated);
+  };
+
+  // ── Required Skills (chip tags) handlers ────────────────────────
   const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && skillInput.trim()) {
       e.preventDefault();
@@ -125,14 +159,16 @@ function PostJobPageContent() {
     setServerError('');
 
     const cleanResponsibilities = responsibilities.filter((r) => r.trim() !== '');
+    const cleanRequirements = requirementsList.filter((r) => r.trim() !== '');
 
     try {
       await jobApi.post('/jobs', {
         ...data,
         status,
         responsibilities: cleanResponsibilities,
+        requirementsList: cleanRequirements,
+        requirements: cleanRequirements.join('. '), // legacy flat string, backend also derives this itself
         skills: skills,
-        requirements: skills.join(', '),
         salaryMin: data.salaryMin ? parseInt(data.salaryMin) : undefined,
         salaryMax: data.salaryMax ? parseInt(data.salaryMax) : undefined,
       });
@@ -152,68 +188,79 @@ function PostJobPageContent() {
   const minDate = tomorrow.toISOString().split('T')[0];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-8 text-slate-800">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-8 text-slate-800 font-sans">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Top Header & Action Buttons */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 sm:p-8 rounded-[28px] border border-sky-100 shadow-xl">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Post a New Position</h1>
-            <p className="text-sm text-slate-500">Fill in the details to reach top-tier talent in our exclusive network.</p>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Post a New Position</h1>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Fill in the details to reach top-tier talent in our exclusive network.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button 
               type="button" 
               variant="outline" 
               onClick={handleSubmit((d) => submitJob(d, 'DRAFT'))}
-              className="border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+              className="rounded-full h-11 px-5 border-sky-200 text-[#0025B8] hover:bg-sky-50 font-bold text-xs cursor-pointer shadow-xs"
             >
               Save Draft
             </Button>
-            <Button type="button" variant="outline" className="border-blue-500 text-blue-600 bg-blue-50 hover:bg-blue-100 gap-2">
-              <Eye className="w-4 h-4" /> Preview
+            <Button type="button" variant="outline" className="rounded-full h-11 px-5 border-sky-200 text-[#0025B8] bg-sky-50/50 hover:bg-sky-100 gap-2 font-bold text-xs cursor-pointer shadow-xs">
+              <Eye className="w-4 h-4 text-[#0F9DE4]" /> Preview
             </Button>
-            <Button 
-              onClick={handleSubmit(onSubmit)} 
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-            >
-              <Send className="w-4 h-4" /> Post New Job
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button 
+                onClick={handleSubmit(onSubmit)} 
+                disabled={loading}
+                variant="gradient"
+                className="rounded-full h-11 px-6 text-white gap-2 font-bold text-xs shadow-md cursor-pointer"
+              >
+                <Send className="w-4 h-4" /> Post New Job
+              </Button>
+            </motion.div>
           </div>
         </div>
 
         {serverError && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm font-semibold text-rose-800 shadow-sm">
             {serverError}
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl border border-slate-200 p-4 sticky top-8">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">SECTIONS</p>
-              <nav className="space-y-1">
-                <a href="#basic-info" className="block px-3 py-2 text-sm font-medium border-l-2 border-blue-600 text-blue-600 bg-blue-50/50 rounded-r-md">Basic Info</a>
-                <a href="#location-salary" className="block px-3 py-2 text-sm font-medium border-l-2 border-transparent text-slate-600 hover:text-slate-900">Location & Salary</a>
-                <a href="#job-description" className="block px-3 py-2 text-sm font-medium border-l-2 border-transparent text-slate-600 hover:text-slate-900">Job Description</a>
-                <a href="#requirements" className="block px-3 py-2 text-sm font-medium border-l-2 border-transparent text-slate-600 hover:text-slate-900">Requirements</a>
+        {/* Main Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Sidebar Navigation Links */}
+          <div className="lg:col-span-3 hidden lg:block sticky top-28">
+            <div className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 shadow-xl space-y-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Sections</p>
+              <nav className="space-y-1.5">
+                <a href="#basic-info" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-[#0025B8] text-[#0025B8] bg-sky-50 rounded-r-2xl">Basic Info</a>
+                <a href="#location-salary" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Location & Salary</a>
+                <a href="#job-description" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Job Description</a>
+                <a href="#requirements" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Requirements & Skills</a>
               </nav>
             </div>
           </div>
 
+          {/* Center Form Section */}
           <div className="lg:col-span-6 space-y-6">
-            <div id="basic-info" className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
-              <h2 className="text-base font-semibold border-b border-slate-100 pb-3">Basic Info</h2>
+            
+            {/* Basic Info */}
+            <div id="basic-info" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-5">
+              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Basic Info</h2>
               
-              <div>
-                <Label className="text-xs font-semibold text-slate-600">Job Title</Label>
-                <Input placeholder="Enter the job title" className="mt-1" {...register('title')} />
-                {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title.message}</p>}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700">Job Title</Label>
+                <Input placeholder="Enter the job title" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('title')} />
+                {errors.title && <p className="text-xs text-rose-600 font-semibold mt-1">{errors.title.message}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Department</Label>
-                  <select {...register('department')} className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Department</Label>
+                  <select {...register('department')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
                     <option value="Engineering">Engineering</option>
                     <option value="Design">Design</option>
                     <option value="Marketing">Marketing</option>
@@ -221,9 +268,9 @@ function PostJobPageContent() {
                   </select>
                 </div>
 
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Employment Type</Label>
-                  <select {...register('jobType')} className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Employment Type</Label>
+                  <select {...register('jobType')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
                     <option value="REMOTE">Remote</option>
                     <option value="FULL_TIME">Full Time</option>
                     <option value="PART_TIME">Part Time</option>
@@ -233,38 +280,39 @@ function PostJobPageContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Experience Level</Label>
-                  <select {...register('experienceLevel')} className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Experience Level</Label>
+                  <select {...register('experienceLevel')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
                     <option value="Entry Level">Entry Level</option>
                     <option value="Mid Level">Mid Level</option>
                     <option value="Senior Level">Senior Level</option>
                   </select>
                 </div>
 
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Application Deadline</Label>
-                  <Input type="date" min={minDate} className="mt-1" {...register('deadline')} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Application Deadline</Label>
+                  <Input type="date" min={minDate} className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('deadline')} />
                 </div>
               </div>
             </div>
 
-            <div id="location-salary" className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
-              <h2 className="text-base font-semibold border-b border-slate-100 pb-3">Location & Salary</h2>
+            {/* Location & Salary */}
+            <div id="location-salary" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-5">
+              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Location & Salary</h2>
 
-              <div>
-                <Label className="text-xs font-semibold text-slate-600">Location Type</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700">Location Type</Label>
                 <div className="flex items-center gap-6 mt-2">
                   {['Remote', 'On-Site', 'Hybrid'].map((type) => {
                     const value = type.toUpperCase().replace('-', '_');
                     return (
-                      <label key={type} className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                      <label key={type} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
                         <input
                           type="radio"
                           value={value}
                           {...register('locationType')}
-                          className="text-blue-600 focus:ring-blue-500"
+                          className="text-[#0025B8] focus:ring-[#0F9DE4]"
                         />
                         {type}
                       </label>
@@ -273,64 +321,71 @@ function PostJobPageContent() {
                 </div>
               </div>
 
-              <div>
-                <Label className="text-xs font-semibold text-slate-600">Office Location</Label>
-                <Input placeholder="Colombo, Sri Lanka" className="mt-1" {...register('location')} />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-700">Office Location</Label>
+                <Input placeholder="Colombo, Sri Lanka" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('location')} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Min. Salary ( Monthly )</Label>
-                  <Input placeholder="LKR 0.00" className="mt-1" {...register('salaryMin')} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Min. Salary ( Monthly )</Label>
+                  <Input placeholder="LKR 0.00" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('salaryMin')} />
                 </div>
-                <div>
-                  <Label className="text-xs font-semibold text-slate-600">Max. Salary ( Monthly )</Label>
-                  <Input placeholder="LKR 0.00" className="mt-1" {...register('salaryMax')} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-slate-700">Max. Salary ( Monthly )</Label>
+                  <Input placeholder="LKR 0.00" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('salaryMax')} />
                 </div>
               </div>
             </div>
 
-            <div id="job-description" className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
-              <h2 className="text-base font-semibold border-b border-slate-100 pb-3">Job Description</h2>
+            {/* Job Description */}
+            <div id="job-description" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-4">
+              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Job Description</h2>
 
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <div className="bg-slate-100 px-3 py-2 border-b border-slate-200 flex items-center gap-3 text-slate-600">
-                  <button type="button" onClick={() => applyFormat('**', '**')} className="p-1 hover:bg-slate-200 rounded"><Bold className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => applyFormat('*', '*')} className="p-1 hover:bg-slate-200 rounded"><Italic className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => applyFormat('[', '](https://)')} className="p-1 hover:bg-slate-200 rounded"><LinkIcon className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => applyFormat('\n- ')} className="p-1 hover:bg-slate-200 rounded"><List className="w-3.5 h-3.5" /></button>
+              <div className="border border-sky-100 rounded-2xl overflow-hidden shadow-xs">
+                <div className="bg-sky-50/70 px-4 py-2.5 border-b border-sky-100 flex items-center gap-3 text-slate-600">
+                  <button type="button" onClick={() => applyFormat('**', '**')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><Bold className="w-4 h-4 text-[#0025B8]" /></button>
+                  <button type="button" onClick={() => applyFormat('*', '*')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><Italic className="w-4 h-4 text-[#0025B8]" /></button>
+                  <button type="button" onClick={() => applyFormat('[', '](https://)')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><LinkIcon className="w-4 h-4 text-[#0025B8]" /></button>
+                  <button type="button" onClick={() => applyFormat('\n- ')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><List className="w-4 h-4 text-[#0025B8]" /></button>
                 </div>
                 <textarea
                   id="job-description-textarea"
                   rows={6}
                   placeholder="Describe the role, impact, and who you're looking for..."
                   {...register('description')}
-                  className="w-full p-3 text-sm focus:outline-none resize-none"
+                  className="w-full p-4 text-xs sm:text-sm focus:outline-none resize-none bg-slate-50/30 text-slate-800 font-medium"
                 />
               </div>
-              {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
+              {errors.description && <p className="text-xs text-rose-600 font-semibold">{errors.description.message}</p>}
             </div>
 
-            <div id="requirements" className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
-              <h2 className="text-base font-semibold border-b border-slate-100 pb-3">Requirements & Skills</h2>
+            {/* Requirements & Skills — now 3 clearly separated subsections */}
+            <div id="requirements" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-8">
+              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Requirements & Skills</h2>
 
-              <div>
-                <Label className="text-xs font-semibold text-slate-600">Key Responsibilities</Label>
-                <div className="space-y-2 mt-2">
+              {/* 01. Responsibilities */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">01</span>
+                  <Label className="text-xs font-bold text-slate-700">Responsibilities</Label>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium pl-8">Add one responsibility per line (e.g. &ldquo;Design intuitive UI/UX for websites and mobile applications.&rdquo;)</p>
+                <div className="space-y-3 mt-2 pl-8">
                   {responsibilities.map((resp, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <div key={idx} className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#0F9DE4] shrink-0"></span>
                       <Input
                         value={resp}
                         onChange={(e) => handleResponsibilityChange(idx, e.target.value)}
-                        placeholder="Add a Key responsibility..."
-                        className="text-sm"
+                        placeholder="Add a key responsibility..."
+                        className="h-11 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50 flex-1"
                       />
                       {responsibilities.length > 1 && (
                         <button
                           type="button"
                           onClick={() => handleRemoveResponsibility(idx)}
-                          className="text-slate-400 hover:text-red-500"
+                          className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -341,25 +396,68 @@ function PostJobPageContent() {
                 <button
                   type="button"
                   onClick={handleAddResponsibility}
-                  className="mt-3 text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                  className="mt-2 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] hover:underline flex items-center gap-1.5 cursor-pointer pl-8"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add Another
+                  <Plus className="w-4 h-4" /> Add Another Responsibility
                 </button>
               </div>
 
-              <div>
-                <Label className="text-xs font-semibold text-slate-600">Required Skills</Label>
-                <div className="border border-slate-200 rounded-lg p-2 mt-2 flex flex-wrap gap-2 items-center bg-white min-h-[48px]">
+              {/* 02. Requirements */}
+              <div className="space-y-2 pt-6 border-t border-sky-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">02</span>
+                  <Label className="text-xs font-bold text-slate-700">Requirements</Label>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium pl-8">Add one requirement per line (e.g. &ldquo;3+ years of UI/UX design experience.&rdquo;)</p>
+                <div className="space-y-3 mt-2 pl-8">
+                  {requirementsList.map((req, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#0F9DE4] shrink-0"></span>
+                      <Input
+                        value={req}
+                        onChange={(e) => handleRequirementChange(idx, e.target.value)}
+                        placeholder="Add a requirement..."
+                        className="h-11 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50 flex-1"
+                      />
+                      {requirementsList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRequirement(idx)}
+                          className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddRequirement}
+                  className="mt-2 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] hover:underline flex items-center gap-1.5 cursor-pointer pl-8"
+                >
+                  <Plus className="w-4 h-4" /> Add Another Requirement
+                </button>
+              </div>
+
+              {/* 03. Required Skills */}
+              <div className="space-y-2 pt-6 border-t border-sky-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">03</span>
+                  <Label className="text-xs font-bold text-slate-700">Required Skills</Label>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium pl-8">Type a tool/technology and press Enter (e.g. React, Node, Python, Figma, PHP)</p>
+                <div className="border border-sky-100 rounded-2xl p-3 mt-2 flex flex-wrap gap-2 items-center bg-slate-50/50 min-h-[52px] shadow-xs pl-8">
                   {skills.map((skill) => (
                     <span
                       key={skill}
-                      className="bg-blue-600 text-white text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5 font-medium"
+                      className="bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white text-xs px-3 py-1.5 rounded-xl flex items-center gap-2 font-bold shadow-xs"
                     >
                       {skill}
                       <button
                         type="button"
                         onClick={() => handleRemoveSkill(skill)}
-                        className="hover:text-red-200 text-xs"
+                        className="hover:text-cyan-200 text-xs font-bold cursor-pointer"
                       >
                         ×
                       </button>
@@ -371,71 +469,77 @@ function PostJobPageContent() {
                     onChange={(e) => setSkillInput(e.target.value)}
                     onKeyDown={handleAddSkill}
                     placeholder="Type and press enter..."
-                    className="border-none outline-none text-xs flex-1 min-w-[150px] p-1"
+                    className="border-none outline-none text-xs font-medium flex-1 min-w-[150px] p-2 bg-transparent text-slate-800"
                   />
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-4">
-              <span className="text-xs text-slate-400">Draft autosaved.</span>
+              <span className="text-xs text-slate-400 font-medium">Draft autosaved securely.</span>
               <div className="flex items-center gap-3">
-                <Button type="button" variant="outline" className="border-slate-300">
+                <Button type="button" variant="outline" className="rounded-full h-11 px-6 border-sky-200 text-[#0025B8] hover:bg-sky-50 font-bold text-xs cursor-pointer shadow-xs">
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit(onSubmit)} disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Post This Job
-                </Button>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <Button onClick={handleSubmit(onSubmit)} disabled={loading} variant="gradient" className="rounded-full h-11 px-7 text-white font-bold text-xs shadow-md cursor-pointer">
+                    Post This Job
+                  </Button>
+                </motion.div>
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-3 space-y-6">
-            <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-4">
-              <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wide">Recruiter Pro-Tip</h3>
-              <p className="text-xs text-blue-900 mt-2 leading-relaxed">
-                "Job posts with explicit salary ranges and hybrid policies receive 3x more high-quality applications."
+          {/* Right Preview Sidebar (3 Columns) */}
+          <div className="lg:col-span-3 space-y-6 sticky top-28">
+            <div className="bg-sky-50/80 border border-sky-200 rounded-[28px] p-5 shadow-sm space-y-2">
+              <h3 className="text-xs font-extrabold text-[#0025B8] uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#0F9DE4]" /> Recruiter Pro-Tip
+              </h3>
+              <p className="text-xs text-slate-700 font-medium leading-relaxed">
+                &ldquo;Job posts with explicit salary ranges and hybrid policies receive 3x more high-quality applications.&rdquo;
               </p>
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">POST PREVIEW</p>
+            <div className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 shadow-xl space-y-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Post Preview</p>
               
-              <div className="border border-slate-200 rounded-lg p-4 shadow-sm bg-white space-y-3">
-                <div className="flex items-center gap-2">
+              <div className="border border-sky-100 rounded-2xl p-4 shadow-sm bg-slate-50/50 space-y-3">
+                <div className="flex items-center gap-2.5">
                   {companyLogo ? (
-                    <img src={companyLogo} alt={companyName} className="w-7 h-7 rounded object-cover" />
+                    <img src={companyLogo} alt={companyName} className="w-8 h-8 rounded-xl object-cover shadow-xs border border-sky-100" />
                   ) : (
-                    <div className="w-7 h-7 rounded bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0025B8] to-[#0F9DE4] flex items-center justify-center text-white text-xs font-black shadow-xs">
                       {companyName?.[0]?.toUpperCase() || 'C'}
                     </div>
                   )}
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800">{companyName || 'Company Name'}</h4>
-                    <p className="text-[10px] text-slate-400">HIRING NOW</p>
+                    <h4 className="text-xs font-bold text-slate-900 truncate max-w-[130px]">{companyName || 'Company Name'}</h4>
+                    <p className="text-[10px] font-bold text-[#0F9DE4] uppercase">HIRING NOW</p>
                   </div>
                 </div>
 
-                <h3 className="text-sm font-bold text-slate-900">{watchTitle || 'Senior Full-Stack Engineer'}</h3>
+                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">{watchTitle || 'Senior Full-Stack Engineer'}</h3>
 
-                <div className="flex flex-wrap gap-1">
-                  <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded">{watchJobType}</span>
-                  <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{watchLocationType}</span>
-                  <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Closing soon</span>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-[10px] font-bold bg-[#0025B8] text-white px-2.5 py-1 rounded-full shadow-xs">{watchJobType}</span>
+                  <span className="text-[10px] font-bold bg-sky-100 text-[#0025B8] px-2.5 py-1 rounded-full shadow-xs">{watchLocationType}</span>
+                  <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full shadow-xs">Closing soon</span>
                 </div>
 
                 {watchDescription && (
-                  <p className="text-xs text-slate-500 line-clamp-3 pt-1 border-t border-slate-100 whitespace-pre-wrap">
+                  <p className="text-xs text-slate-600 font-medium line-clamp-3 pt-2 border-t border-sky-100 whitespace-pre-wrap leading-relaxed">
                     {watchDescription}
                   </p>
                 )}
 
-                <Button className="w-full text-xs bg-blue-600 text-white hover:bg-blue-700 h-8 mt-2">
+                <Button className="w-full text-xs font-bold rounded-full h-9 bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white hover:opacity-90 transition-all shadow-md mt-2 cursor-pointer">
                   APPLY NOW
                 </Button>
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>

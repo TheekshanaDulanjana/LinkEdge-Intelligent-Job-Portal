@@ -1,16 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { jobApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import HeroSection from '@/components/jobs/HeroSection';
-import SidebarFilters from '@/components/jobs/SidebarFilters';
+import SidebarFilters, { JobFilterValues } from '@/components/jobs/SidebarFilters';
 import JobCard from '@/components/jobs/JobCard';
 import CTAAccount from '@/components/jobs/CTAAccount';
 import { Button } from '@/components/ui/button';
 import { Sparkles } from 'lucide-react';
+
+const EMPTY_FILTERS: JobFilterValues = {
+  jobType: '',
+  department: '',
+  experienceLevel: '',
+  locationType: '',
+};
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -18,21 +25,25 @@ export default function JobsPage() {
   const [search, setSearch] = useState('');
   const [location, setLocation] = useState('');
   const [total, setTotal] = useState(0);
+  const [filters, setFilters] = useState<JobFilterValues>(EMPTY_FILTERS);
 
-  async function fetchJobs(s = search, l = location, t = '') {
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (s) params.append('search', s);
-      if (l) params.append('location', l);
-      if (t) params.append('jobType', t);
+      if (search) params.append('search', search);
+      if (location) params.append('location', location);
+      if (filters.jobType) params.append('jobType', filters.jobType);
+      if (filters.department) params.append('department', filters.department);
+      if (filters.experienceLevel) params.append('experienceLevel', filters.experienceLevel);
+      if (filters.locationType) params.append('locationType', filters.locationType);
 
       // Pass seekerId so backend enriches with ATS scores
       const userId = useAuthStore.getState().user?.id;
       if (userId) params.append('seekerId', userId);
 
       const res = await jobApi.get(`/jobs?${params.toString()}`);
-      
+
       const fetchedJobs = res.data?.data?.jobs || res.data?.jobs || [];
       const fetchedTotal = res.data?.data?.total || res.data?.total || fetchedJobs.length;
 
@@ -43,42 +54,42 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  }
+    // eslint-disable-next-line
+  }, [search, location, filters]);
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [fetchJobs]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-24 font-sans">
-      {/* Pass total prop to HeroSection */}
-      <HeroSection 
-        search={search} 
-        setSearch={setSearch} 
-        location={location} 
-        setLocation={setLocation} 
-        handleSearch={() => fetchJobs(search, location)} 
+      <HeroSection
+        search={search}
+        setSearch={setSearch}
+        location={location}
+        setLocation={setLocation}
+        handleSearch={fetchJobs}
         total={total}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 flex flex-col md:flex-row gap-8 lg:gap-10">
-        
+
         {/* Left Side: Filters and CTA */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
           className="w-full md:w-80 flex-shrink-0 flex flex-col gap-6"
         >
-          <SidebarFilters />
+          <SidebarFilters filters={filters} onChange={setFilters} />
           <CTAAccount />
         </motion.div>
 
         {/* Right Side: Job Grid */}
         <div className="flex-1 space-y-6">
-          
+
           {/* TOP ACTION BAR: Premium Feature Banner */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
@@ -95,8 +106,8 @@ export default function JobsPage() {
 
             <Link href="/seeker/smart-apply" className="w-full sm:w-auto">
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full sm:w-auto cursor-pointer bg-white border-sky-200 text-[#0025B8] hover:bg-gradient-to-r hover:from-[#0025B8] hover:to-[#0F9DE4] hover:text-white transition-all duration-200 shadow-sm font-semibold gap-2 rounded-full px-6 h-11 border-2"
                 >
                   <Sparkles className="w-4 h-4 text-[#0F9DE4]" />
@@ -113,7 +124,7 @@ export default function JobsPage() {
               ))}
             </div>
           ) : (
-            <motion.div 
+            <motion.div
               initial="hidden"
               animate="show"
               variants={{
@@ -158,7 +169,7 @@ export default function JobsPage() {
                   </motion.div>
                 ))
               ) : (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="col-span-full py-24 text-center text-slate-500 bg-white/60 backdrop-blur-sm border-2 border-dashed border-sky-100 rounded-3xl shadow-sm"
