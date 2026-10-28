@@ -1,76 +1,96 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, ArrowUpDown, Pencil, Trash2,
-  Briefcase, FileText, CalendarClock, ChevronLeft, ChevronRight, Eye,
-  AlertTriangle
+  Search, Plus, ArrowUpDown, Trash2, Briefcase, FileText, CalendarClock, Users, Eye,
+  PauseCircle, PlayCircle, MapPin, Clock, Download, ArrowUp, ArrowDown, ExternalLink,
 } from 'lucide-react';
-import PageHeader from '@/components/enterprise/PageHeader';
-import StatCard from '@/components/enterprise/StatCard';
-import StatusBadge from '@/components/enterprise/StatusBadge';
-import EmptyState from '@/components/enterprise/EmptyState';
-import { Button } from '@/components/ui/button';
 import {
-  fetchJobsSummary, fetchCompanyJobs, deleteJob,
-  JobsSummary, JobRow,
+  fetchJobsSummary, fetchCompanyJobs, deleteJob, toggleJobStatus, JobsSummary, JobRow,
 } from '@/lib/jobs';
+import {
+  Panel, KpiTile, EmptyNote, ErrorNote, PanelSkeleton, Pill, cx, fmtNum, daysLeft,
+} from '@/components/enterprise/dashboard/primitives';
+import {
+  PageHead, Segmented, Pagination, ConfirmDialog, Toast, JobStatusPill, useHideFooter,
+  inputCls, selectCls, btnPrimary, btnSecondary, iconBtn, thCls, tdCls,
+} from '@/components/enterprise/dashboard/kit';
 
-const STATUS_FILTERS = ['ALL', 'ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT'];
-const TYPE_FILTERS   = ['ALL', 'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'];
+const STATUS_OPTIONS = [
+  { value: 'ALL', label: 'All' },
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'INACTIVE', label: 'Paused' },
+  { value: 'CLOSED', label: 'Closed' },
+  { value: 'DRAFT', label: 'Draft' },
+];
+const TYPE_OPTIONS = ['ALL', 'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'];
+const PAGE_SIZE = 10;
+
+const typeLabel = (t: string) => t.replace('_', ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 
 export default function JobsPage() {
+  useHideFooter();
+
   const [summary, setSummary] = useState<JobsSummary | null>(null);
-  const [jobs, setJobs]        = useState<JobRow[]>([]);
-  const [total, setTotal]      = useState(0);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const [search, setSearch]         = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [sortBy, setSortBy]         = useState('createdAt');
-  const [sortOrder, setSortOrder]   = useState<'asc' | 'desc'>('desc');
-  const [page, setPage]             = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState<JobRow | null>(null);
-  const [deleting, setDeleting]     = useState(false);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
 
-  // Footer eka hide kirima me page ekedi
+  const [deleteTarget, setDeleteTarget] = useState<JobRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
+
+  function flash(type: 'ok' | 'err', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  // Header search sends the user here with ?q=
   useEffect(() => {
-    const footerElement = document.querySelector('footer');
-    if (footerElement) {
-      footerElement.style.display = 'none';
-    }
-    return () => {
-      if (footerElement) {
-        footerElement.style.display = '';
-      }
-    };
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) { setSearchInput(q); setSearch(q); }
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const loadSummary = useCallback(() => { fetchJobsSummary().then(setSummary).catch(() => {}); }, []);
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
       const res = await fetchCompanyJobs({
-        page, limit: 10, search,
-        status: statusFilter, jobType: typeFilter,
-        sortBy, sortOrder,
+        page, limit: PAGE_SIZE, search, status: statusFilter, jobType: typeFilter, sortBy, sortOrder,
       });
       setJobs(res.jobs);
       setTotal(res.total);
       setTotalPages(res.totalPages);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); setError(true); }
     finally { setLoading(false); }
   }, [page, search, statusFilter, typeFilter, sortBy, sortOrder]);
 
-  useEffect(() => { fetchJobsSummary().then(setSummary).catch(console.error); }, []);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
   function toggleSort(field: string) {
-    if (sortBy === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    if (sortBy === field) setSortOrder(o => (o === 'asc' ? 'desc' : 'asc'));
     else { setSortBy(field); setSortOrder('desc'); }
+    setPage(1);
   }
 
   async function confirmDelete() {
@@ -78,274 +98,182 @@ export default function JobsPage() {
     setDeleting(true);
     try {
       await deleteJob(deleteTarget.id);
+      flash('ok', `“${deleteTarget.title}” deleted.`);
       setDeleteTarget(null);
-      loadJobs();
-    } catch (e) { console.error(e); }
+      loadJobs(); loadSummary();
+    } catch (e) { console.error(e); flash('err', 'Could not delete this job.'); }
     finally { setDeleting(false); }
   }
 
+  async function handleToggle(job: JobRow) {
+    const next = job.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    setBusyId(job.id);
+    try {
+      await toggleJobStatus(job.id, next);
+      setJobs(prev => prev.map(j => (j.id === job.id ? { ...j, status: next } : j)));
+      flash('ok', next === 'ACTIVE' ? 'Job is live again.' : 'Job paused. It is hidden from seekers.');
+      loadSummary();
+    } catch (e) { console.error(e); flash('err', 'Status change failed.'); }
+    finally { setBusyId(null); }
+  }
+
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Title', 'Type', 'Location', 'Status', 'Applicants', 'Posted', 'Deadline', 'Salary min', 'Salary max']];
+    jobs.forEach(j => rows.push([j.title, j.jobType, j.location, j.status, String(j.applicationCount),
+      new Date(j.createdAt).toISOString().slice(0, 10), new Date(j.deadline).toISOString().slice(0, 10),
+      String(j.salaryMin ?? ''), String(j.salaryMax ?? '')]));
+    const blob = new Blob([rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `jobs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const maxApps = useMemo(() => Math.max(1, ...jobs.map(j => j.applicationCount)), [jobs]);
+  const avgPerJob = summary && summary.totalActiveJobs ? summary.totalApplications / summary.totalActiveJobs : null;
   const salaryLabel = (min: number | null, max: number | null) =>
-    min || max ? `LKR ${min?.toLocaleString() ?? '—'} – ${max?.toLocaleString() ?? '—'}` : '—';
+    min || max ? `${min ? min.toLocaleString() : '–'} – ${max ? max.toLocaleString() : '–'}` : 'Not disclosed';
+
+  const SortHead = ({ field, children }: { field: string; children: React.ReactNode }) => (
+    <button onClick={() => toggleSort(field)} className="inline-flex items-center gap-1 hover:text-slate-700 cursor-pointer uppercase tracking-wide">
+      {children}
+      {sortBy === field
+        ? (sortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-[#0025B8]" /> : <ArrowDown className="w-3 h-3 text-[#0025B8]" />)
+        : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+    </button>
+  );
 
   return (
-    <div className="space-y-8 pb-12 font-sans text-slate-800">
-      
-      {/* Enterprise Page Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <PageHeader
-          title="Open Opportunities"
-          description="Manage every job posting, track applications, and monitor hiring status."
-          actions={
-            <Link href="/company/post-job">
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button variant="gradient" className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-full shadow-md cursor-pointer h-10">
-                  <Plus className="w-4 h-4" /> Post New Job
-                </Button>
-              </motion.div>
-            </Link>
-          }
-        />
-      </motion.div>
+    <div className="space-y-5 pb-10 text-slate-800">
+      <PageHead
+        eyebrow="Recruitment"
+        title="Jobs"
+        description="Every posting in one place. Track applicants, pause or reopen roles, and watch deadlines."
+        actions={<>
+          <button onClick={exportCsv} disabled={jobs.length === 0} className={btnSecondary}><Download className="w-3.5 h-3.5" /> Export view</button>
+          <Link href="/company/post-job" className={btnPrimary}><Plus className="w-3.5 h-3.5" /> Post a job</Link>
+        </>}
+      />
 
-      {/* Summary Stat Cards Grid */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
-      >
-        <StatCard
-          label="Total Active Jobs"
-          value={summary?.totalActiveJobs ?? '—'}
-          icon={Briefcase}
-          change={summary?.newJobsThisWeek}
-          changeLabel="this week"
-          iconColor="indigo"
-        />
-        <StatCard
-          label="Total Applications"
-          value={summary?.totalApplications ?? '—'}
-          icon={FileText}
-          change={summary?.newAppsThisWeek}
-          changeLabel="this week"
-          iconColor="purple"
-        />
-        <div className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 shadow-xl flex flex-col justify-between">
-          <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 shadow-xs">
-            <CalendarClock className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-3xl font-black text-slate-900 tracking-tight">{summary?.interviewsToday ?? '—'}</p>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              Interviews Today
-              {summary?.nextInterviewTime && ` · Next ${summary.nextInterviewTime}`}
-            </p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile label="Active jobs" icon={<Briefcase className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.totalActiveJobs)} delta={summary ? { value: summary.newJobsThisWeek, label: 'new this week' } : null} />
+        <KpiTile label="Applications" icon={<FileText className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.totalApplications)} delta={summary ? { value: summary.newAppsThisWeek, label: 'new this week' } : null} />
+        <KpiTile label="Interviews today" icon={<CalendarClock className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.interviewsToday)}
+          hint={summary?.nextInterviewTime ? `Next ${summary.nextInterviewTime}` : 'None scheduled next'} href="/company/calendar" />
+        <KpiTile label="Avg applicants per job" icon={<Users className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(avgPerJob, 1)} hint="Across active postings" />
+      </div>
+
+      <Panel title="All postings" subtitle={loading ? 'Loading…' : `${total} result${total === 1 ? '' : 's'}`} icon={<Briefcase className="w-3.5 h-3.5" />} noPad>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
+          <Segmented value={statusFilter} onChange={v => { setStatusFilter(v); setPage(1); }} options={STATUS_OPTIONS} />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Search title or location"
+                className={cx(inputCls, 'pl-9 sm:w-64')} />
+            </div>
+            <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }} className={cx(selectCls, 'sm:w-40')}>
+              {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t === 'ALL' ? 'All types' : typeLabel(t)}</option>)}
+            </select>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] rounded-[28px] p-6 flex flex-col justify-between text-white shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-          <p className="text-xs font-bold tracking-wider uppercase text-cyan-200">Ready for a new role?</p>
-          <Link href="/company/post-job" className="mt-4">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <button className="w-full inline-flex items-center justify-center gap-2 bg-white text-[#0025B8] text-xs font-bold rounded-full py-2.5 hover:bg-sky-50 transition-all shadow-md cursor-pointer">
-                <Plus className="w-4 h-4" /> Post New Job
-              </button>
-            </motion.div>
-          </Link>
-        </div>
-      </motion.div>
 
-      {/* Filters Bar Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-5 shadow-xl flex flex-col md:flex-row gap-3.5 md:items-center justify-between"
-      >
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by title or location..."
-            className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 border border-sky-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 focus:border-[#0F9DE4] text-slate-800 shadow-xs transition-all"
-          />
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="text-xs font-semibold border border-sky-100 rounded-2xl px-4 py-2.5 text-slate-700 bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer shadow-xs"
-          >
-            {STATUS_FILTERS.map(s => <option key={s} value={s}>{s === 'ALL' ? 'All Statuses' : s}</option>)}
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-            className="text-xs font-semibold border border-sky-100 rounded-2xl px-4 py-2.5 text-slate-700 bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer shadow-xs"
-          >
-            {TYPE_FILTERS.map(t => <option key={t} value={t}>{t === 'ALL' ? 'All Types' : t.replace('_', ' ')}</option>)}
-          </select>
-        </div>
-      </motion.div>
-
-      {/* Main Table Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 overflow-hidden shadow-xl"
-      >
-        {loading ? (
-          <div className="p-8 space-y-3 animate-pulse">
-            {[...Array(5)].map((_, i) => <div key={i} className="h-12 bg-sky-50/60 rounded-2xl" />)}
-          </div>
-        ) : jobs.length === 0 ? (
-          <EmptyState
-            icon={Briefcase}
-            title="No jobs found"
-            description="Try adjusting your filters, or post your first job to get started."
-            action={
-              <Link href="/company/post-job" className="text-xs font-bold text-[#0025B8] hover:underline">
-                Post New Job →
-              </Link>
-            }
-          />
-        ) : (
-          <>
+        {loading ? <div className="p-5"><PanelSkeleton rows={6} /></div>
+          : error ? <ErrorNote text="Could not load postings. Is the job service (port 3002) running?" onRetry={loadJobs} />
+          : jobs.length === 0 ? (
+            <div className="py-6">
+              <EmptyNote text="No postings match these filters." icon={<Briefcase className="w-6 h-6" />} />
+              <div className="text-center"><Link href="/company/post-job" className="text-xs font-semibold text-[#0025B8] hover:underline">Post your first job</Link></div>
+            </div>
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-sky-100 bg-sky-50/40">
-                    <th className="px-6 py-3.5">
-                      <button onClick={() => toggleSort('title')} className="flex items-center gap-1.5 hover:text-slate-700 cursor-pointer">
-                        Job Position <ArrowUpDown className="w-3 h-3 text-[#0F9DE4]" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-3.5">Location</th>
-                    <th className="px-6 py-3.5">Salary Range</th>
-                    <th className="px-6 py-3.5">Applications</th>
-                    <th className="px-6 py-3.5">
-                      <button onClick={() => toggleSort('createdAt')} className="flex items-center gap-1.5 hover:text-slate-700 cursor-pointer">
-                        Date Posted <ArrowUpDown className="w-3 h-3 text-[#0F9DE4]" />
-                      </button>
-                    </th>
-                    <th className="px-6 py-3.5">Status</th>
-                    <th className="px-6 py-3.5 text-right">Actions</th>
+                  <tr>
+                    <th className={thCls}><SortHead field="title">Position</SortHead></th>
+                    <th className={thCls}>Salary (LKR)</th>
+                    <th className={cx(thCls, 'w-48')}>Applicants</th>
+                    <th className={thCls}><SortHead field="createdAt">Posted</SortHead></th>
+                    <th className={thCls}>Deadline</th>
+                    <th className={thCls}>Status</th>
+                    <th className={cx(thCls, 'text-right')}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-sky-50">
-                  {jobs.map(job => (
-                    <tr key={job.id} className="hover:bg-sky-50/40 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-900 text-xs sm:text-sm">{job.title}</p>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{job.jobType.replace('_', ' ')} · #{job.id.slice(0, 8)}</p>
-                      </td>
-                      <td className="px-6 py-4 text-xs sm:text-sm text-slate-600 font-medium">{job.location}</td>
-                      <td className="px-6 py-4 text-xs sm:text-sm text-slate-600 font-medium whitespace-nowrap">{salaryLabel(job.salaryMin, job.salaryMax)}</td>
-                      <td className="px-6 py-4">
-                        <Link href={`/company/jobs/${job.id}/applicants`} className="text-xs sm:text-sm font-bold text-[#0025B8] hover:text-[#0F9DE4] transition-colors hover:underline">
-                          {job.applicationCount} applicants
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 text-xs sm:text-sm text-slate-500 font-medium">{new Date(job.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                      <td className="px-6 py-4"><StatusBadge status={job.status} /></td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Link href={`/company/jobs/${job.id}/applicants`} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors shadow-xs" title="View Applicants">
-                            <Eye className="w-4 h-4" />
+                <tbody className="divide-y divide-slate-100">
+                  {jobs.map(job => {
+                    const dl = daysLeft(job.deadline);
+                    const live = job.status === 'ACTIVE';
+                    return (
+                      <tr key={job.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className={tdCls}>
+                          <Link href={`/company/jobs/${job.id}`} className="text-[13px] font-semibold text-slate-900 hover:text-[#0025B8]">{job.title}</Link>
+                          <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            <span>{typeLabel(job.jobType)}</span><span>·</span>
+                            <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{job.location}</span>
+                            <span>·</span><span className="font-mono">#{job.id.slice(0, 8)}</span>
+                          </p>
+                        </td>
+                        <td className={cx(tdCls, 'text-slate-600 whitespace-nowrap tabular-nums')}>{salaryLabel(job.salaryMin, job.salaryMax)}</td>
+                        <td className={tdCls}>
+                          <Link href={`/company/jobs/${job.id}/applicants`} className="flex items-center gap-2 group">
+                            <div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-[#0025B8] to-[#0F9DE4]" style={{ width: `${(job.applicationCount / maxApps) * 100}%` }} />
+                            </div>
+                            <span className="tabular-nums font-semibold text-slate-700 group-hover:text-[#0025B8] w-8 text-right">{job.applicationCount}</span>
                           </Link>
-                          <Link href={`/company/jobs/${job.id}/edit`} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shadow-xs" title="Edit">
-                            <Pencil className="w-4 h-4" />
-                          </Link>
-                          <button onClick={() => setDeleteTarget(job)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors shadow-xs cursor-pointer" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>
+                          {new Date(job.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className={cx(tdCls, 'whitespace-nowrap')}>
+                          {dl === null ? <span className="text-slate-300">–</span>
+                            : dl < 0 ? <Pill tone="slate">Ended</Pill>
+                            : dl <= 3 ? <Pill tone="rose"><Clock className="w-3 h-3" />{dl}d left</Pill>
+                            : dl <= 7 ? <Pill tone="amber"><Clock className="w-3 h-3" />{dl}d left</Pill>
+                            : <span className="text-slate-500">{new Date(job.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>}
+                        </td>
+                        <td className={tdCls}><JobStatusPill status={job.status === 'INACTIVE' ? 'INACTIVE' : job.status} /></td>
+                        <td className={tdCls}>
+                          <div className="flex items-center justify-end gap-0.5">
+                            <Link href={`/company/jobs/${job.id}`} className={iconBtn} title="Open job"><ExternalLink className="w-4 h-4" /></Link>
+                            <Link href={`/company/jobs/${job.id}/applicants`} className={iconBtn} title="Review applicants"><Eye className="w-4 h-4" /></Link>
+                            {(live || job.status === 'INACTIVE') && (
+                              <button onClick={() => handleToggle(job)} disabled={busyId === job.id} className={cx(iconBtn, 'disabled:opacity-40')}
+                                title={live ? 'Pause posting' : 'Resume posting'}>
+                                {live ? <PauseCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
+                              </button>
+                            )}
+                            <button onClick={() => setDeleteTarget(job)} className={cx(iconBtn, 'hover:!bg-rose-50 hover:!text-rose-600')} title="Delete"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+          )}
+        {!loading && !error && <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPage={setPage} />}
+      </Panel>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-sky-100 bg-sky-50/20">
-              <p className="text-xs text-slate-400 font-medium">
-                Showing {(page - 1) * 10 + 1}–{Math.min(page * 10, total)} of {total} postings
-              </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-sky-200 text-slate-600 disabled:opacity-40 hover:bg-sky-50 transition-colors shadow-xs cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-xs font-bold text-slate-600 px-2">Page {page} of {totalPages}</span>
-                <button
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl border border-sky-200 text-slate-600 disabled:opacity-40 hover:bg-sky-50 transition-colors shadow-xs cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this job posting?"
+        confirmLabel="Delete permanently"
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        message={deleteTarget && (
+          <>“<b className="text-slate-900">{deleteTarget.title}</b>” and its <b className="text-slate-900">{deleteTarget.applicationCount} application{deleteTarget.applicationCount === 1 ? '' : 's'}</b> will be removed for good. This cannot be undone.</>
         )}
-      </motion.div>
-
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {deleteTarget && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white/95 backdrop-blur-2xl rounded-[28px] shadow-2xl w-full max-w-md p-6 sm:p-8 border border-sky-100 space-y-5"
-            >
-              <div className="flex items-center gap-3.5 pb-3 border-b border-sky-100">
-                <div className="w-12 h-12 bg-rose-50 border border-rose-100 rounded-2xl flex items-center justify-center text-rose-600 shadow-xs">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-base tracking-tight">Delete job posting?</h3>
-                  <p className="text-xs text-rose-600 font-medium">Irreversible action</p>
-                </div>
-              </div>
-
-              <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
-                &ldquo;{deleteTarget.title}&rdquo; and all <strong className="text-slate-900">{deleteTarget.applicationCount} associated applications</strong> will be permanently removed.
-              </p>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={deleting}
-                  className="flex-1 py-2.5 text-xs font-bold rounded-full border border-sky-200 text-slate-700 hover:bg-sky-50 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
-                >
-                  Cancel
-                </button>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
-                  <button
-                    onClick={confirmDelete}
-                    disabled={deleting}
-                    className="w-full py-2.5 text-xs font-bold rounded-full bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 transition-all shadow-md cursor-pointer"
-                  >
-                    {deleting ? 'Deleting...' : 'Delete Permanently'}
-                  </button>
-                </motion.div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      />
+      <Toast toast={toast} />
     </div>
   );
 }

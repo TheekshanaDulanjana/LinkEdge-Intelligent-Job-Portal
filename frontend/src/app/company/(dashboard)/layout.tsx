@@ -1,5 +1,6 @@
 'use client';
 
+import { assetUrl } from '@/lib/assetUrl';
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/enterprise/Sidebar';
 import TopHeader from '@/components/enterprise/TopHeader';
@@ -11,16 +12,16 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
   useEffect(() => {
     api.get('/auth/me').then(res => {
       const profile = res.data?.data?.profile;
-      if (profile) setCompany(profile);
+      if (profile) setCompany({ ...profile, logoUrl: assetUrl(profile.logoUrl) });
     }).catch(() => {});
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-slate-50">
       <Sidebar companyName={company?.companyName ?? 'Company'} logoUrl={company?.logoUrl} />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopHeader userName={company?.companyName ?? 'Loading...'} />
-        <main className="flex-1 p-6 max-w-[1400px] w-full mx-auto">
+        <TopHeader userName={company?.companyName ?? 'Loading…'} userAvatar={company?.logoUrl} />
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1680px] w-full mx-auto">
           {children}
         </main>
       </div>

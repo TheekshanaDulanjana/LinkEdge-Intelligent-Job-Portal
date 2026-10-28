@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from src.database.db import get_db
 from src.database.models import InterviewSession, InterviewQuestion
+from src.services_context import load_context
 from src.agents.workflow import question_workflow, evaluation_workflow
 from src.models.schemas import (
     StartSessionRequest, StartSessionResponse,
@@ -80,13 +81,29 @@ def start_interview(request: StartSessionRequest, db: Session = Depends(get_db))
     Creates a new interview session and generates questions.
     Call this when the seeker clicks 'Start Practice Interview'.
     """
-    print(f"\nStarting interview for job: {request.job_title}")
+    ctx = load_context(db, request.application_id, request.seeker_id)
+    if not ctx or not ctx.get("job_title"):
+        raise HTTPException(status_code=404, detail="Application or job not found")
+    # Ownership: the application must belong to the seeker making the request.
+    if ctx["owner_id"] != request.seeker_id:
+        raise HTTPException(status_code=403, detail="This application does not belong to you")
+    if ctx["status"] != "INTERVIEW":
+        raise HTTPException(status_code=403, detail="Practice is only available for shortlisted candidates")
+    exp = ctx.get("practice_expires_at")
+    if exp and datetime.utcnow() > exp:
+        raise HTTPException(status_code=403, detail="Practice interview period has expired")
 
-    # Run the question generation workflow
+    print(f"\nStarting interview for job: {ctx['job_title']} (level={ctx['level']})")
+
     initial_state = {
-        "job_title": request.job_title,
-        "job_description": request.job_description,
-        "job_requirements": request.job_requirements,
+        "job_title": ctx["job_title"],
+        "job_description": ctx["job_description"],
+        "job_requirements": ctx["job_requirements"],
+        "job_responsibilities": ctx.get("responsibilities", []),
+        "job_skills": ctx.get("skills", []),
+        "candidate_level": ctx["level"],
+        "candidate_profile": ctx["candidate_profile"],
+        "previous_questions": ctx["previous_questions"],
         "seeker_answers": [],
         "questions": [],
         "evaluations": [],
@@ -112,8 +129,9 @@ def start_interview(request: StartSessionRequest, db: Session = Depends(get_db))
     session = InterviewSession(
         application_id=request.application_id,
         seeker_id=request.seeker_id,
-        job_id=request.job_id,
-        job_title=request.job_title,
+        job_id=ctx["job_id"],
+        job_title=ctx["job_title"],
+        level=ctx["level"],
         status="IN_PROGRESS",
     )
     db.add(session)
@@ -136,6 +154,7 @@ def start_interview(request: StartSessionRequest, db: Session = Depends(get_db))
     return StartSessionResponse(
         session_id=session.id,
         questions=questions,
+        level=ctx["level"],
         message=f"Interview started. Answer all {len(questions)} questions.",
     )
 
@@ -179,10 +198,16 @@ def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db))
     print(f"\nEvaluating {len(answers)} answers for session {request.session_id[:8]}...")
 
     # Run evaluation workflow
+    ctx = load_context(db, session.application_id, session.seeker_id) or {}
     eval_state = {
         "job_title": session.job_title,
-        "job_description": "",
-        "job_requirements": "",
+        "job_description": ctx.get("job_description", ""),
+        "job_requirements": ctx.get("job_requirements", ""),
+        "job_responsibilities": ctx.get("responsibilities", []),
+        "job_skills": ctx.get("skills", []),
+        "candidate_level": session.level or ctx.get("level", "junior"),
+        "candidate_profile": ctx.get("candidate_profile", ""),
+        "previous_questions": [],
         "seeker_answers": answers,
         "questions": questions_text,
         "evaluations": [],
@@ -210,6 +235,7 @@ def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db))
             q_row.answer_text = answers[i] if i < len(answers) else ""
             q_row.score = ev.get("score", 0.0)
             q_row.feedback = ev.get("feedback", "")
+            q_row.model_answer = ev.get("model_answer", "")
 
     # Mark session as completed
     session.status = "COMPLETED"
@@ -243,6 +269,7 @@ def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db))
                 answer=ev.get("answer", ""),
                 score=ev.get("score", 0.0),
                 feedback=ev.get("feedback", ""),
+                model_answer=ev.get("model_answer", ""),
             )
             for ev in evaluations
         ],
@@ -287,6 +314,7 @@ def get_session_results(session_id: str, db: Session = Depends(get_db)):
                 answer=q.answer_text or "",
                 score=q.score or 0.0,
                 feedback=q.feedback or "",
+                model_answer=q.model_answer or "",
             )
             for q in questions
         ],

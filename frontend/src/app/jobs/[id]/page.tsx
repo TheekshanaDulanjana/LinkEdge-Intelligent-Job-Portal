@@ -1,5 +1,6 @@
 'use client';
 
+import { assetUrl } from '@/lib/assetUrl';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { jobApi, applicationApi } from '@/lib/api';
@@ -182,7 +183,7 @@ export default function JobDetailPage() {
               <div className="flex items-center gap-4">
                 {job.company?.logoUrl ? (
                   <img
-                    src={job.company.logoUrl.startsWith('http') ? job.company.logoUrl : `http://localhost:3001${job.company.logoUrl}`}
+                    src={assetUrl(job.company.logoUrl)}
                     alt={job.company.companyName}
                     className="w-16 h-16 rounded-2xl object-cover border-2 border-white/30 bg-white shadow-md"
                   />
@@ -196,7 +197,11 @@ export default function JobDetailPage() {
                     WE ARE HIRING
                   </span>
                   <h1 className="text-2xl md:text-3xl font-bold leading-tight">
-                    {job.company?.companyName || 'Company Name'}
+                    {job.company?.id ? (
+                      <Link href={`/company/${job.company.id}/profile`} className="hover:underline underline-offset-4" title="View company profile">
+                        {job.company.companyName}
+                      </Link>
+                    ) : (job.company?.companyName || 'Company Name')}
                   </h1>
                   <p className="text-xs text-white/80 font-medium mt-1 flex items-center gap-1">
                     <MapPin className="w-3.5 h-3.5" /> {job.location}

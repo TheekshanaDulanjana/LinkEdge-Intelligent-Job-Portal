@@ -1,493 +1,505 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { assetUrl } from '@/lib/assetUrl';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Search, Download, FileDown, Users, Clock, MessageSquare, CheckCircle2,
-  MapPin, ExternalLink, GraduationCap, Briefcase, Award, Wrench, Eye, X,
-  Globe, Globe2, Grid,
+  Search, Users, Clock, MessageSquare, CheckCircle2, MapPin, ExternalLink, GraduationCap,
+  Briefcase, Award, Wrench, Eye, Globe, Code2, Palette, Download, CalendarClock, XCircle,
+  LayoutList, Columns3, FileText, Mail,
 } from 'lucide-react';
-import PageHeader from '@/components/enterprise/PageHeader';
-import StatCard from '@/components/enterprise/StatCard';
-import EmptyState from '@/components/enterprise/EmptyState';
-import CandidateDetailSkeleton from '@/components/enterprise/skeletons/CandidateDetailSkeleton';
-import { Button } from '@/components/ui/button';
 import {
   fetchCandidatesSummary, fetchCandidates, fetchCandidateProfile, updateCandidateStage,
-  fetchCandidateCvFile,
-  CandidatesSummary, CandidateRow, CandidateProfile,
+  fetchCandidateCvFile, fetchCandidateAnalysis, CandidatesSummary, CandidateRow, CandidateProfile,
+  CandidateAnalysisData,
 } from '@/lib/candidates';
+import { OverviewTab, ExperienceTab, EducationTab, SkillsTab } from '@/components/enterprise/CandidateAnalysis';
+import InterviewScheduleModal from '@/components/enterprise/InterviewScheduleModal';
+import RejectReasonModal from '@/components/enterprise/RejectReasonModal';
+import {
+  Panel, KpiTile, EmptyNote, ErrorNote, PanelSkeleton, ScoreRing, cx, fmtNum, relTime,
+} from '@/components/enterprise/dashboard/primitives';
+import {
+  PageHead, Segmented, Pagination, Drawer, Modal, Toast, Avatar, StagePill, STAGE_META, useHideFooter,
+  inputCls, selectCls, btnPrimary, btnSecondary, thCls, tdCls,
+} from '@/components/enterprise/dashboard/kit';
 
 const STAGES = ['ALL', 'PENDING', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW', 'REJECTED'];
-const STAGE_LABELS: Record<string, string> = {
-  PENDING: 'Pending', REVIEWING: 'Under Review', SHORTLISTED: 'Shortlisted',
-  INTERVIEW: 'Interview', REJECTED: 'Rejected',
-};
-const STAGE_COLORS: Record<string, string> = {
-  PENDING: 'bg-slate-100 text-slate-500 border-slate-200',
-  REVIEWING: 'bg-sky-50 text-[#0025B8] border-sky-200',
-  SHORTLISTED: 'bg-purple-50 text-purple-700 border-purple-200',
-  INTERVIEW: 'bg-amber-50 text-amber-800 border-amber-200',
-  REJECTED: 'bg-rose-50 text-rose-700 border-rose-200',
-};
+const BOARD_COLUMNS = ['PENDING', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW', 'REJECTED'];
+const MOVABLE = ['PENDING', 'REVIEWING', 'SHORTLISTED'];
+const TABS = ['Overview', 'Experience', 'Education', 'Skills'] as const;
+type Tab = (typeof TABS)[number];
+const PAGE_SIZE = 20;
 
-const TABS = ['Overview', 'Education', 'Experience', 'Skills', 'Certifications'] as const;
-type Tab = typeof TABS[number];
+const best = (c: CandidateRow) => Math.max(c.aiScore ?? -1, c.atsScore ?? -1);
 
 export default function CandidatesPage() {
-  const [summary, setSummary]        = useState<CandidatesSummary | null>(null);
-  const [candidates, setCandidates] = useState<CandidateRow[]>([]);
-  const [loading, setLoading]        = useState(true);
-  const [search, setSearch]          = useState('');
-  const [stage, setStage]            = useState('ALL');
+  useHideFooter();
 
-  const [selected, setSelected]      = useState<CandidateRow | null>(null);
-  const [profile, setProfile]        = useState<CandidateProfile | null>(null);
+  const [summary, setSummary] = useState<CandidatesSummary | null>(null);
+  const [rows, setRows] = useState<CandidateRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [stage, setStage] = useState('ALL');
+  const [view, setView] = useState<'table' | 'board'>('table');
+  const [sort, setSort] = useState<'recent' | 'score'>('recent');
+
+  // Names live in the auth service, so they are fetched per row and cached.
+  const [names, setNames] = useState<Record<string, { name: string; img?: string | null; location?: string | null }>>({});
+  const nameCache = useRef<Set<string>>(new Set());
+
+  const [selected, setSelected] = useState<CandidateRow | null>(null);
+  const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [activeTab, setActiveTab]    = useState<Tab>('Overview');
+  const [analysis, setAnalysis] = useState<CandidateAnalysisData | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState(false);
+  const [tab, setTab] = useState<Tab>('Overview');
 
-  // CV Preview modal state
-  const [cvPreviewOpen, setCvPreviewOpen]       = useState(false);
-  const [cvPreviewUrl, setCvPreviewUrl]         = useState<string | null>(null);
-  const [cvPreviewLoading, setCvPreviewLoading] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [cvOpen, setCvOpen] = useState(false);
+  const [cvUrl, setCvUrl] = useState<string | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
-  // Footer eka hide kirima me page ekedi
+  function flash(type: 'ok' | 'err', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }
+
   useEffect(() => {
-    const footerElement = document.querySelector('footer');
-    if (footerElement) {
-      footerElement.style.display = 'none';
-    }
-    return () => {
-      if (footerElement) {
-        footerElement.style.display = '';
-      }
-    };
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) { setSearchInput(q); setSearch(q); }
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const loadSummary = useCallback(() => { fetchCandidatesSummary().then(setSummary).catch(() => {}); }, []);
+
+  const loadNames = useCallback((list: CandidateRow[]) => {
+    const todo = Array.from(new Set(list.map(c => c.seekerId))).filter(id => !nameCache.current.has(id));
+    todo.forEach(id => nameCache.current.add(id));
+    todo.forEach(id => {
+      fetchCandidateProfile(id)
+        .then(p => setNames(prev => ({ ...prev, [id]: { name: p.profile.fullName, img: assetUrl(p.profile.profileImageUrl), location: p.profile.location } })))
+        .catch(() => nameCache.current.delete(id));
+    });
   }, []);
 
-  const loadCandidates = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
-      const res = await fetchCandidates({ search, stage });
-      setCandidates(res.candidates);
-      if (!selected && res.candidates.length > 0) {
-        selectCandidate(res.candidates[0]);
-      }
-    } catch (e) { console.error(e); }
+      const res = await fetchCandidates({ search, stage, page });
+      setRows(res.candidates);
+      setTotal(res.total);
+      setTotalPages(res.totalPages);
+      loadNames(res.candidates);
+    } catch (e) { console.error(e); setError(true); }
     finally { setLoading(false); }
-    // eslint-disable-next-line
-  }, [search, stage]);
+  }, [search, stage, page, loadNames]);
 
-  useEffect(() => { fetchCandidatesSummary().then(setSummary).catch(console.error); }, []);
-  useEffect(() => { loadCandidates(); }, [loadCandidates]);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+  useEffect(() => { load(); }, [load]);
 
-  async function selectCandidate(c: CandidateRow) {
+  const view_rows = useMemo(
+    () => (sort === 'score' ? [...rows].sort((a, b) => best(b) - best(a)) : rows),
+    [rows, sort],
+  );
+
+  async function openCandidate(c: CandidateRow) {
     setSelected(c);
-    setActiveTab('Overview');
+    setTab('Overview');
+    setProfile(null);
+    setAnalysis(null);
+    setAnalysisError(false);
     setProfileLoading(true);
-    try {
-      const p = await fetchCandidateProfile(c.seekerId);
-      setProfile(p);
-    } catch (e) { console.error(e); setProfile(null); }
-    finally { setProfileLoading(false); }
+    setAnalysisLoading(true);
+
+    fetchCandidateProfile(c.seekerId)
+      .then(setProfile)
+      .catch(e => console.error(e))
+      .finally(() => setProfileLoading(false));
+
+    // Full CV analysis: parsed CV, ATS breakdown and AI match for this job.
+    fetchCandidateAnalysis(c.applicationId)
+      .then(res => {
+        setAnalysis(res);
+        if (res.hasResume) {
+          const ai = res.aiMatch.score;
+          const ats = res.ats.overall_score;
+          setRows(rs => rs.map(x => (x.applicationId === c.applicationId ? { ...x, aiScore: ai, atsScore: ats } : x)));
+          setSelected(cur => (cur && cur.applicationId === c.applicationId ? { ...cur, aiScore: ai, atsScore: ats } : cur));
+        }
+      })
+      .catch(e => { console.error(e); setAnalysisError(true); })
+      .finally(() => setAnalysisLoading(false));
   }
 
-  async function handleStageChange(newStage: string) {
-    if (!selected) return;
+  async function moveStage(c: CandidateRow, next: string) {
+    if (c.status === next) return;
+    const prev = c.status;
+    const lift = c.autoRejected ? { autoRejected: false, companyOverride: true, rejectionReason: null } : {};
+    setRows(r => r.map(x => (x.applicationId === c.applicationId ? { ...x, status: next, ...lift } : x)));
+    if (selected?.applicationId === c.applicationId) setSelected({ ...c, status: next, ...lift });
     try {
-      await updateCandidateStage(selected.applicationId, newStage);
-      setSelected({ ...selected, status: newStage });
-      setCandidates(prev => prev.map(c => c.applicationId === selected.applicationId ? { ...c, status: newStage } : c));
-    } catch (e) { console.error(e); }
-  }
-
-  async function handleOpenCvPreview() {
-    if (!selected) return;
-    setCvPreviewOpen(true);
-    setCvPreviewLoading(true);
-    try {
-      const blob = await fetchCandidateCvFile(selected.seekerId);
-      setCvPreviewUrl(URL.createObjectURL(blob));
+      await updateCandidateStage(c.applicationId, next);
+      flash('ok', `Moved to ${STAGE_META[next]?.label ?? next}.`);
+      loadSummary();
     } catch (e) {
-      console.error('CV preview failed', e);
-    } finally {
-      setCvPreviewLoading(false);
+      console.error(e);
+      setRows(r => r.map(x => (x.applicationId === c.applicationId ? { ...x, status: prev, autoRejected: c.autoRejected, companyOverride: c.companyOverride } : x)));
+      if (selected?.applicationId === c.applicationId) setSelected({ ...c, status: prev });
+      flash('err', (e as any)?.response?.data?.message || 'Could not change the stage.');
     }
   }
 
-  function handleCloseCvPreview() {
-    setCvPreviewOpen(false);
-    if (cvPreviewUrl) { URL.revokeObjectURL(cvPreviewUrl); setCvPreviewUrl(null); }
+  async function openCv() {
+    if (!selected) return;
+    setCvOpen(true);
+    setCvLoading(true);
+    try { setCvUrl(URL.createObjectURL(await fetchCandidateCvFile(selected.seekerId))); }
+    catch (e) { console.error(e); }
+    finally { setCvLoading(false); }
+  }
+  function closeCv() {
+    setCvOpen(false);
+    if (cvUrl) { URL.revokeObjectURL(cvUrl); setCvUrl(null); }
   }
 
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const out = [['Name', 'Applied for', 'Stage', 'AI score', 'ATS score', 'Applied', 'Interview']];
+    view_rows.forEach(c => out.push([
+      names[c.seekerId]?.name ?? c.seekerId, c.jobTitle, STAGE_META[c.status]?.label ?? c.status,
+      c.aiScore != null ? c.aiScore.toFixed(0) : '', c.atsScore != null ? c.atsScore.toFixed(0) : '',
+      new Date(c.appliedDate).toISOString().slice(0, 10), c.interviewDate ? new Date(c.interviewDate).toISOString().slice(0, 10) : '',
+    ]));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([out.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' }));
+    a.download = `candidates-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const nameOf = (c: CandidateRow) => names[c.seekerId]?.name ?? `Candidate ${c.seekerId.slice(0, 6)}`;
+  const p = profile?.profile;
+  const r = profile?.resume;
+  const ana = analysis && analysis.hasResume ? analysis : null;
+
+  const Link_ = ({ href, icon, label }: { href?: string | null; icon: React.ReactNode; label: string }) =>
+    href ? (
+      <a href={href} target="_blank" rel="noreferrer"
+        className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#0F9DE4] hover:text-[#0025B8] transition-colors">
+        {icon}{label}<ExternalLink className="w-3 h-3 text-slate-300" />
+      </a>
+    ) : (
+      <span className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-dashed border-slate-200 text-xs text-slate-300">{icon}{label} not added</span>
+    );
+
   return (
-    <div className="space-y-8 pb-12 font-sans text-slate-800">
-      
-      {/* Enterprise Page Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <PageHeader
-          title="All Candidates"
-          description="Review applicants, evaluate skills, and manage the hiring pipeline."
-          actions={
-            <div className="flex items-center gap-3 flex-wrap">
-              <button className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold border border-sky-200 rounded-full text-[#0025B8] bg-white hover:bg-sky-50 transition-all shadow-xs cursor-pointer">
-                <FileDown className="w-4 h-4 text-[#0F9DE4]" /> Export CSV
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold border border-sky-200 rounded-full text-[#0025B8] bg-white hover:bg-sky-50 transition-all shadow-xs cursor-pointer">
-                <Download className="w-4 h-4 text-[#0F9DE4]" /> Export PDF
-              </button>
-            </div>
-          }
-        />
-      </motion.div>
+    <div className="space-y-5 pb-10 text-slate-800">
+      <PageHead
+        eyebrow="Recruitment"
+        title="Candidates"
+        description="Everyone who applied to your jobs. Review profiles, compare AI and ATS scores, and move people through the pipeline."
+        actions={<button onClick={exportCsv} disabled={rows.length === 0} className={btnSecondary}><Download className="w-3.5 h-3.5" /> Export view</button>}
+      />
 
-      {/* Stat Cards Grid */}
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
-      >
-        <StatCard label="Total Applicants" value={summary?.totalApplicants ?? '—'} icon={Users} change={summary?.newToday} changeLabel="today" iconColor="indigo" />
-        <StatCard label="Under Review"     value={summary?.underReview ?? '—'}     icon={Clock} iconColor="amber" />
-        <StatCard label="Interviewing"     value={summary?.interviewing ?? '—'}    icon={MessageSquare} changeLabel={summary?.interviewsToday ? `${summary.interviewsToday} today` : undefined} iconColor="purple" />
-        <StatCard label="Hired"            value={summary?.hired ?? '—'}            icon={CheckCircle2} change={summary?.hiredThisWeek} changeLabel="this week" iconColor="green" />
-      </motion.div>
-
-      {/* Main Split Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* LEFT: Candidate List (5 Columns) */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="lg:col-span-5 bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 overflow-hidden flex flex-col shadow-xl" 
-          style={{ maxHeight: 740 }}
-        >
-          <div className="p-4 border-b border-sky-100 space-y-3.5 flex-shrink-0 bg-sky-50/30">
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search candidates..."
-                className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 border border-sky-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 focus:border-[#0F9DE4] text-slate-800 shadow-xs transition-all"
-              />
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-              {STAGES.map(s => (
-                <button
-                  key={s}
-                  onClick={() => setStage(s)}
-                  className={`flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer border shadow-xs ${
-                    stage === s 
-                      ? 'bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white border-transparent shadow-sm' 
-                      : 'bg-white text-slate-600 border-sky-100 hover:bg-sky-50'
-                  }`}
-                >
-                  {s === 'ALL' ? 'All Stages' : STAGE_LABELS[s]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-y-auto flex-1 divide-y divide-sky-50">
-            {loading ? (
-              <div className="p-4 space-y-3 animate-pulse">
-                {[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-sky-50/60 rounded-2xl" />)}
-              </div>
-            ) : candidates.length === 0 ? (
-              <EmptyState icon={Users} title="No candidates found" description="Try adjusting your search or stage filter." />
-            ) : (
-              candidates.map(c => (
-                <button
-                  key={c.applicationId}
-                  onClick={() => selectCandidate(c)}
-                  className={`w-full text-left flex items-center gap-3.5 px-5 py-4 hover:bg-sky-50/50 transition-colors cursor-pointer ${
-                    selected?.applicationId === c.applicationId ? 'bg-sky-50/80 border-l-4 border-[#0F9DE4]' : ''
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-100 to-blue-100 text-[#0025B8] flex items-center justify-center text-xs font-extrabold flex-shrink-0 shadow-xs">
-                    {c.seekerId.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">{c.jobTitle}</p>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">Applied {new Date(c.appliedDate).toLocaleDateString()}</p>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border flex-shrink-0 shadow-xs ${STAGE_COLORS[c.status]}`}>
-                    {STAGE_LABELS[c.status] ?? c.status}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </motion.div>
-
-        {/* RIGHT: Candidate Detail (7 Columns) */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="lg:col-span-7 bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl"
-        >
-          {!selected ? (
-            <EmptyState icon={Users} title="Select a candidate" description="Choose a candidate from the list to view their full profile." />
-          ) : profileLoading ? (
-            <CandidateDetailSkeleton />
-          ) : (
-            <div className="space-y-6">
-              
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-sky-100">
-                <div className="flex items-center gap-4">
-                  {profile?.profile.profileImageUrl ? (
-                    <img src={profile.profile.profileImageUrl} className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md" alt="" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] text-white flex items-center justify-center text-xl font-extrabold shadow-md">
-                      {profile?.profile.fullName?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <h3 className="text-lg font-bold text-slate-900 tracking-tight">{profile?.profile.fullName ?? 'Unknown candidate'}</h3>
-                    <p className="text-xs font-semibold text-[#0F9DE4]">{selected.jobTitle}</p>
-                    {profile?.profile.location && (
-                      <p className="text-xs text-slate-400 font-medium flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5" /> {profile.profile.location}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex gap-2.5 flex-wrap sm:flex-nowrap">
-                  <select
-                    value={selected.status}
-                    onChange={(e) => handleStageChange(e.target.value)}
-                    className="text-xs font-bold border border-sky-200 rounded-2xl px-3.5 py-2.5 text-slate-700 bg-slate-50/80 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer shadow-xs"
-                  >
-                    {STAGES.filter(s => s !== 'ALL').map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
-                  </select>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      onClick={() => handleStageChange('INTERVIEW')}
-                      variant="gradient"
-                      className="text-xs font-bold rounded-full h-10 px-4 shadow-md cursor-pointer"
-                    >
-                      Schedule Interview
-                    </Button>
-                  </motion.div>
-                </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="flex gap-1.5 border-b border-sky-100 overflow-x-auto pb-1 scrollbar-hide">
-                {TABS.map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-xs font-bold border-b-2 transition-all flex-shrink-0 cursor-pointer ${
-                      activeTab === tab 
-                        ? 'border-[#0F9DE4] text-[#0025B8]' 
-                        : 'border-transparent text-slate-400 hover:text-slate-700'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab Content */}
-              <div className="pt-2">
-                {activeTab === 'Overview' && (
-                  <div className="space-y-6">
-                    {profile?.profile.professionalSummary && (
-                      <div className="bg-sky-50/50 p-4 rounded-2xl border border-sky-100">
-                        <p className="text-[10px] font-bold text-[#0F9DE4] uppercase tracking-wider mb-1">Professional Summary</p>
-                        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">{profile.profile.professionalSummary}</p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-sky-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Experience Level</p>
-                        <p className="text-sm font-extrabold text-slate-900">
-                          {profile?.resume?.experienceYears ? `${profile.resume.experienceYears}+ Years` : 'Entry Level'}
-                        </p>
-                      </div>
-                      <div className="bg-slate-50 rounded-2xl p-4 border border-sky-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ATS Match</p>
-                        <p className="text-sm font-extrabold text-[#0025B8]">
-                          {selected.atsScore != null ? `${selected.atsScore.toFixed(0)}%` : 'Not scored'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Portfolio links with fallback debug chips */}
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Portfolio & Links</p>
-                      <div className="flex flex-wrap gap-2.5">
-                        {profile?.profile?.websiteUrl ? (
-                          <a href={profile.profile.websiteUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#0025B8] bg-white border border-sky-100 px-3.5 py-2 rounded-xl flex items-center gap-2 hover:border-[#0F9DE4] hover:bg-sky-50 transition-colors shadow-xs">
-                            <Globe className="w-3.5 h-3.5 text-[#0F9DE4]" />
-                            Personal Website
-                            <ExternalLink className="w-3 h-3 text-slate-400" />
-                          </a>
-                        ) : (
-                          <span className="text-xs font-medium text-slate-400 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl flex items-center gap-2">
-                            <Globe className="w-3.5 h-3.5 text-slate-300" /> Website - not added
-                          </span>
-                        )}
-
-                        {profile?.profile?.githubUrl ? (
-                          <a href={profile.profile.githubUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#0025B8] bg-white border border-sky-100 px-3.5 py-2 rounded-xl flex items-center gap-2 hover:border-[#0F9DE4] hover:bg-sky-50 transition-colors shadow-xs">
-                            <Globe2 className="w-3.5 h-3.5 text-[#0F9DE4]" />
-                            GitHub
-                            <ExternalLink className="w-3 h-3 text-slate-400" />
-                          </a>
-                        ) : (
-                          <span className="text-xs font-medium text-slate-400 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl flex items-center gap-2">
-                            <Globe2 className="w-3.5 h-3.5 text-slate-300" /> GitHub - not added
-                          </span>
-                        )}
-
-                        {profile?.profile?.behanceUrl ? (
-                          <a href={profile.profile.behanceUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#0025B8] bg-white border border-sky-100 px-3.5 py-2 rounded-xl flex items-center gap-2 hover:border-[#0F9DE4] hover:bg-sky-50 transition-colors shadow-xs">
-                            <Grid className="w-3.5 h-3.5 text-[#0F9DE4]" />
-                            Behance
-                            <ExternalLink className="w-3 h-3 text-slate-400" />
-                          </a>
-                        ) : (
-                          <span className="text-xs font-medium text-slate-400 bg-slate-50 border border-slate-100 px-3.5 py-2 rounded-xl flex items-center gap-2">
-                            <Grid className="w-3.5 h-3.5 text-slate-300" /> Behance - not added
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="border border-sky-100 bg-white rounded-2xl p-4 flex items-center justify-between shadow-xs">
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Resume Preview</p>
-                        <p className="text-[11px] text-slate-400 font-medium">
-                          {profile?.resume ? 'Uploaded document available on file' : 'No resume uploaded yet'}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleOpenCvPreview}
-                        disabled={!profile?.resume}
-                        className="flex items-center gap-1.5 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] bg-sky-50 px-3.5 py-2 rounded-xl border border-sky-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        Preview CV <Eye className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'Education' && (
-                  <div className="space-y-4">
-                    {(!profile?.resume?.education || profile.resume.education.length === 0) ? (
-                      <EmptyState icon={GraduationCap} title="No education data" description="Candidate has not uploaded a parsed resume yet." />
-                    ) : profile.resume.education.map((e, i) => (
-                      <div key={i} className="flex gap-4 bg-slate-50 p-4 rounded-2xl border border-sky-50 items-start">
-                        <div className="w-9 h-9 rounded-xl bg-sky-100 text-[#0025B8] flex items-center justify-center shrink-0">
-                          <GraduationCap className="w-4 h-4" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-xs sm:text-sm font-bold text-slate-900">{e.degree ?? 'Degree'}</p>
-                          <p className="text-xs text-slate-500 font-medium">{e.institution} {e.year && `· ${e.year}`}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeTab === 'Experience' && (
-                  <div className="space-y-4">
-                    {(!profile?.resume?.experience || profile.resume.experience.length === 0) ? (
-                      <EmptyState icon={Briefcase} title="No experience data" description="Candidate has not uploaded a parsed resume yet." />
-                    ) : profile.resume.experience.map((e, i) => (
-                      <div key={i} className="flex gap-4 bg-slate-50 p-4 rounded-2xl border border-sky-50 items-start">
-                        <div className="w-9 h-9 rounded-xl bg-sky-100 text-[#0025B8] flex items-center justify-center shrink-0">
-                          <Briefcase className="w-4 h-4" />
-                        </div>
-                        <div className="space-y-1 flex-1">
-                          <p className="text-xs sm:text-sm font-bold text-slate-900">{e.title ?? 'Role'}</p>
-                          <p className="text-xs text-slate-500 font-medium">{e.company} {e.duration && `· ${e.duration}`}</p>
-                          {e.description && (
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed pt-1">{e.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {activeTab === 'Skills' && (
-                  <div className="space-y-3 bg-slate-50 p-5 rounded-2xl border border-sky-100">
-                    <p className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 mb-2">
-                      <Wrench className="w-4 h-4 text-[#0F9DE4]" /> Core Technical Competencies
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {(profile?.resume?.skills ?? []).length === 0
-                        ? <p className="text-xs text-slate-400 font-medium">No skills extracted yet.</p>
-                        : profile!.resume!.skills.map(s => (
-                            <span key={s} className="text-xs font-bold bg-white text-[#0025B8] px-3 py-1.5 rounded-xl border border-sky-100 shadow-xs">{s}</span>
-                          ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'Certifications' && (
-                  <div className="flex flex-wrap gap-2">
-                    {(profile?.resume?.certifications ?? []).length === 0
-                      ? <EmptyState icon={Award} title="No certifications" description="No certifications were found on this candidate's resume." />
-                      : profile!.resume!.certifications.map(c => (
-                          <span key={c} className="text-xs font-bold bg-amber-50 text-amber-800 px-3.5 py-2 rounded-2xl border border-amber-200 flex items-center gap-2 shadow-xs">
-                            <Award className="w-4 h-4 text-amber-600" /> {c}
-                          </span>
-                        ))}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-        </motion.div>
-
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile label="Total applicants" icon={<Users className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.totalApplicants)} delta={summary ? { value: summary.newToday, label: 'new today' } : null} />
+        <KpiTile label="Under review" icon={<Clock className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.underReview)} hint="Waiting for a decision" />
+        <KpiTile label="Interviewing" icon={<MessageSquare className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.interviewing)} hint={summary?.interviewsToday ? `${summary.interviewsToday} today` : 'None today'} />
+        <KpiTile label="Hired" icon={<CheckCircle2 className="w-3.5 h-3.5" />} loading={!summary}
+          value={fmtNum(summary?.hired)} delta={summary ? { value: summary.hiredThisWeek, label: 'this week' } : null} />
       </div>
 
-      {/* CV Preview Modal */}
-      {cvPreviewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 sm:p-6">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col border border-slate-100 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <h3 className="font-semibold text-slate-900 text-sm">
-                {profile?.profile.fullName ?? 'Candidate'}&apos;s CV
-              </h3>
-              <button onClick={handleCloseCvPreview} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
+      <Panel title="Pipeline" subtitle={loading ? 'Loading…' : `${total} candidate${total === 1 ? '' : 's'}`} icon={<Users className="w-3.5 h-3.5" />}
+        actions={<Segmented size="sm" value={view} onChange={setView} options={[
+          { value: 'table', label: <span className="inline-flex items-center gap-1.5"><LayoutList className="w-3.5 h-3.5" />Table</span> },
+          { value: 'board', label: <span className="inline-flex items-center gap-1.5"><Columns3 className="w-3.5 h-3.5" />Board</span> },
+        ]} />} noPad>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
+          <div className="overflow-x-auto">
+            <Segmented value={stage} onChange={v => { setStage(v); setPage(1); }}
+              options={STAGES.map(s => ({ value: s, label: s === 'ALL' ? 'All stages' : STAGE_META[s].label }))} />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Search candidates" className={cx(inputCls, 'pl-9 sm:w-64')} />
             </div>
-            <div className="flex-1 bg-slate-100/60 p-4 overflow-hidden relative">
-              {cvPreviewLoading ? (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-500 bg-white rounded-xl border border-slate-200">
-                  <span className="w-6 h-6 border-2 border-[#0F9DE4] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs font-medium">Loading CV...</p>
+            <select value={sort} onChange={e => setSort(e.target.value as 'recent' | 'score')} className={cx(selectCls, 'sm:w-40')}>
+              <option value="recent">Most recent</option>
+              <option value="score">Highest score</option>
+            </select>
+          </div>
+        </div>
+
+        {loading ? <div className="p-5"><PanelSkeleton rows={7} /></div>
+          : error ? <ErrorNote text="Could not load candidates. Is the application service (port 3003) running?" onRetry={load} />
+          : rows.length === 0 ? <EmptyNote text="No candidates match this view." icon={<Users className="w-6 h-6" />} />
+          : view === 'table' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className={thCls}>Candidate</th>
+                    <th className={thCls}>Applied for</th>
+                    <th className={cx(thCls, 'text-center')} title="AI match: how well this person fits the role">AI match</th>
+                    <th className={cx(thCls, 'text-center')} title="ATS score: how well the CV matches the requirements">ATS</th>
+                    <th className={thCls}>Stage</th>
+                    <th className={thCls}>Applied</th>
+                    <th className={thCls}>Interview</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {view_rows.map(c => (
+                    <tr key={c.applicationId} onClick={() => openCandidate(c)}
+                      className={cx('cursor-pointer hover:bg-slate-50/80 transition-colors', selected?.applicationId === c.applicationId && 'bg-sky-50/50')}>
+                      <td className={tdCls}>
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={names[c.seekerId]?.name} src={names[c.seekerId]?.img} size={32} />
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-slate-900 truncate">{nameOf(c)}
+                              {c.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">System rejected</span>}
+                              {c.companyOverride && !c.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Override</span>}
+                            </p>
+                            {names[c.seekerId]?.location && <p className="text-[11px] text-slate-400 truncate">{names[c.seekerId]?.location}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className={cx(tdCls, 'text-slate-600')}>{c.jobTitle}</td>
+                      <td className={tdCls}><div className="flex justify-center"><ScoreRing value={c.aiScore} /></div></td>
+                      <td className={tdCls}><div className="flex justify-center"><ScoreRing value={c.atsScore} /></div></td>
+                      <td className={tdCls}><StagePill status={c.status} /></td>
+                      <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>{relTime(c.appliedDate)}</td>
+                      <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>
+                        {c.interviewDate ? new Date(c.interviewDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : <span className="text-slate-300">–</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="p-4 overflow-x-auto">
+              <div className="grid grid-flow-col auto-cols-[260px] gap-3 min-w-max">
+                {BOARD_COLUMNS.map(col => {
+                  const items = view_rows.filter(c => c.status === col);
+                  return (
+                    <div key={col} className="bg-slate-50 rounded-lg border border-slate-200 flex flex-col max-h-[640px]">
+                      <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200">
+                        <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                          <span className="w-2 h-2 rounded-full" style={{ background: STAGE_META[col].color }} />{STAGE_META[col].label}
+                        </span>
+                        <span className="text-[11px] font-semibold text-slate-400 tabular-nums">{items.length}</span>
+                      </div>
+                      <div className="p-2 space-y-2 overflow-y-auto">
+                        {items.length === 0 && <p className="text-[11px] text-slate-300 text-center py-6">Empty</p>}
+                        {items.map(c => (
+                          <div key={c.applicationId} className="bg-white rounded-lg border border-slate-200 p-3 hover:border-slate-300 hover:shadow-sm transition-all">
+                            <button onClick={() => openCandidate(c)} className="w-full text-left cursor-pointer">
+                              <div className="flex items-center gap-2">
+                                <Avatar name={names[c.seekerId]?.name} src={names[c.seekerId]?.img} size={26} />
+                                <p className="text-xs font-semibold text-slate-900 truncate">{nameOf(c)}</p>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-1.5 truncate">{c.jobTitle}</p>
+                            </button>
+                            <div className="flex items-center justify-between mt-2.5">
+                              <div className="flex items-center gap-1.5"><ScoreRing value={c.aiScore} size={30} /><ScoreRing value={c.atsScore} size={30} /></div>
+                              {MOVABLE.includes(c.status) && (
+                                <select value={c.status} onChange={e => moveStage(c, e.target.value)} onClick={e => e.stopPropagation()}
+                                  className="h-7 text-[11px] rounded-md border border-slate-200 bg-white px-1.5 text-slate-600 cursor-pointer focus:outline-none">
+                                  {MOVABLE.map(s => <option key={s} value={s}>{STAGE_META[s].label}</option>)}
+                                </select>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {stage === 'ALL' && total > rows.length && <p className="text-[11px] text-slate-400 mt-3">Showing this page only. Use the pager below for more.</p>}
+            </div>
+          )}
+        {!loading && !error && <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPage={setPage} />}
+      </Panel>
+
+      {/* ---------------- Candidate drawer ---------------- */}
+      <Drawer open={!!selected} onClose={() => setSelected(null)} title={selected ? nameOf(selected) : ''} subtitle={selected?.jobTitle} width="max-w-2xl">
+        {selected && (
+          <div>
+            <div className="px-5 py-5 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-start gap-4">
+                <Avatar name={p?.fullName ?? names[selected.seekerId]?.name} src={assetUrl(p?.profileImageUrl)} size={56} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-semibold text-slate-900">{p?.fullName ?? nameOf(selected)}</h3>
+                    <StagePill status={selected.status} />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Applied for <b className="text-slate-700">{selected.jobTitle}</b> · {relTime(selected.appliedDate)}</p>
+                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400 flex-wrap">
+                    {p?.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{p.location}</span>}
+                    {p?.phone && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{p.phone}</span>}
+                  </div>
                 </div>
-              ) : cvPreviewUrl ? (
-                <iframe src={cvPreviewUrl} className="w-full h-full rounded-xl border border-slate-200/80 bg-white shadow-inner" title="Candidate CV Preview" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-medium">
-                  Could not load CV preview.
-                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.aiScore} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">AI match</p><p className="text-xs font-semibold text-slate-800">{selected.aiScore != null ? `${selected.aiScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.atsScore} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">ATS score</p><p className="text-xs font-semibold text-slate-800">{selected.atsScore != null ? `${selected.atsScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={ana?.analysis.cv_health.score} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">CV quality</p><p className="text-xs font-semibold text-slate-800">{ana ? `${ana.analysis.cv_health.score}%` : analysisLoading ? 'Reading…' : '–'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3"><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">Experience</p><p className="text-sm font-semibold text-slate-800 mt-1">{ana ? (ana.analysis.experience_years > 0 ? `${ana.analysis.experience_years} yrs` : 'Entry level') : r?.experienceYears ? `${r.experienceYears}+ yrs` : '–'}</p></div>
+              </div>
+
+              {selected.status === 'REJECTED' && selected.autoRejected && (
+                <p className="mt-4 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-lg p-3 leading-relaxed">
+                  <b>Rejected by the system.</b> This CV scored below the minimum match for the job. The candidate was told why. If you think they are worth meeting, you can still interview or shortlist them.
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 mt-4">
+                {MOVABLE.includes(selected.status) && (
+                  <select value={selected.status} onChange={e => moveStage(selected, e.target.value)} className={cx(selectCls, 'w-40')}>
+                    {MOVABLE.map(s => <option key={s} value={s}>{STAGE_META[s].label}</option>)}
+                  </select>
+                )}
+                {selected.status === 'REJECTED' && selected.autoRejected && (
+                  <>
+                    <button onClick={() => setScheduleOpen(true)} className={btnPrimary}><CalendarClock className="w-3.5 h-3.5" /> Interview anyway</button>
+                    <button onClick={() => moveStage(selected, 'SHORTLISTED')} className={btnSecondary}><CheckCircle2 className="w-3.5 h-3.5" /> Shortlist anyway</button>
+                  </>
+                )}
+                {selected.status !== 'REJECTED' && (
+                  <>
+                    <button onClick={() => setScheduleOpen(true)} className={btnPrimary}><CalendarClock className="w-3.5 h-3.5" /> Schedule interview</button>
+                    <button onClick={() => setRejectOpen(true)} className={cx(btnSecondary, 'hover:!text-rose-600 hover:!border-rose-200')}><XCircle className="w-3.5 h-3.5" /> Reject</button>
+                  </>
+                )}
+                <button onClick={openCv} disabled={!r} className={btnSecondary}><Eye className="w-3.5 h-3.5" /> View CV</button>
+              </div>
+            </div>
+
+            <div className="flex gap-1 px-5 border-b border-slate-100 overflow-x-auto">
+              {TABS.map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  className={cx('px-3 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors cursor-pointer whitespace-nowrap',
+                    tab === t ? 'border-[#0025B8] text-[#0025B8]' : 'border-transparent text-slate-400 hover:text-slate-700')}>{t}</button>
+              ))}
+            </div>
+
+            <div className="p-5">
+              {analysisLoading && !ana ? <PanelSkeleton rows={8} /> : ana ? (
+                <>
+                  {tab === 'Overview' && <OverviewTab d={ana} profile={profile} onOpenCv={openCv} />}
+                  {tab === 'Experience' && <ExperienceTab d={ana} />}
+                  {tab === 'Education' && <EducationTab d={ana} />}
+                  {tab === 'Skills' && <SkillsTab d={ana} />}
+                </>
+              ) : profileLoading ? <PanelSkeleton rows={6} /> : (
+                <>
+                  {analysisError && <p className="mb-4 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">Detailed CV analysis is unavailable (is the ATS service on port 8003 running?). Showing the saved profile instead.</p>}
+                  {analysis && !analysis.hasResume && <p className="mb-4 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">This candidate has no parsed CV yet, so there is no AI or ATS score.</p>}
+                  {tab === 'Overview' && (
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Professional summary</p>
+                        <p className="text-[13px] text-slate-600 leading-relaxed">{p?.professionalSummary || <span className="text-slate-300">No summary added.</span>}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-400">Work status</p><p className="font-semibold text-slate-800 mt-0.5">{p?.workStatus?.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || '–'}</p></div>
+                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-400">Interest area</p><p className="font-semibold text-slate-800 mt-0.5">{p?.interestArea || '–'}</p></div>
+                        {selected.interviewDate && <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3 col-span-2"><p className="text-sky-700">Interview scheduled</p><p className="font-semibold text-slate-800 mt-0.5">{new Date(selected.interviewDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>}
+                      </div>
+                      <div>
+                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Links</p>
+                        <div className="flex flex-wrap gap-2">
+                          <Link_ href={p?.websiteUrl} icon={<Globe className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="Website" />
+                          <Link_ href={p?.githubUrl} icon={<Code2 className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="GitHub" />
+                          <Link_ href={p?.behanceUrl} icon={<Palette className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="Behance" />
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 p-3.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3"><span className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center"><FileText className="w-4 h-4" /></span>
+                          <div><p className="text-xs font-semibold text-slate-800">{r?.originalName ?? 'No resume uploaded'}</p>{r && <p className="text-[11px] text-slate-400">{(r.fileSize / 1024).toFixed(0)} KB · {r.isParsed ? 'Parsed' : 'Not parsed yet'}</p>}</div></div>
+                        <button onClick={openCv} disabled={!r} className={btnSecondary}>Preview</button>
+                      </div>
+                    </div>
+                  )}
+                  {tab === 'Experience' && (!r?.experience?.length
+                    ? <EmptyNote text="No experience found on the parsed resume." icon={<Briefcase className="w-6 h-6" />} />
+                    : <ol className="relative border-l border-slate-200 ml-2 space-y-5">
+                        {r.experience.map((e, i) => (
+                          <li key={i} className="pl-5 relative">
+                            <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#0F9DE4] ring-4 ring-white" />
+                            <p className="text-[13px] font-semibold text-slate-900">{e.title ?? 'Role'}</p>
+                            <p className="text-xs text-slate-500">{[e.company, e.duration].filter(Boolean).join(' · ')}</p>
+                            {e.description && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{e.description}</p>}
+                          </li>
+                        ))}
+                      </ol>)}
+                  {tab === 'Education' && (!r?.education?.length
+                    ? <EmptyNote text="No education found on the parsed resume." icon={<GraduationCap className="w-6 h-6" />} />
+                    : <ul className="space-y-3">{r.education.map((e, i) => (
+                        <li key={i} className="flex gap-3 rounded-lg border border-slate-200 p-3.5">
+                          <span className="w-9 h-9 rounded-lg bg-slate-50 text-[#0025B8] flex items-center justify-center shrink-0"><GraduationCap className="w-4 h-4" /></span>
+                          <div><p className="text-[13px] font-semibold text-slate-900">{e.degree ?? 'Degree'}</p><p className="text-xs text-slate-500">{[e.institution, e.year].filter(Boolean).join(' · ')}</p></div>
+                        </li>))}</ul>)}
+                  {tab === 'Skills' && (
+                    <div className="space-y-5">
+                      <div>
+                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" /> Skills</p>
+                        {r?.skills?.length ? <div className="flex flex-wrap gap-1.5">{r.skills.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-700">{s}</span>)}</div> : <p className="text-xs text-slate-300">No skills extracted.</p>}
+                      </div>
+                      {!!r?.technologies?.length && <div>
+                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Technologies</p>
+                        <div className="flex flex-wrap gap-1.5">{r.technologies.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-blue-50 text-blue-700">{s}</span>)}</div>
+                      </div>}
+                      <div>
+                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Award className="w-3.5 h-3.5" /> Certifications</p>
+                        {r?.certifications?.length ? <div className="flex flex-wrap gap-1.5">{r.certifications.map(c => <span key={c} className="text-xs font-medium px-2.5 py-1 rounded-md bg-amber-50 text-amber-800">{c}</span>)}</div> : <p className="text-xs text-slate-300">None listed.</p>}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
-        </div>
+        )}
+      </Drawer>
+
+      {selected && scheduleOpen && (
+        <InterviewScheduleModal applicationId={selected.applicationId} candidateName={nameOf(selected)}
+          onClose={() => setScheduleOpen(false)}
+          onScheduled={() => { setScheduleOpen(false); setSelected(null); load(); loadSummary(); flash('ok', 'Interview scheduled. Invite email sent.'); }} />
       )}
+      {selected && rejectOpen && (
+        <RejectReasonModal applicationId={selected.applicationId} candidateName={nameOf(selected)}
+          onClose={() => setRejectOpen(false)}
+          onRejected={() => { setRejectOpen(false); setSelected(null); load(); loadSummary(); flash('ok', 'Candidate rejected. Notification sent.'); }} />
+      )}
+
+      <Modal open={cvOpen} onClose={closeCv} title={`${p?.fullName ?? 'Candidate'} · CV`} width="max-w-4xl">
+        <div className="h-[70vh] bg-slate-100 rounded-lg overflow-hidden">
+          {cvLoading ? <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading CV…</div>
+            : cvUrl ? <iframe src={cvUrl} title="CV preview" className="w-full h-full bg-white" />
+            : <div className="h-full flex items-center justify-center text-xs text-slate-400">Could not load the CV.</div>}
+        </div>
+      </Modal>
+      <Toast toast={toast} />
     </div>
   );
 }

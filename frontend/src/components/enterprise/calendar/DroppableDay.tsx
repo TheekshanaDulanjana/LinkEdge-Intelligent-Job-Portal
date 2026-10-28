@@ -8,7 +8,7 @@ export default function DroppableDay({
   const { setNodeRef, isOver } = useDroppable({ id, data: { date } });
 
   return (
-    <div ref={setNodeRef} className={`${className} ${isOver ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-300' : ''}`}>
+    <div ref={setNodeRef} className={`${className ?? ''} ${isOver ? '!bg-sky-50 ring-2 ring-inset ring-[#0F9DE4]/50' : ''}`}>
       {children}
     </div>
   );

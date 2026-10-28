@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const schema = z.object({
-  password: z.string().min(8),
+  password: z.string().min(8, 'At least 8 characters').max(72, 'At most 72 characters')
+    .regex(/[A-Za-z]/, 'Include a letter').regex(/\d/, 'Include a number'),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, { message: 'Passwords do not match', path: ['confirm'] });
 
@@ -29,7 +30,7 @@ export default function ResetPasswordPage() {
     const result = schema.safeParse(form);
     if (!result.success) {
       const e: Record<string, string> = {};
-      result.error.errors.forEach((err) => { e[err.path[0]] = err.message; });
+      result.error.issues.forEach((err) => { e[String(err.path[0])] = err.message; });
       setErrors(e); return;
     }
     setLoading(true); setServerError('');
@@ -37,7 +38,7 @@ export default function ResetPasswordPage() {
       await api.post('/auth/reset-password', { token, newPassword: form.password });
       setDone(true);
     } catch (err: any) {
-      setServerError(err.message || 'Reset failed. Link may have expired.');
+      setServerError(err.response?.data?.message || 'Reset failed. Link may have expired.');
     } finally { setLoading(false); }
   }
 
@@ -60,7 +61,7 @@ export default function ResetPasswordPage() {
               <div className="space-y-4">
                 <div>
                   <Label>New password</Label>
-                  <Input type="password" placeholder="Min 8 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}/>
+                  <Input type="password" maxLength={72} autoComplete="new-password" placeholder="Min 8 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}/>
                   {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
                 </div>
                 <div>

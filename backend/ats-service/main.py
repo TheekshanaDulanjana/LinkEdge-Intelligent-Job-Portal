@@ -34,6 +34,21 @@ app.include_router(matching_router, prefix="/api/v1/ats", tags=["Matching"])
 app.include_router(job_router,      prefix="/api/v1/ats", tags=["Jobs"])
 
 
+@app.on_event("startup")
+def _refresh_stored_resumes() -> None:
+    """Upgrade older parsed CVs in the background with the current extractor."""
+    import threading
+    from src.routers.resume_router import reparse_all_resumes
+
+    def _run() -> None:
+        try:
+            print("[startup] reparse:", reparse_all_resumes())
+        except Exception as exc:
+            print("[startup] reparse skipped:", exc)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 @app.get("/health")
 def health():
     return {

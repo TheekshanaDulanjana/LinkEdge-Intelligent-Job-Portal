@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=D:\02. KDU\Final Year Project\LinkEdge\backend\ai-service\venv
+set VIRTUAL_ENV=D:\02. KDU\Final Year Project\SkillSync\backend\ai-service\venv
 
 if not defined PROMPT set PROMPT=$P$G
 

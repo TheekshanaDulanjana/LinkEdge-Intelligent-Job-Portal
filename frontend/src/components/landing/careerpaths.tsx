@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 const JOBS = [
@@ -87,8 +88,9 @@ export default function CareerPath() {
                 }}
                 whileHover={{ scale: 1.1, y: -6, transition: { duration: 0.2 } }}
                 whileTap={{ scale: 0.95 }}
-                className="relative group cursor-pointer"
+                className="relative group"
               >
+                <Link href={`/jobs?search=${encodeURIComponent(job)}`} aria-label={`Search ${job} jobs`} className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0F9DE4]">
                 {/* Thin Dashed Border Layer */}
                 <div 
                   className="absolute inset-0 rounded-xl border border-dashed border-[#0F9DE4]/70 group-hover:border-[#0025B8] group-hover:bg-[#0F9DE4]/5 transition-colors pointer-events-none shadow-xs"
@@ -98,6 +100,7 @@ export default function CareerPath() {
                 <div className="relative px-5 py-2.5 sm:px-6 sm:py-3 text-[#0025B8] font-semibold text-xs sm:text-sm rounded-xl transition-colors">
                   {job}
                 </div>
+                </Link>
               </motion.div>
             );
           })}

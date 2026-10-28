@@ -234,19 +234,31 @@ export const authService = {
 
   // ── Google OAuth ──────────────────────────────────────────────
 
-  async googleAuth(googleToken: string, role: 'SEEKER' | 'COMPANY') {
-    // Verify the Google token with Google's API
-    const googleRes = await axios.get(
-      `https://www.googleapis.com/oauth2/v3/userinfo`,
-      { headers: { Authorization: `Bearer ${googleToken}` } }
-    );
+  async googleAuth(idToken: string, role: 'SEEKER' | 'COMPANY') {
+    if (!idToken) throw new AppError('Google sign-in token is missing.', 400, 'NO_TOKEN');
+    if (role !== 'SEEKER' && role !== 'COMPANY') role = 'SEEKER';
 
-    const { sub: googleId, email, name, picture } = googleRes.data;
+    // The browser signs in through Firebase, so what arrives here is a Firebase ID token.
+    // It must be verified with the Firebase Admin SDK (not Google's userinfo endpoint).
+    let decoded: { uid: string; email?: string; name?: string; picture?: string; email_verified?: boolean };
+    try {
+      const { admin } = await import('../config/firebase');
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch (err: any) {
+      logger.security('Google token verification failed', { reason: err?.code || err?.message });
+      throw new AppError('Google sign-in could not be verified. Please try again.', 401, 'INVALID_GOOGLE_TOKEN');
+    }
 
+    const googleId = decoded.uid;
+    const { email, name, picture } = decoded;
+    if (decoded.email_verified === false) {
+      throw new AppError('Your Google email address is not verified.', 400, 'EMAIL_NOT_VERIFIED');
+    }
     if (!email) throw new AppError('Google account has no email.', 400, 'NO_EMAIL');
 
+    const normalizedEmail = email.toLowerCase().trim();
     let user = await prisma.user.findFirst({
-      where: { OR: [{ googleId }, { email }] },
+      where: { OR: [{ googleId }, { email: normalizedEmail }] },
       include: { seeker: true, company: true },
     });
 
@@ -254,14 +266,14 @@ export const authService = {
       // First time — create account
       user = await prisma.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           googleId,
           authProvider: 'GOOGLE',
           isEmailVerified: true, // Google accounts are pre-verified
           role,
           ...(role === 'SEEKER'
-            ? { seeker: { create: { fullName: name || email.split('@')[0], profileImageUrl: picture } } }
-            : { company: { create: { companyName: name || email.split('@')[0], logoUrl: picture } } }
+            ? { seeker: { create: { fullName: name || email.split('@')[0], profileImageUrl: picture ?? null } } }
+            : { company: { create: { companyName: name || email.split('@')[0], logoUrl: picture ?? null } } }
           ),
         },
         include: { seeker: true, company: true },

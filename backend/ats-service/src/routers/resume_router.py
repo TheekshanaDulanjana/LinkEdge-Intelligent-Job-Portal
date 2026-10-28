@@ -2,7 +2,7 @@ import os
 import json
 import uuid
 from fastapi    import APIRouter, HTTPException, BackgroundTasks
-from pydantic   import BaseModel
+from pydantic   import BaseModel, Field
 from typing     import Optional
 
 from src.database.db           import get_connection
@@ -14,9 +14,9 @@ router = APIRouter()
 
 
 class ParseResumeRequest(BaseModel):
-    candidate_id: str
-    resume_id:    str
-    file_path:    str
+    candidate_id: str = Field(max_length=64)
+    resume_id:    str = Field(max_length=64)
+    file_path:    str = Field(max_length=1000)
 
 
 # DB helpers
@@ -177,3 +177,48 @@ async def get_resume_skills(candidate_id: str):
         }
     finally:
         conn.close()
+
+
+def reparse_all_resumes() -> dict:
+    """
+    Re-run the current extractor over every stored CV text. Rows whose extracted
+    skills, years or role count changed are updated and their cached ATS scores
+    are dropped so they are recomputed with the new data. Cheap and idempotent.
+    """
+    conn = get_connection()
+    changed = checked = failed = 0
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, candidate_id, parsed_text, skills, experience_years, experience
+               FROM candidate_resumes
+               WHERE parsed_text IS NOT NULL AND length(parsed_text) > 40"""
+        )
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    for rid, cid, text, old_skills, old_years, old_exp in rows:
+        checked += 1
+        try:
+            parsed = extract_resume_data(text)
+            old_exp_n = len(old_exp) if isinstance(old_exp, list) else len(json.loads(old_exp or "[]"))
+            same = (
+                sorted(old_skills or []) == sorted(parsed.skills)
+                and abs(float(old_years or 0) - parsed.experience_years) < 0.05
+                and old_exp_n == len(parsed.experience)
+            )
+            if same:
+                continue
+            _update_resume_db(rid, parsed)
+            _invalidate_ats_scores(cid)
+            changed += 1
+        except Exception as exc:
+            failed += 1
+            print(f"[reparse-all] {rid}: {exc}")
+    return {"checked": checked, "updated": changed, "failed": failed}
+
+
+@router.post("/reparse-all")
+async def reparse_all():
+    return reparse_all_resumes()

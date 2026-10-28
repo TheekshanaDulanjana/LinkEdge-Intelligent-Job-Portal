@@ -14,7 +14,10 @@ async function getCompanyId(req: any): Promise<string | null> {
 function resolveDateRange(period: string, customFrom?: string, customTo?: string) {
   const now = new Date();
   if (period === 'custom' && customFrom && customTo) {
-    return { from: new Date(customFrom), to: new Date(customTo) };
+    const f = new Date(customFrom);
+    const e = new Date(customTo);
+    const valid = !Number.isNaN(f.getTime()) && !Number.isNaN(e.getTime()) && f <= e && e.getTime() - f.getTime() <= 731 * 86400000;
+    if (valid) return { from: f, to: e };
   }
   const days = period === '7d' ? 7 : period === '90d' ? 90 : period === 'year' ? 365 : 30;
   return { from: new Date(now.getTime() - days * 24 * 60 * 60 * 1000), to: now };

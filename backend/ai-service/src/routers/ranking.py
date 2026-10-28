@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from src.agents.ranking_agent import ranking_workflow
 
@@ -7,17 +7,17 @@ router = APIRouter()
 
 
 class ApplicationInput(BaseModel):
-    id: str
-    seekerId: str
-    cvUrl: str
+    id: str = Field(max_length=64)
+    seekerId: str = Field(max_length=64)
+    cvUrl: str = Field(max_length=500)
 
 
 class RankingRequest(BaseModel):
-    job_id: str
-    job_title: str
-    job_description: str
-    job_requirements: str
-    applications: List[ApplicationInput]
+    job_id: str = Field(max_length=64)
+    job_title: str = Field(max_length=200)
+    job_description: str = Field(max_length=30000)
+    job_requirements: str = Field(max_length=30000)
+    applications: List[ApplicationInput] = Field(max_length=200)
 
 
 class CandidateResult(BaseModel):

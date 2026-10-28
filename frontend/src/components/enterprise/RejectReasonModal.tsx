@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { rejectCandidate } from '@/lib/jobApplicants';
+import { Modal, btnDanger, btnSecondary, cx } from '@/components/enterprise/dashboard/kit';
 
 const REASONS = [
   'Qualifications do not match the role',
@@ -19,7 +19,7 @@ export default function RejectReasonModal({
 }: { applicationId: string; candidateName: string; onClose: () => void; onRejected: () => void }) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,49 +30,31 @@ export default function RejectReasonModal({
       await rejectCandidate(applicationId, reason);
       onRejected();
       onClose();
-    } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Failed to reject candidate');
-    } finally {
-      setSaving(false);
-    }
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to reject the candidate.');
+    } finally { setSaving(false); }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h3 className="font-semibold text-gray-900">Reject Candidate</h3>
-            <p className="text-xs text-gray-400 mt-0.5">{candidateName}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-2">
-          {error && <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-2">{error}</div>}
-
-          <p className="text-xs font-medium text-gray-500 mb-2">Select a reason</p>
-          {REASONS.map(r => (
-            <label key={r} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors
-              ${reason === r ? 'border-red-300 bg-red-50 text-red-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-              <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="accent-red-500" />
-              {r}
-            </label>
-          ))}
-
-          <p className="text-xs text-gray-400 bg-gray-50 rounded-lg p-2.5 mt-3">
-            A personalised explanation will be generated based on this candidate's CV and emailed to them automatically.
-          </p>
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">
-              Cancel
-            </button>
-            <button type="submit" disabled={!reason || saving} className="flex-1 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
-              {saving ? 'Rejecting...' : 'Reject & Notify'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal open onClose={onClose} title="Reject candidate" subtitle={candidateName}
+      footer={<>
+        <button type="button" onClick={onClose} className={btnSecondary}>Cancel</button>
+        <button type="submit" form="reject-form" disabled={!reason || saving} className={btnDanger}>{saving ? 'Rejecting…' : 'Reject and notify'}</button>
+      </>}>
+      <form id="reject-form" onSubmit={handleSubmit} className="space-y-2">
+        {error && <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">{error}</p>}
+        <p className="text-xs font-semibold text-slate-700 mb-1">Select a reason</p>
+        {REASONS.map(r => (
+          <label key={r} className={cx('flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer text-[13px] transition-colors',
+            reason === r ? 'border-rose-300 bg-rose-50 text-rose-800' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+            <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="accent-rose-600" />
+            {r}
+          </label>
+        ))}
+        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg p-3 leading-relaxed mt-3">
+          A personalised explanation based on this candidate’s CV is generated and emailed to them.
+        </p>
+      </form>
+    </Modal>
   );
 }

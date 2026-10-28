@@ -11,7 +11,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function sendEmail(to: string, subject: string, html: string) {
+const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
+
+async function sendEmail(to: string, rawSubject: string, html: string) {
+  // Values arrive HTML-escaped for the body; the subject is plain text, so decode and strip line breaks.
+  const subject = rawSubject.replace(/&amp;|&lt;|&gt;|&quot;|&#39;/g, (m) => ENTITIES[m]).replace(/[\r\n]+/g, ' ');
   try {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,

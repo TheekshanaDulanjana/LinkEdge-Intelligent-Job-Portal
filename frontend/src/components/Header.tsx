@@ -1,5 +1,6 @@
 'use client';
 
+import { assetUrl } from '@/lib/assetUrl';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -7,6 +8,7 @@ import { useAuthStore } from '@/store/authStore';
 import api, { applicationApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import LogoutConfirmModal from '@/components/LogoutConfirmModal';
 
 interface Notification {
   id: string;
@@ -80,7 +82,7 @@ export default function Header() {
       const profile = res.data.data.profile;
       const imgUrl = profile?.profileImageUrl || profile?.logoUrl || '';
       if (imgUrl) {
-        setProfileImageUrl(`http://localhost:3001${imgUrl}`);
+        setProfileImageUrl(assetUrl(imgUrl));
       }
     }).catch(() => {});
   }, [isAuthenticated]);
@@ -130,14 +132,24 @@ export default function Header() {
     setUnreadCount(0);
   }
 
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
   function handleLogout() {
-    logout();
     setShowUserMenu(false);
+    setConfirmLogout(true);
+  }
+
+  function doLogout() {
+    setConfirmLogout(false);
+    logout();
     router.push('/');
   }
 
   const dashboardPath = user?.role === 'SEEKER'
     ? '/seeker/dashboard' : '/company/dashboard';
+
+  // A signed-in company never lands on the public home page.
+  const homePath = user?.role === 'COMPANY' ? '/company/dashboard' : '/';
 
   const profilePath = user?.role === 'SEEKER'
     ? '/seeker/profile' : '/company/profile';
@@ -146,7 +158,7 @@ export default function Header() {
   if (hideOn.some((p) => pathname?.startsWith(p))) return null;
 
   const navLinks = [
-    { name: 'Home', href: '/' },
+    { name: 'Home', href: homePath },
     { name: 'Discover', href: '/jobs' },
     { name: 'Overview', href: '/overview' },
     { name: 'For Job Seekers', href: '/seeker' },
@@ -165,7 +177,7 @@ export default function Header() {
         <div className="flex justify-between items-center h-16 sm:h-20">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          <Link href={homePath} className="flex items-center gap-2 group">
             <img 
               src={useColoredTheme ? "/linkedgeColored.png" : "/linkedge.png"} 
               alt="LinkEdge.ai" 
@@ -384,6 +396,7 @@ export default function Header() {
         </AnimatePresence>
 
       </div>
+      <LogoutConfirmModal open={confirmLogout} onConfirm={doLogout} onCancel={() => setConfirmLogout(false)} />
     </header>
   );
 }
