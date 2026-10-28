@@ -1,10 +1,20 @@
 import { applicationApi } from '@/lib/api';
 
+export interface ScreeningInfo {
+  score: number;       // blended match used for the decision
+  threshold: number;   // the job's minimum match
+  autoScreen: boolean;
+  at: string;
+}
+
 export interface AtsBreakdown {
   strengths: string[];
   weaknesses: string[];
   recommendation: string;
+  matchedSkills?: string[];
+  missingSkills?: string[];
   rankedAt: string;
+  screening?: ScreeningInfo | null;
 }
 
 export interface Applicant {
@@ -20,6 +30,8 @@ export interface Applicant {
   interviewVenue: string | null;
   rejectionReason: string | null;
   rejectionMessage: string | null;
+  autoRejected?: boolean;       // rejected by the system's auto-screening
+  companyOverride?: boolean;    // company moved a system-rejected candidate forward
   cvUrl: string;
 }
 

@@ -14,6 +14,8 @@ import { requestIdMiddleware, httpLogger } from '../../shared/logger/logger';
 import { globalErrorHandler } from '../../shared/middleware/errorHandler';
 import { generalLimiter, authLimiter } from '../../shared/security/rateLimiter';
 import authRoutes from './routes/auth.routes';
+import { PrismaClient } from '@prisma/client';
+import { absolutizeStoredUrls } from './services/storage.service';
 
 const env = validateEnv(authEnvSchema);
 const app = express();
@@ -44,7 +46,16 @@ app.use(
 
 // -- Static Files --
 // Serves uploaded images from the uploads directory
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Files get unique names, so they can be cached for a year. The cross-origin header lets the
+// frontend (another port/domain) display them; helmet blocks that by default.
+// CVs are private: only the owner and companies (through authenticated endpoints) may read them.
+app.use('/uploads/resumes', (_req, res) => {
+  res.status(404).json({ success: false, message: 'Not found' });
+});
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static(path.join(__dirname, '..', 'uploads'), { maxAge: '365d', immutable: true, index: false }));
 
 // -- Body parsing --
 app.use(express.json({ limit: '10kb' }));
@@ -80,6 +91,8 @@ app.use(globalErrorHandler('auth-service'));
 
 const PORT = parseInt(env.PORT);
 app.listen(PORT, () => {
+  // Old rows stored relative paths (/uploads/...). Make them full URLs once.
+  absolutizeStoredUrls(new PrismaClient()).catch(() => undefined);
   console.log(
     JSON.stringify({
       timestamp: new Date().toISOString(),

@@ -23,3 +23,8 @@ def create_tables():
     """Creates all tables defined in models.py."""
     import src.database.models 
     Base.metadata.create_all(bind=engine)
+    # create_all never alters existing tables: add new columns idempotently.
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE interview_questions ADD COLUMN IF NOT EXISTS model_answer TEXT"))
+        conn.execute(text("ALTER TABLE interview_sessions ADD COLUMN IF NOT EXISTS level VARCHAR"))

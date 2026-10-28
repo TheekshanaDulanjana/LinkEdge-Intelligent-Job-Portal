@@ -45,11 +45,24 @@ export default function GoogleAuthButton({
         user.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
       );
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        // User closed popup — not an error
+      const code: string = err?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        // User closed the popup: not an error
         return;
       }
-      setError(err.message || 'Google login failed. Please try again.');
+      const friendly: Record<string, string> = {
+        'auth/popup-blocked': 'Your browser blocked the Google window. Allow pop-ups for this site and try again.',
+        'auth/unauthorized-domain': 'This domain is not authorised for Google sign-in. Add it under Firebase Console > Authentication > Settings > Authorized domains.',
+        'auth/operation-not-allowed': 'Google sign-in is not enabled. Turn it on in Firebase Console > Authentication > Sign-in method.',
+        'auth/network-request-failed': 'Network error. Check your connection and try again.',
+        'auth/invalid-api-key': 'Firebase API key is invalid. Check NEXT_PUBLIC_FIREBASE_API_KEY in frontend/.env.local.',
+      };
+      setError(
+        friendly[code] ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Google login failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

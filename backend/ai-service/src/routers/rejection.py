@@ -2,19 +2,19 @@ import os
 import re
 import google.generativeai as genai
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 router = APIRouter()
 
 
 class RejectionRequest(BaseModel):
-    reason_title:     str    # Company selects this from dropdown
-    candidate_name:   str
-    job_title:        str
-    company_name:     str
-    cv_text:          str    # Candidate's actual CV content
-    job_description:  str    # Job posting description + requirements
+    reason_title:     str = Field(max_length=200)     # Company selects this from dropdown
+    candidate_name:   str = Field(max_length=120)
+    job_title:        str = Field(max_length=200)
+    company_name:     str = Field(max_length=200)
+    cv_text:          str = Field(max_length=60000)   # Candidate's actual CV content
+    job_description:  str = Field(max_length=30000)   # Job posting description + requirements
 
 
 class RejectionResponse(BaseModel):
@@ -22,10 +22,23 @@ class RejectionResponse(BaseModel):
     generated:  bool
 
 
+def _fit_words(text: str, hi: int = 50) -> str:
+    """Keep the paragraph near 40 words: cut at the last full sentence within `hi` words."""
+    text = re.sub(r"\s+", " ", text).strip()
+    words = text.split()
+    if len(words) <= hi:
+        return text
+    cut = " ".join(words[:hi])
+    end = max(cut.rfind(". "), cut.rfind("."))
+    if end > 100 or (end > 0 and len(cut[:end + 1].split()) >= 25):
+        return cut[:end + 1]
+    return cut.rstrip(",;:") + "."
+
+
 def get_model():
     return genai.GenerativeModel(
         model_name=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        generation_config=genai.GenerationConfig(temperature=0.4, max_output_tokens=400)
+        generation_config=genai.GenerationConfig(temperature=0.4, max_output_tokens=300)
     )
 
 
@@ -42,48 +55,44 @@ async def generate_rejection_message(req: RejectionRequest):
     """
     model = get_model()
 
-    cv_snippet = (req.cv_text or "")[:3000]
-    jd_snippet = (req.job_description or "")[:2000]
+    cv_snippet = (req.cv_text or "")[:4500]
+    jd_snippet = (req.job_description or "")[:2500]
 
-    prompt = f"""You are writing a short, respectful explanation for a job application rejection.
+    prompt = f"""You are a recruiter writing a short, honest explanation directly to a candidate who was not selected.
 
-REJECTION REASON SELECTED BY THE EMPLOYER: "{req.reason_title}"
+REJECTION REASON CHOSEN BY THE EMPLOYER: "{req.reason_title}"
+JOB TITLE: {req.job_title}
 
-CANDIDATE'S ACTUAL CV CONTENT:
+CANDIDATE'S CV (full details):
 {cv_snippet}
 
-JOB POSTING (description + requirements):
+JOB POSTING (description, requirements, responsibilities, skills):
 {jd_snippet}
 
 TASK:
-Write ONE short paragraph (3-4 sentences, maximum 70 words) that explains SPECIFICALLY why this candidate's profile falls short in relation to the reason "{req.reason_title}".
+Compare the CV with the job posting, then write ONE paragraph of about 40 words (between 35 and 45) addressed to the candidate ("you", "your"). It must explain that the application was not successful because of the chosen reason, naming the concrete gap you found (specific skills, tools, experience level or domain) and, in a few words, what would strengthen a future application.
 
 Rules:
-- Compare the candidate's ACTUAL skills/experience (from their CV) against what the job ACTUALLY requires.
-- Be specific — mention real skills, technologies, or experience gaps found by comparing the two texts. Do not invent details not present in the CV or job posting.
-- Do NOT repeat the reason title verbatim as a sentence — explain the underlying gap instead.
-- Tone: professional, respectful, and constructive — not harsh.
-- Do NOT include a greeting, sign-off, or the candidate's name.
-- Do NOT use markdown, bullet points, or bold text — plain prose only.
-- Output ONLY the paragraph text, nothing else.
-
-Example (for reason "Missing required technical skills"):
-"The role requires hands-on experience with Kubernetes and CI/CD pipelines, which are not reflected in your current CV. While your background in Python development is strong, the position calls for infrastructure and deployment experience that your profile does not yet demonstrate."
+- Use only facts present in the CV or the job posting. Never invent details.
+- Do not repeat the reason title as a sentence; explain the underlying gap.
+- Respectful, professional, constructive. No greeting, no sign-off, no name.
+- Plain prose only: no markdown, bullets or quotes.
+- Output ONLY the paragraph.
 """
 
     try:
         response = model.generate_content(prompt)
-        message = response.text.strip()
-        # Strip any accidental markdown formatting
-        message = re.sub(r'\*\*|__|`|#{1,6}\s', '', message).strip()
+        message = re.sub(r'\*\*|__|`|#{1,6}\s', '', response.text or '').strip().strip('"')
+        message = _fit_words(message)
+        if len(message.split()) < 15:
+            raise ValueError("generated paragraph too short")
         return RejectionResponse(ai_message=message, generated=True)
 
     except Exception as e:
         print(f"AI rejection generation failed: {e}")
         fallback = (
-            f"After reviewing your application for the {req.job_title} role, "
-            f"we found that your current profile does not fully align with our "
-            f"requirements in relation to: {req.reason_title.lower()}. "
-            f"We encourage you to apply for future roles that better match your experience."
+            f"Thank you for applying for the {req.job_title} role. After comparing your CV with the "
+            f"position's requirements, we could not move forward mainly because of: "
+            f"{req.reason_title.lower().rstrip('.')}. We encourage you to strengthen this area and apply again."
         )
-        return RejectionResponse(ai_message=fallback, generated=False)
+        return RejectionResponse(ai_message=_fit_words(fallback, hi=55), generated=False)

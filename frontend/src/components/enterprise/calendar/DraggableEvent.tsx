@@ -3,13 +3,7 @@
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { CalendarEvent } from '@/lib/calendar';
-
-const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  amber:  'bg-amber-100 text-amber-700 border-amber-200',
-  red:    'bg-red-100 text-red-600 border-red-200',
-  green:  'bg-green-100 text-green-700 border-green-200',
-};
+import { styleFor } from './eventStyle';
 
 export default function DraggableEvent({
   event, onClick, compact = true,
@@ -23,8 +17,11 @@ export default function DraggableEvent({
   const style = transform ? {
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 50 : undefined,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.6 : 1,
   } : undefined;
+
+  const s = styleFor(event);
+  const time = new Date(event.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div
@@ -33,17 +30,16 @@ export default function DraggableEvent({
       {...listeners}
       {...attributes}
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      className={`cursor-grab active:cursor-grabbing rounded border truncate transition-shadow hover:shadow-sm
-        ${COLOR_MAP[event.color ?? 'indigo']}
-        ${compact ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-1.5'}`}
+      className={`cursor-grab active:cursor-grabbing rounded-md border border-l-[3px] truncate transition-shadow hover:shadow-sm ${s.chip} ${s.bar}
+        ${compact ? 'text-[10.5px] px-1.5 py-0.5' : 'text-xs px-2 py-1.5'}`}
       title={event.title}
     >
-      {!compact && (
-        <p className="opacity-70">
-          {new Date(event.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      )}
-      <p className="font-medium truncate">{event.title}</p>
+      {compact
+        ? <p className="font-medium truncate"><span className="opacity-60 tabular-nums mr-1">{time}</span>{event.title}</p>
+        : (<>
+            <p className="opacity-70 tabular-nums">{time}</p>
+            <p className="font-semibold truncate">{event.title}</p>
+          </>)}
     </div>
   );
 }

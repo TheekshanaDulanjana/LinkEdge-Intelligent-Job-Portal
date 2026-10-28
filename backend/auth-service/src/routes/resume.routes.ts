@@ -5,6 +5,8 @@ import fs from 'fs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import crypto from 'crypto';
+import { uploadLimiter } from '../../../shared/security/rateLimiter';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -44,8 +46,8 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req: any, file, cb) => {
-    const uid = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `resume-${req.user.userId}-${uid}${path.extname(file.originalname)}`);
+    // Random, unguessable name; extension is whitelisted by fileFilter below.
+    cb(null, `resume-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
   },
 });
 
@@ -68,11 +70,28 @@ router.post(
   '/upload',
   auth,
   seekerOnly,
+  uploadLimiter,
   upload.single('resume'),
   async (req: any, res: Response) => {
     try {
       if (!req.file) {
         res.status(400).json({ success: false, message: 'Resume file is required' });
+        return;
+      }
+
+      // Check the real content, not just the extension.
+      const fd = fs.openSync(req.file.path, 'r');
+      const head = Buffer.alloc(8);
+      const read = fs.readSync(fd, head, 0, 8, 0);
+      fs.closeSync(fd);
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const okPdf = ext === '.pdf' && head.slice(0, 5).toString('latin1') === '%PDF-';
+      const okDocx = ext === '.docx' && head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04;
+      const okDoc = ext === '.doc' && head.slice(0, 4).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0]));
+      const okTxt = ext === '.txt' && read > 0 && !head.slice(0, read).includes(0);
+      if (!okPdf && !okDocx && !okDoc && !okTxt) {
+        try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+        res.status(400).json({ success: false, message: 'The file content does not match its type. Upload a real PDF, Word or TXT file.' });
         return;
       }
 

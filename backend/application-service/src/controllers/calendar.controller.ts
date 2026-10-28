@@ -22,10 +22,13 @@ export async function getCalendarEvents(req: any, res: Response) {
     }
 
     const { from, to } = req.query;
-    const dateFrom = from ? new Date(from as string) : new Date(new Date().setDate(1));
-    const dateTo = to
-      ? new Date(to as string)
-      : new Date(new Date(dateFrom).setMonth(dateFrom.getMonth() + 1));
+    const monthStart = new Date(new Date().setDate(1));
+    let dateFrom = from ? new Date(from as string) : monthStart;
+    if (Number.isNaN(dateFrom.getTime())) dateFrom = monthStart;
+    let dateTo = to ? new Date(to as string) : new Date(new Date(dateFrom).setMonth(dateFrom.getMonth() + 1));
+    if (Number.isNaN(dateTo.getTime()) || dateTo < dateFrom || dateTo.getTime() - dateFrom.getTime() > 93 * 86400000) {
+      dateTo = new Date(new Date(dateFrom).setMonth(dateFrom.getMonth() + 1));
+    }
 
     // 1. Manually created events
     const manualEvents = await prisma.calendarEvent.findMany({
@@ -207,6 +210,7 @@ export async function rescheduleInterview(req: any, res: Response) {
       data: {
         interviewDate: new Date(interviewDate),
         ...(interviewTime && { interviewTime }),
+        practiceExpiresAt: new Date(new Date(interviewDate).getTime() - 60 * 60 * 1000),
       },
     });
 
