@@ -27,31 +27,23 @@ export default function DayView({
 
   return (
     <div>
-      <div className="text-center py-3 border-b border-gray-100">
-        <p className="text-xs text-gray-400">{date.toLocaleDateString('en-US', { weekday: 'long' })}</p>
-        <p className="text-lg font-semibold text-gray-900 mt-0.5">
-          {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-        </p>
+      <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/70">
+        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{date.toLocaleDateString('en-US', { weekday: 'long' })}</p>
+        <p className="text-base font-semibold text-slate-900">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
       </div>
-
-      <div className="max-w-2xl mx-auto">
+      <div>
         {HOURS.map(hour => {
           const slotDate = new Date(date);
           slotDate.setHours(hour, 0, 0, 0);
-          const hourEvents = eventsForHour(hour);
-
           return (
-            <div key={hour} className="flex border-b border-gray-50">
-              <div className="w-16 flex-shrink-0 text-xs text-gray-400 text-right pr-3 pt-2">
+            <div key={hour} className="flex border-b border-slate-100">
+              <div className="w-16 shrink-0 text-[11px] text-slate-400 text-right pr-3 pt-2 tabular-nums">
                 {hour % 12 === 0 ? 12 : hour % 12}{hour < 12 ? 'am' : 'pm'}
               </div>
-              <DroppableDay
-                id={`slot-${slotDate.toISOString()}`}
-                date={slotDate}
-                className="flex-1 min-h-[60px] p-1.5 space-y-1 cursor-pointer hover:bg-gray-50/50"
-              >
-                <div onClick={() => onSlotClick(slotDate)} className="min-h-[52px]">
-                  {hourEvents.length === 0 ? null : hourEvents.map(ev => (
+              <DroppableDay id={`slot-${slotDate.toISOString()}`} date={slotDate}
+                className="flex-1 min-h-[60px] p-1.5 border-l border-slate-100 cursor-pointer hover:bg-slate-50/60">
+                <div onClick={() => onSlotClick(slotDate)} className="min-h-[48px] space-y-1">
+                  {eventsForHour(hour).map(ev => (
                     <DraggableEvent key={ev.id} event={ev} compact={false} onClick={() => onEventClick(ev)} />
                   ))}
                 </div>

@@ -47,6 +47,7 @@ interface Evaluation {
   answer: string;
   score: number;
   feedback: string;
+  model_answer?: string;
 }
 
 interface Results {
@@ -834,20 +835,26 @@ function InterviewPage() {
 
                     {/* Right Column: Spoken Transcript & AI Feedback */}
                     <div className="lg:col-span-7 space-y-3 pt-2 lg:pt-0 lg:border-l lg:border-sky-100 lg:pl-6">
-                      {ev.answer && ev.answer !== '[No answer captured]' && (
-                        <div className="bg-white border border-sky-100 rounded-xl p-3.5 shadow-xs">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Your spoken transcript</p>
-                          <p className="text-xs text-slate-700 italic font-medium leading-relaxed">
-                            &ldquo;{ev.answer}&rdquo;
-                          </p>
-                        </div>
-                      )}
+                      <div className="bg-white border border-sky-100 rounded-xl p-3.5 shadow-xs">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Your answer</p>
+                        <p className="text-xs text-slate-700 italic font-medium leading-relaxed">
+                          {ev.answer && ev.answer !== '[No answer captured]' ? <>&ldquo;{ev.answer}&rdquo;</> : 'No answer captured'}
+                        </p>
+                      </div>
                       <div className="space-y-1">
                         <p className="text-[10px] font-bold text-[#0025B8] uppercase tracking-wider">AI Assessment Feedback</p>
                         <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
                           {ev.feedback}
                         </p>
                       </div>
+                      {ev.model_answer && (
+                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 shadow-xs">
+                          <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">Best answer (model response)</p>
+                          <p className="text-xs sm:text-sm text-emerald-900 font-medium leading-relaxed">
+                            {ev.model_answer}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -866,6 +873,9 @@ function InterviewPage() {
                 <Button
                   onClick={() => {
                     setStage('ready');
+                    setQuestions([]);
+                    setSessionId('');
+                    setError('');
                     setAnswers([]);
                     setCurrentQ(0);
                     setResults(null);

@@ -1,99 +1,78 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Trash2 } from 'lucide-react';
-import PageHeader from '@/components/enterprise/PageHeader';
+import { ChevronLeft, ChevronRight, Plus, MapPin, Clock, Trash2, CalendarDays, CalendarCheck, Info } from 'lucide-react';
 import EventFormModal from '@/components/enterprise/EventFormModal';
 import DraggableEvent from '@/components/enterprise/calendar/DraggableEvent';
 import DroppableDay from '@/components/enterprise/calendar/DroppableDay';
 import WeekView from '@/components/enterprise/calendar/WeekView';
 import DayView from '@/components/enterprise/calendar/DayView';
-import { Button } from '@/components/ui/button';
+import { EVENT_STYLE, styleFor } from '@/components/enterprise/calendar/eventStyle';
 import {
-  fetchCalendarEvents, deleteCalendarEvent, rescheduleEvent, rescheduleInterview,
-  CalendarEvent,
+  fetchCalendarEvents, deleteCalendarEvent, rescheduleEvent, rescheduleInterview, CalendarEvent,
 } from '@/lib/calendar';
-
-const COLOR_MAP: Record<string, string> = {
-  indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  amber:  'bg-amber-50 text-amber-800 border-amber-200',
-  red:    'bg-rose-50 text-rose-700 border-rose-200',
-  green:  'bg-emerald-50 text-emerald-800 border-emerald-200',
-};
+import { Panel, KpiTile, EmptyNote, PanelSkeleton, Pill, cx } from '@/components/enterprise/dashboard/primitives';
+import {
+  PageHead, Segmented, Modal, ConfirmDialog, Toast, useHideFooter, btnPrimary, btnSecondary, iconBtn,
+} from '@/components/enterprise/dashboard/kit';
 
 type ViewMode = 'month' | 'week' | 'day';
 
-function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d: Date)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59); }
-function startOfWeek(d: Date)  { const r = new Date(d); r.setDate(d.getDate() - d.getDay()); r.setHours(0, 0, 0, 0); return r; }
-function endOfWeek(d: Date)    { const r = startOfWeek(d); r.setDate(r.getDate() + 6); r.setHours(23, 59, 59); return r; }
-function sameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+function startOfWeek(d: Date) { const r = new Date(d); r.setDate(d.getDate() - d.getDay()); r.setHours(0, 0, 0, 0); return r; }
+function endOfWeek(d: Date) { const r = startOfWeek(d); r.setDate(r.getDate() + 6); r.setHours(23, 59, 59); return r; }
+const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 export default function CalendarPage() {
+  useHideFooter();
+
   const [view, setView] = useState<ViewMode>('month');
-  const [cursor, setCursor] = useState(new Date());
+  const [cursor, setCursor] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [detail, setDetail] = useState<CalendarEvent | null>(null);
+  const [toDelete, setToDelete] = useState<CalendarEvent | null>(null);
+  const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const today = new Date();
 
-  // Footer eka hide kirima me page ekedi
-  useEffect(() => {
-    const footerElement = document.querySelector('footer');
-    if (footerElement) {
-      footerElement.style.display = 'none';
-    }
-    return () => {
-      if (footerElement) {
-        footerElement.style.display = '';
-      }
-    };
-  }, []);
+  function flash(type: 'ok' | 'err', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }
 
-  const rangeStart = useMemo(() => {
-    if (view === 'month') return startOfMonth(cursor);
-    if (view === 'week')  return startOfWeek(cursor);
-    return new Date(cursor.setHours(0, 0, 0, 0));
-  }, [view, cursor]);
-
-  const rangeEnd = useMemo(() => {
-    if (view === 'month') return endOfMonth(cursor);
-    if (view === 'week')  return endOfWeek(cursor);
-    return new Date(cursor.setHours(23, 59, 59, 999));
-  }, [view, cursor]);
-
+  const monthKey = `${cursor.getFullYear()}-${cursor.getMonth()}`;
   const loadEvents = useCallback(async () => {
     setLoading(true);
     try {
-      // Always fetch a full month window so drag targets outside the visible week/day still resolve
-      const data = await fetchCalendarEvents(startOfMonth(cursor), endOfMonth(cursor));
-      setEvents(data);
-    } catch (e) { console.error(e); }
+      // Always load a full month so drag targets outside the visible week or day still resolve.
+      // Week views that straddle two months also need the neighbouring month.
+      const from = view === 'week' ? new Date(Math.min(startOfMonth(cursor).getTime(), startOfWeek(cursor).getTime())) : startOfMonth(cursor);
+      const to = view === 'week' ? new Date(Math.max(endOfMonth(cursor).getTime(), endOfWeek(cursor).getTime())) : endOfMonth(cursor);
+      setEvents(await fetchCalendarEvents(from, to));
+    } catch (e) { console.error(e); flash('err', 'Could not load events.'); }
     finally { setLoading(false); }
-  }, [cursor]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey, view, view === 'week' ? startOfWeek(cursor).getTime() : 0]);
   useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  const visible = useMemo(() => events.filter(e => !hidden[e.eventType]), [events, hidden]);
 
   const monthGrid = useMemo(() => {
     const first = startOfMonth(cursor);
     const gridStart = new Date(first);
     gridStart.setDate(1 - first.getDay());
-    return Array.from({ length: 42 }, (_, i) => {
-      const d = new Date(gridStart);
-      d.setDate(gridStart.getDate() + i);
-      return d;
-    });
+    return Array.from({ length: 42 }, (_, i) => { const d = new Date(gridStart); d.setDate(gridStart.getDate() + i); return d; });
   }, [cursor]);
 
-  function eventsOnDay(day: Date) {
-    return events.filter(e => sameDay(new Date(e.startTime), day));
-  }
+  const eventsOn = (day: Date) => visible.filter(e => sameDay(new Date(e.startTime), day)).sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime));
 
   function navigate(dir: -1 | 1) {
     const next = new Date(cursor);
@@ -106,241 +85,168 @@ export default function CalendarPage() {
   async function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
     if (!over) return;
+    const dragged = active.data.current?.event as CalendarEvent | undefined;
+    const target = over.data.current?.date as Date | undefined;
+    if (!dragged || !target) return;
 
-    const draggedEvent = active.data.current?.event as CalendarEvent | undefined;
-    const targetDate    = over.data.current?.date as Date | undefined;
-    if (!draggedEvent || !targetDate) return;
+    const s0 = new Date(dragged.startTime);
+    const dur = new Date(dragged.endTime).getTime() - s0.getTime();
+    const newStart = new Date(target);
+    if (view === 'month') newStart.setHours(s0.getHours(), s0.getMinutes());
+    const newEnd = new Date(newStart.getTime() + dur);
+    if (newStart.getTime() === s0.getTime()) return;
 
-    const originalStart = new Date(draggedEvent.startTime);
-    const originalEnd    = new Date(draggedEvent.endTime);
-    const durationMs     = originalEnd.getTime() - originalStart.getTime();
-
-    const newStart = new Date(targetDate);
-    // In month view (day cells, not hour slots), preserve the original time of day
-    if (view === 'month') {
-      newStart.setHours(originalStart.getHours(), originalStart.getMinutes());
-    }
-    const newEnd = new Date(newStart.getTime() + durationMs);
-
-    // Optimistic UI update
-    setEvents(prev => prev.map(ev => ev.id === draggedEvent.id
-      ? { ...ev, startTime: newStart.toISOString(), endTime: newEnd.toISOString() }
-      : ev
-    ));
-
+    setEvents(prev => prev.map(ev => (ev.id === dragged.id ? { ...ev, startTime: newStart.toISOString(), endTime: newEnd.toISOString() } : ev)));
     try {
-      if (draggedEvent.applicationId) {
-        // Interview event — reschedule on the Application record
-        const timeStr = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`;
-        await rescheduleInterview(draggedEvent.applicationId, newStart.toISOString(), timeStr);
+      if (dragged.applicationId) {
+        const t = `${String(newStart.getHours()).padStart(2, '0')}:${String(newStart.getMinutes()).padStart(2, '0')}`;
+        await rescheduleInterview(dragged.applicationId, newStart.toISOString(), t);
       } else {
-        // Manual calendar event
-        await rescheduleEvent(draggedEvent.id, newStart.toISOString(), newEnd.toISOString());
+        await rescheduleEvent(dragged.id, newStart.toISOString(), newEnd.toISOString());
       }
-    } catch (err) {
-      console.error(err);
-      loadEvents(); // rollback on failure
-    }
+      flash('ok', 'Rescheduled.');
+    } catch (err) { console.error(err); flash('err', 'Could not reschedule. Restored the original time.'); loadEvents(); }
   }
 
-  async function handleDelete(id: string, isSystem?: boolean) {
-    if (isSystem) return;
-    if (!confirm('Delete this event?')) return;
-    try { await deleteCalendarEvent(id); loadEvents(); } catch (e) { console.error(e); }
+  async function confirmDelete() {
+    if (!toDelete) return;
+    try { await deleteCalendarEvent(toDelete.id); setToDelete(null); setDetail(null); loadEvents(); flash('ok', 'Event deleted.'); }
+    catch (e) { console.error(e); flash('err', 'Could not delete the event.'); }
   }
 
-  const today = new Date();
-  const upcomingEvents = events
-    .filter(e => new Date(e.startTime) >= today)
-    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-    .slice(0, 6);
+  const upcoming = useMemo(() => visible
+    .filter(e => new Date(e.endTime) >= today)
+    .sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))
+    .slice(0, 8),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [visible]);
+
+  const todays = events.filter(e => sameDay(new Date(e.startTime), today));
+  const weekEnd = endOfWeek(today);
+  const thisWeek = events.filter(e => { const s = new Date(e.startTime); return s >= startOfWeek(today) && s <= weekEnd; });
+  const interviewsMonth = events.filter(e => e.eventType === 'INTERVIEW').length;
+  const deadlines = events.filter(e => e.eventType === 'DEADLINE' && new Date(e.startTime) >= today).length;
 
   const headerLabel = view === 'month'
     ? cursor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : view === 'week'
-      ? `${startOfWeek(cursor).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${endOfWeek(cursor).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-      : cursor.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      ? `${startOfWeek(cursor).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${endOfWeek(cursor).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      : cursor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="space-y-8 pb-12 font-sans text-slate-800">
-      
-      {/* Enterprise Page Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <PageHeader
-          title="Recruitment Calendar"
-          description="Schedule interviews, meetings, and hiring deadlines. Drag events to reschedule."
-          actions={
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                onClick={() => { setSelectedDate(new Date()); setShowModal(true); }}
-                variant="gradient"
-                className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white rounded-full shadow-md cursor-pointer h-10"
-              >
-                <Plus className="w-4 h-4" /> New Event
-              </Button>
-            </motion.div>
-          }
-        />
-      </motion.div>
+    <div className="space-y-5 pb-10 text-slate-800">
+      <PageHead
+        eyebrow="Schedule"
+        title="Calendar"
+        description="Interviews, meetings and hiring deadlines in one view. Drag an event to a new day or time to reschedule it."
+        actions={<button onClick={() => { setSelectedDate(new Date()); setShowModal(true); }} className={btnPrimary}><Plus className="w-3.5 h-3.5" /> New event</button>}
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiTile label="Today" icon={<CalendarCheck className="w-3.5 h-3.5" />} loading={loading} value={todays.length} hint={todays.length ? `Next ${timeOf(todays.sort((a, b) => +new Date(a.startTime) - +new Date(b.startTime))[0].startTime)}` : 'Nothing scheduled'} />
+        <KpiTile label="This week" icon={<CalendarDays className="w-3.5 h-3.5" />} loading={loading} value={thisWeek.length} hint="All event types" />
+        <KpiTile label="Interviews this month" icon={<Clock className="w-3.5 h-3.5" />} loading={loading} value={interviewsMonth} hint={cursor.toLocaleDateString('en-US', { month: 'long' })} />
+        <KpiTile label="Upcoming deadlines" icon={<Info className="w-3.5 h-3.5" />} loading={loading} value={deadlines} hint="This month" />
+      </div>
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Main Calendar View Container (8 Columns) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="lg:col-span-8 bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-6"
-          >
-            {/* Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-sky-100">
-              <div className="flex items-center gap-3">
-                <h3 className="font-bold text-slate-900 text-base sm:text-lg tracking-tight">{headerLabel}</h3>
-                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-2xl border border-sky-100">
-                  <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-sky-100 hover:bg-white text-slate-600 transition-colors shadow-xs cursor-pointer">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setCursor(new Date())} className="px-3 h-8 text-xs font-bold rounded-xl border border-sky-100 hover:bg-white text-slate-700 transition-colors shadow-xs cursor-pointer">
-                    Today
-                  </button>
-                  <button onClick={() => navigate(1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-sky-100 hover:bg-white text-slate-600 transition-colors shadow-xs cursor-pointer">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+          <Panel className="xl:col-span-9" title={headerLabel} subtitle={loading ? 'Loading…' : `${visible.length} event${visible.length === 1 ? '' : 's'} in range`} icon={<CalendarDays className="w-3.5 h-3.5" />} noPad
+            actions={<>
+              <div className="flex items-center gap-1">
+                <button onClick={() => navigate(-1)} className={cx(iconBtn, 'border border-slate-200')} aria-label="Previous"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => setCursor(new Date())} className={cx(btnSecondary, '!h-8 !px-3')}>Today</button>
+                <button onClick={() => navigate(1)} className={cx(iconBtn, 'border border-slate-200')} aria-label="Next"><ChevronRight className="w-4 h-4" /></button>
               </div>
-
-              <div className="flex bg-slate-100/80 rounded-2xl p-1 border border-sky-100/60 shadow-xs">
-                {(['month', 'week', 'day'] as ViewMode[]).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setView(v)}
-                    className={`px-4 py-1.5 text-xs font-bold rounded-xl capitalize transition-all cursor-pointer ${
-                      view === v ? 'bg-white text-[#0025B8] shadow-sm' : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
+              <Segmented size="sm" value={view} onChange={setView} options={[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }, { value: 'day', label: 'Day' }]} />
+            </>}>
+            <div className="flex items-center gap-4 px-5 py-2.5 border-b border-slate-100 flex-wrap">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Show</span>
+              {Object.entries(EVENT_STYLE).map(([k, s]) => (
+                <label key={k} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={!hidden[k]} onChange={() => setHidden(h => ({ ...h, [k]: !h[k] }))} className="accent-[#0025B8]" />
+                  <span className={cx('w-2 h-2 rounded-full', s.dot)} />{s.label}
+                </label>
+              ))}
             </div>
 
-            {/* Views */}
-            {loading ? (
-              <div className="h-96 bg-sky-50/60 rounded-2xl animate-pulse" />
-            ) : view === 'month' ? (
-              <div className="grid grid-cols-7 gap-1.5 bg-sky-50/40 rounded-2xl p-2 border border-sky-100">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                  <div key={d} className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider py-2">{d}</div>
-                ))}
-                {monthGrid.map((day, i) => {
-                  const inMonth = day.getMonth() === cursor.getMonth();
-                  const isToday = sameDay(day, today);
-                  const dayEvents = eventsOnDay(day);
-
-                  return (
-                    <DroppableDay
-                      key={i}
-                      id={`slot-${day.toISOString()}`}
-                      date={day}
-                      className={`bg-white min-h-[100px] p-2 text-left rounded-2xl border border-sky-100/60 transition-all shadow-xs hover:border-sky-200 ${!inMonth ? 'opacity-40 bg-slate-50/50' : ''}`}
-                    >
-                      <button
-                        onClick={() => { setSelectedDate(day); setShowModal(true); }}
-                        className={`text-xs inline-flex items-center justify-center w-7 h-7 rounded-xl font-bold transition-all cursor-pointer ${
-                          isToday ? 'bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white shadow-sm' : 'text-slate-700 hover:bg-sky-50'
-                        }`}
-                      >
-                        {day.getDate()}
-                      </button>
-                      <div className="mt-1.5 space-y-1">
-                        {dayEvents.slice(0, 2).map(ev => (
-                          <DraggableEvent key={ev.id} event={ev} onClick={() => {}} />
-                        ))}
-                        {dayEvents.length > 2 && (
-                          <p className="text-[10px] font-bold text-[#0F9DE4] px-1">+{dayEvents.length - 2} more</p>
-                        )}
-                      </div>
-                    </DroppableDay>
-                  );
-                })}
-              </div>
-            ) : view === 'week' ? (
-              <WeekView
-                weekStart={startOfWeek(cursor)}
-                events={events}
-                onEventClick={() => {}}
-                onSlotClick={(d) => { setSelectedDate(d); setShowModal(true); }}
-              />
-            ) : (
-              <DayView
-                date={cursor}
-                events={events}
-                onEventClick={() => {}}
-                onSlotClick={(d) => { setSelectedDate(d); setShowModal(true); }}
-              />
-            )}
-          </motion.div>
-
-          {/* Upcoming Sidebar (4 Columns) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="lg:col-span-4 bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-6 h-fit sticky top-28"
-          >
-            <div className="border-b border-sky-100 pb-4 space-y-0.5">
-              <h3 className="font-bold text-slate-900 text-base tracking-tight">Upcoming Events</h3>
-              <p className="text-xs text-slate-400 font-medium">{today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-            </div>
-
-            {loading ? (
-              <div className="space-y-3 animate-pulse">
-                {[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-sky-50/60 rounded-2xl" />)}
-              </div>
-            ) : upcomingEvents.length === 0 ? (
-              <p className="text-xs text-slate-400 font-medium text-center py-6">No upcoming events scheduled.</p>
-            ) : (
-              <div className="space-y-3.5">
-                {upcomingEvents.map(ev => (
-                  <div key={ev.id} className={`rounded-2xl border p-4 shadow-xs ${COLOR_MAP[ev.color ?? 'indigo']}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs sm:text-sm font-bold tracking-tight">{ev.title}</p>
-                      {!ev.isSystemGenerated && (
-                        <button onClick={() => handleDelete(ev.id, ev.isSystemGenerated)} className="opacity-60 hover:opacity-100 flex-shrink-0 cursor-pointer p-1 rounded-lg hover:bg-black/5 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs opacity-80 font-medium flex items-center gap-1.5 mt-2">
-                      <Clock className="w-3.5 h-3.5" />
-                      {new Date(ev.startTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                    {ev.location && (
-                      <p className="text-xs opacity-80 font-medium flex items-center gap-1.5 mt-1">
-                        <MapPin className="w-3.5 h-3.5" /> {ev.location}
-                      </p>
-                    )}
+            {loading ? <div className="p-5"><PanelSkeleton rows={9} /></div>
+              : view === 'month' ? (
+                <div>
+                  <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 py-2">{d}</div>)}
                   </div>
-                ))}
-              </div>
-            )}
-          </motion.div>
+                  <div className="grid grid-cols-7">
+                    {monthGrid.map((day, i) => {
+                      const inMonth = day.getMonth() === cursor.getMonth();
+                      const isToday = sameDay(day, today);
+                      const list = eventsOn(day);
+                      return (
+                        <DroppableDay key={i} id={`slot-${day.toISOString()}`} date={day}
+                          className={cx('min-h-[112px] p-1.5 border-b border-l border-slate-100 text-left transition-colors', !inMonth && 'bg-slate-50/60', i % 7 === 0 && 'border-l-0')}>
+                          <button onClick={() => { setSelectedDate(day); setShowModal(true); }}
+                            className={cx('text-[11px] inline-flex items-center justify-center w-6 h-6 rounded-full font-semibold cursor-pointer transition-colors',
+                              isToday ? 'bg-[#0025B8] text-white' : inMonth ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-300 hover:bg-slate-100')}>
+                            {day.getDate()}
+                          </button>
+                          <div className="mt-1 space-y-0.5">
+                            {list.slice(0, 3).map(ev => <DraggableEvent key={ev.id} event={ev} onClick={() => setDetail(ev)} />)}
+                            {list.length > 3 && <button onClick={() => { setCursor(day); setView('day'); }} className="text-[10px] font-semibold text-[#0025B8] px-1 hover:underline cursor-pointer">+{list.length - 3} more</button>}
+                          </div>
+                        </DroppableDay>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : view === 'week' ? (
+                <WeekView weekStart={startOfWeek(cursor)} events={visible} onEventClick={setDetail} onSlotClick={d => { setSelectedDate(d); setShowModal(true); }} />
+              ) : (
+                <DayView date={cursor} events={visible} onEventClick={setDetail} onSlotClick={d => { setSelectedDate(d); setShowModal(true); }} />
+              )}
+          </Panel>
 
+          <div className="xl:col-span-3 space-y-4 xl:sticky xl:top-24">
+            <Panel title="Upcoming" subtitle={today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} icon={<Clock className="w-3.5 h-3.5" />} noPad>
+              {loading ? <div className="p-5"><PanelSkeleton rows={4} /></div> : upcoming.length === 0 ? <EmptyNote text="Nothing coming up in this range." icon={<CalendarDays className="w-6 h-6" />} /> : (
+                <ul className="divide-y divide-slate-100 max-h-[460px] overflow-y-auto">
+                  {upcoming.map(ev => {
+                    const s = styleFor(ev);
+                    return (
+                      <li key={ev.id}>
+                        <button onClick={() => setDetail(ev)} className={cx('w-full text-left px-5 py-3 border-l-[3px] hover:bg-slate-50 transition-colors cursor-pointer', s.bar)}>
+                          <p className="text-[13px] font-semibold text-slate-900 truncate">{ev.title}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5"><Clock className="w-3 h-3" />{new Date(ev.startTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                          {ev.location && <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3" />{ev.location}</p>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Panel>
+          </div>
         </div>
       </DndContext>
 
-      {showModal && selectedDate && (
-        <EventFormModal
-          defaultDate={selectedDate}
-          onClose={() => setShowModal(false)}
-          onCreated={loadEvents}
-        />
-      )}
+      {showModal && selectedDate && <EventFormModal defaultDate={selectedDate} onClose={() => setShowModal(false)} onCreated={() => { loadEvents(); flash('ok', 'Event created.'); }} />}
+
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.title ?? ''} subtitle={detail ? styleFor(detail).label : undefined}
+        footer={detail && <>
+          {!detail.isSystemGenerated && <button onClick={() => setToDelete(detail)} className={cx(btnSecondary, 'text-rose-600 hover:!bg-rose-50')}><Trash2 className="w-3.5 h-3.5" /> Delete</button>}
+          <button onClick={() => setDetail(null)} className={btnSecondary}>Close</button>
+        </>}>
+        {detail && (
+          <div className="space-y-3 text-[13px]">
+            <div className="flex items-center gap-2"><Pill tone={detail.eventType === 'DEADLINE' ? 'rose' : detail.eventType === 'REMINDER' ? 'green' : detail.eventType === 'INTERVIEW' ? 'sky' : 'blue'}>{styleFor(detail).label}</Pill>{detail.isSystemGenerated && <Pill tone="slate">Auto-created</Pill>}</div>
+            <p className="flex items-center gap-2 text-slate-700"><Clock className="w-4 h-4 text-slate-400" />{new Date(detail.startTime).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, {timeOf(detail.startTime)} – {timeOf(detail.endTime)}</p>
+            {detail.location && <p className="flex items-center gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-400" />{detail.location}</p>}
+            {detail.description && <p className="text-slate-500 leading-relaxed bg-slate-50 border border-slate-100 rounded-lg p-3">{detail.description}</p>}
+            {detail.applicationId && <p className="text-xs text-slate-400">Linked to an application. Drag it on the calendar to change the interview time.</p>}
+          </div>
+        )}
+      </Modal>
+      <ConfirmDialog open={!!toDelete} title="Delete this event?" confirmLabel="Delete" onConfirm={confirmDelete} onCancel={() => setToDelete(null)} message="It will be removed from your calendar." />
+      <Toast toast={toast} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ Add a new skill by adding an entry — no other file needs changing.
 # These are only matched when found inside an identified SKILLS section
 # or directly adjacent to other technology terms.
 CONTEXT_SENSITIVE: set[str] = {
-    "go", "c", "r", "rust", "dart", "swift", "scala",
+    "go", "c", "r", "rust", "dart", "swift", "scala", "sketch", "miro", "framer",
 }
 
 SKILL_TAXONOMY: dict[str, list[str]] = {
@@ -239,6 +239,33 @@ SKILL_TAXONOMY: dict[str, list[str]] = {
     "OpenAPI":           ["openapi", "swagger"],
     "WebSocket":         ["websocket", "websockets", "socket.io"],
     "PWA":               ["pwa", "progressive web app"],
+    # ── Design & UX ───────────────────────────────────────────────────────
+    "Adobe XD":          ["adobe xd"],
+    "Sketch":            ["sketch app", "sketch design", "sketch"],
+    "Adobe Photoshop":   ["photoshop", "adobe photoshop"],
+    "Adobe Illustrator": ["illustrator", "adobe illustrator"],
+    "After Effects":     ["after effects", "adobe after effects"],
+    "InVision":          ["invision"],
+    "Framer":            ["framer", "framer motion"],
+    "Webflow":           ["webflow"],
+    "Zeplin":            ["zeplin"],
+    "Miro":              ["miro", "figjam"],
+    "Storybook":         ["storybook"],
+    "Wireframing":       ["wireframing", "wireframes", "wireframe"],
+    "Prototyping":       ["prototyping", "prototypes", "interactive prototypes"],
+    "User Research":     ["user research", "ux research", "user interviews", "usability testing",
+                          "usability tests", "user testing"],
+    "Design Systems":    ["design system", "design systems", "component library", "design tokens"],
+    "Information Architecture": ["information architecture", "user flows", "user flow", "sitemaps"],
+    "Interaction Design": ["interaction design", "ixd", "micro-interactions", "microinteractions"],
+    "UI Design":         ["ui design", "user interface design", "visual design"],
+    "UX Design":         ["ux design", "user experience design", "ux/ui", "ui/ux", "product design"],
+    "Accessibility":     ["accessibility", "wcag", "a11y", "aria"],
+    "Responsive Design": ["responsive design", "mobile first", "mobile-first"],
+    "Motion Design":     ["motion design", "motion graphics", "lottie"],
+    "A/B Testing":       ["a/b testing", "ab testing", "split testing"],
+    "Design Thinking":   ["design thinking"],
+    "Personas":          ["personas", "user personas", "customer journey", "journey mapping"],
 }
 
 # ── Build reverse lookup: alias → canonical ────────────────────────────────────

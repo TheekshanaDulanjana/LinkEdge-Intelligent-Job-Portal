@@ -299,8 +299,8 @@ export default function HeroSection() {
                     "Cybersecurity Analyst",
                     "Business Analyst",
                   ].map((item, index) => (
+                    <Link key={item} href={`/jobs?search=${encodeURIComponent(item)}`} aria-label={`Search ${item} jobs`} className="inline-block">
                     <motion.span
-                      key={item}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.3, delay: 0.5 + (index * 0.03) }}
@@ -319,6 +319,7 @@ export default function HeroSection() {
                         {item}
                       </span>
                     </motion.span>
+                    </Link>
                   ))}
                 </div>
               </motion.div>

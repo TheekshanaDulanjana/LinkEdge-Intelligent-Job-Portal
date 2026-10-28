@@ -41,6 +41,11 @@ _SECTION_DEFINITIONS: list[tuple[str, list[str]]] = [
         r"tools?\s+(?:&\s+)?(?:and\s+)?technologies",
         r"technical\s+expertise",
         r"areas?\s+of\s+expertise",
+        r"(?:technical\s+|core\s+)?skills?\s*(?:&|and|/)\s*\w+(?:\s+\w+)?",
+        r"technical\s+(?:summary|proficiency|proficiencies|knowledge)",
+        r"(?:key\s+)?strengths?",
+        r"soft\s+skills?",
+        r"tools?",
     ]),
     ("EXPERIENCE", [
         r"(?:professional\s+|work\s+|relevant\s+)?experience",
@@ -49,12 +54,21 @@ _SECTION_DEFINITIONS: list[tuple[str, list[str]]] = [
         r"career\s+history",
         r"positions?\s+held",
         r"internships?",
+        r"(?:professional|work|employment|industry)\s+(?:experience|history)(?:\s*(?:&|and)\s*\w+)?",
+        r"experience\s*(?:&|and)\s*\w+(?:\s+\w+)?",
+        r"relevant\s+work\s+experience",
+        r"volunteer(?:ing)?(?:\s+experience)?",
+        r"training\s+(?:&|and)\s+experience",
     ]),
     ("EDUCATION", [
         r"education(?:al\s+(?:background|qualifications?))?",
         r"academic\s+(?:background|qualifications?|history)",
         r"qualifications?",
         r"degrees?",
+        r"education\s*(?:&|and)\s*\w+(?:\s+\w+)?",
+        r"academics?",
+        r"academic\s+profile",
+        r"education\s+and\s+training",
     ]),
     ("CERTIFICATIONS", [
         r"certifications?",
@@ -64,6 +78,9 @@ _SECTION_DEFINITIONS: list[tuple[str, list[str]]] = [
         r"accreditations?",
         r"credentials?",
         r"professional\s+development",
+        r"courses?(?:\s+(?:&|and)\s+certifications?)?",
+        r"training(?:s)?",
+        r"licen[sc]es?",
     ]),
     ("PROJECTS", [
         r"projects?",
@@ -71,6 +88,10 @@ _SECTION_DEFINITIONS: list[tuple[str, list[str]]] = [
         r"key\s+projects?",
         r"notable\s+projects?",
         r"portfolio",
+        r"academic\s+projects?",
+        r"selected\s+projects?",
+        r"side\s+projects?",
+        r"projects?\s*(?:&|and)\s*\w+(?:\s+\w+)?",
     ]),
     ("ACHIEVEMENTS", [
         r"achievements?",
@@ -84,6 +105,18 @@ _SECTION_DEFINITIONS: list[tuple[str, list[str]]] = [
         r"(?:spoken\s+)?languages?",
         r"language\s+proficiency",
     ]),
+    ("INTERESTS", [
+        r"interests?",
+        r"hobbies",
+        r"hobbies\s*(?:&|and)\s*interests?",
+        r"extra[\s-]?curricular(?:\s+activities)?",
+        r"activities",
+    ]),
+    ("PUBLICATIONS", [
+        r"publications?",
+        r"research(?:\s+papers?)?",
+        r"papers?",
+    ]),
     ("REFERENCES", [
         r"references?",
         r"referees?",
@@ -95,7 +128,7 @@ _COMPILED_SECTIONS: list[tuple[str, re.Pattern]] = [
     (
         name,
         re.compile(
-            r"^[\s\-–—_*#•]*(?:" + "|".join(pats) + r")[\s\-–—_*#•:]*$",
+            r"^[\s\-–—_*#•\d.)]*(?:" + "|".join(pats) + r")[\s\-–—_*#•:|]*$",
             re.IGNORECASE | re.MULTILINE,
         ),
     )

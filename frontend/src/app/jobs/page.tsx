@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { jobApi } from '@/lib/api';
@@ -26,8 +26,12 @@ export default function JobsPage() {
   const [location, setLocation] = useState('');
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<JobFilterValues>(EMPTY_FILTERS);
+  // Wait for the ?search= value from the URL before the first fetch, and ignore stale responses.
+  const [ready, setReady] = useState(false);
+  const requestId = useRef(0);
 
   const fetchJobs = useCallback(async () => {
+    const myId = ++requestId.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -47,19 +51,27 @@ export default function JobsPage() {
       const fetchedJobs = res.data?.data?.jobs || res.data?.jobs || [];
       const fetchedTotal = res.data?.data?.total || res.data?.total || fetchedJobs.length;
 
+      if (myId !== requestId.current) return; // a newer search is already running
       setJobs(fetchedJobs);
       setTotal(fetchedTotal);
     } catch (e) {
       console.error('API Error:', e);
     } finally {
-      setLoading(false);
+      if (myId === requestId.current) setLoading(false);
     }
     // eslint-disable-next-line
   }, [search, location, filters]);
 
+  // Arriving from a career-path chip on the home page: /jobs?search=UI%2FUX%20Designer
   useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+    const q = new URLSearchParams(window.location.search).get('search');
+    if (q) setSearch(q);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (ready) fetchJobs();
+  }, [fetchJobs, ready]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-24 font-sans">

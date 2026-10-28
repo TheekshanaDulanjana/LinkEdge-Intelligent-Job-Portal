@@ -1,5 +1,6 @@
 'use client';
 
+import { assetUrl } from '@/lib/assetUrl';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -22,6 +23,7 @@ interface JobCardProps {
   matchedSkills?: string[];
   missingSkills?: string[];
   onApply?: () => void;
+  job?: unknown;
 }
 
 function ATSScoreBadge({ score, color }: { score: number; color: string }) {
@@ -73,7 +75,7 @@ export default function JobCard({
           <div className="flex items-center gap-3.5 min-w-0">
             {company?.logoUrl ? (
               <img
-                src={company.logoUrl.startsWith('http') ? company.logoUrl : `http://localhost:3001${company.logoUrl}`}
+                src={assetUrl(company.logoUrl)}
                 alt={company.companyName}
                 className="w-12 h-12 rounded-2xl object-cover bg-sky-50 border border-sky-100 flex-shrink-0 shadow-sm"
               />

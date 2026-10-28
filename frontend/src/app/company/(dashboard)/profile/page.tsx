@@ -1,294 +1,256 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuthStore } from '@/store/authStore';
-import api from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthGuard from '@/components/AuthGuard';
+import { assetUrl } from '@/lib/assetUrl';
+import { z } from 'zod';
+import { businessName, optionalPhone, optionalPlace, optionalUrl, optionalText, stripPhone, stripPlace } from '@/lib/validation';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Camera, Edit2, ArrowLeft, Building2, Globe, Phone, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
+import api from '@/lib/api';
+import AuthGuard from '@/components/AuthGuard';
+import {
+  Camera, Building2, Globe, Phone, MapPin, CheckCircle2, AlertTriangle, Eye, ShieldAlert, Image as ImageIcon, Save, Undo2,
+} from 'lucide-react';
+import { Panel, PanelSkeleton, cx } from '@/components/enterprise/dashboard/primitives';
+import {
+  PageHead, Field, Toast, useHideFooter, inputCls, selectCls, textareaCls, btnPrimary, btnSecondary,
+} from '@/components/enterprise/dashboard/kit';
 
 const INDUSTRIES = [
-  'Information Technology', 'Finance & Banking', 'Healthcare',
-  'Education', 'Manufacturing', 'Retail & E-commerce',
-  'Telecommunications', 'Construction', 'Media & Entertainment',
-  'Logistics & Transportation', 'Government', 'Consulting', 'Other',
+  'Information Technology', 'Finance & Banking', 'Healthcare', 'Education', 'Manufacturing', 'Retail & E-commerce',
+  'Telecommunications', 'Construction', 'Media & Entertainment', 'Logistics & Transportation', 'Government', 'Consulting', 'Other',
 ];
 
 interface CompanyProfile {
-  companyName: string;
-  industry: string;
-  website: string;
-  phone: string;
-  location: string;
-  aboutUs: string;
-  logoUrl: string;
-  coverImageUrl: string;
+  companyName: string; industry: string; website: string; phone: string; location: string; aboutUs: string; logoUrl: string; coverImageUrl: string;
 }
+const EMPTY: CompanyProfile = { companyName: '', industry: '', website: '', phone: '', location: '', aboutUs: '', logoUrl: '', coverImageUrl: '' };
+const ABOUT_MAX = 1000;
 
 function CompanyProfileContent() {
-  const { user } = useAuthStore();
-  const [profile, setProfile] = useState<CompanyProfile>({
-    companyName: '', industry: '', website: '',
-    phone: '', location: '', aboutUs: '',
-    logoUrl: '', coverImageUrl: '',
-  });
+  useHideFooter();
+  const [profile, setProfile] = useState<CompanyProfile>(EMPTY);
+  const [initial, setInitial] = useState<CompanyProfile>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [coverPreview, setCoverPreview] = useState('');
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [removeCover, setRemoveCover] = useState(false);
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
 
-  // Footer eka hide kirima me page ekedi
-  useEffect(() => {
-    const footerElement = document.querySelector('footer');
-    if (footerElement) {
-      footerElement.style.display = 'none';
-    }
-    return () => {
-      if (footerElement) {
-        footerElement.style.display = '';
-      }
-    };
-  }, []);
+  function flash(type: 'ok' | 'err', msg: string) {
+    setToast({ type, msg });
+    setTimeout(() => setToast(null), 3500);
+  }
 
   useEffect(() => {
-    async function load() {
+    (async () => {
       try {
         const res = await api.get('/auth/me');
         const p = res.data.data.profile;
-        setProfile({
-          companyName: p?.companyName || '',
-          industry: p?.industry || '',
-          website: p?.website || '',
-          phone: p?.phone || '',
-          location: p?.location || '',
-          aboutUs: p?.aboutUs || '',
-          logoUrl: p?.logoUrl || '',
-          coverImageUrl: p?.coverImageUrl || '',
-        });
-        if (p?.logoUrl) setLogoPreview(p.logoUrl);
-        if (p?.coverImageUrl) setCoverPreview(p.coverImageUrl);
-      } catch { setError('Failed to load profile'); }
+        const next: CompanyProfile = {
+          companyName: p?.companyName || '', industry: p?.industry || '', website: p?.website || '', phone: p?.phone || '',
+          location: p?.location || '', aboutUs: p?.aboutUs || '', logoUrl: p?.logoUrl || '', coverImageUrl: p?.coverImageUrl || '',
+        };
+        setProfile(next); setInitial(next);
+        setLogoPreview(assetUrl(next.logoUrl)); setCoverPreview(assetUrl(next.coverImageUrl));
+      } catch { flash('err', 'Failed to load the profile.'); }
       finally { setLoading(false); }
-    }
-    load();
+    })();
   }, []);
 
-  function handleFileChange(
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: 'logo' | 'cover'
-  ) {
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'cover') {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) { setError('Image must be under 3MB'); return; }
-    const preview = URL.createObjectURL(file);
-    if (type === 'logo') { setLogoFile(file); setLogoPreview(preview); }
-    else { setCoverFile(file); setCoverPreview(preview); }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { flash('err', 'Use a JPG, PNG or WEBP image.'); e.target.value = ''; return; }
+    if (file.size > 5 * 1024 * 1024) { flash('err', 'Image must be under 5MB.'); e.target.value = ''; return; }
+    const url = URL.createObjectURL(file);
+    if (type === 'logo') { setLogoFile(file); setRemoveLogo(false); setLogoPreview(url); } else { setCoverFile(file); setRemoveCover(false); setCoverPreview(url); }
   }
 
+  const dirty = useMemo(
+    () => !!logoFile || !!coverFile || removeLogo || removeCover || (Object.keys(EMPTY) as Array<keyof CompanyProfile>).some(k => k !== 'logoUrl' && k !== 'coverImageUrl' && profile[k] !== initial[k]),
+    [profile, initial, logoFile, coverFile, removeLogo, removeCover],
+  );
+
+  const websiteError = profile.website && !/^https?:\/\/.+\..+/i.test(profile.website) ? 'Start with http:// or https://' : '';
+
+  const checklist = [
+    { label: 'Company name', done: !!profile.companyName },
+    { label: 'Industry', done: !!profile.industry },
+    { label: 'Website', done: !!profile.website },
+    { label: 'Phone', done: !!profile.phone },
+    { label: 'Location', done: !!profile.location },
+    { label: 'About us (50+ characters)', done: profile.aboutUs.trim().length >= 50 },
+    { label: 'Logo', done: !!logoPreview },
+    { label: 'Cover image', done: !!coverPreview },
+  ];
+  const score = Math.round((checklist.filter(c => c.done).length / checklist.length) * 100);
+
   async function handleSave() {
-    setSaving(true); setError(''); setSuccess('');
+    if (websiteError) { flash('err', 'Fix the website address first.'); return; }
+    const check = z.object({
+      companyName: businessName('Company name'),
+      industry: optionalText('Industry', 60),
+      website: optionalUrl('Website'),
+      phone: optionalPhone,
+      location: optionalPlace('Location'),
+      aboutUs: optionalText('About us', 3000),
+    }).safeParse(profile);
+    if (!check.success) { flash('err', check.error.issues[0]?.message || 'Please check the form.'); return; }
+    setSaving(true);
     try {
-      const formData = new FormData();
-      Object.entries(profile).forEach(([k, v]) => { if (v) formData.append(k, v); });
-      if (logoFile) formData.append('logo', logoFile);
-      if (coverFile) formData.append('coverImage', coverFile);
-      await api.patch('/auth/company/profile', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setSuccess('Profile updated successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch { setError('Failed to save profile'); }
+      const fd = new FormData();
+      // Empty optional fields are sent as '' so they can be cleared.
+      (['companyName', 'industry', 'website', 'phone', 'location', 'aboutUs'] as const).forEach(k => fd.append(k, profile[k].trim()));
+      if (logoFile) fd.append('logo', logoFile);
+      if (coverFile) fd.append('coverImage', coverFile);
+      if (!logoFile && removeLogo) fd.append('removeLogo', 'true');
+      if (!coverFile && removeCover) fd.append('removeCover', 'true');
+      const res = await api.patch('/auth/company/profile', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      // Show the permanent URLs the server stored, not the temporary browser previews.
+      const saved = res.data?.data ?? {};
+      setLogoPreview(assetUrl(saved.logoUrl)); setCoverPreview(assetUrl(saved.coverImageUrl));
+      setInitial(profile); setLogoFile(null); setCoverFile(null); setRemoveLogo(false); setRemoveCover(false);
+      flash('ok', 'Profile saved.');
+    } catch (e: unknown) {
+      flash('err', (e as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Failed to save the profile.');
+    }
     finally { setSaving(false); }
   }
 
-  if (loading) return (
-    <div className="min-h-[80vh] flex items-center justify-center">
-      <div className="w-10 h-10 border-4 border-[#0025B8] border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  function discard() {
+    setProfile(initial); setLogoFile(null); setCoverFile(null); setRemoveLogo(false); setRemoveCover(false);
+    setLogoPreview(assetUrl(initial.logoUrl)); setCoverPreview(assetUrl(initial.coverImageUrl));
+  }
+
+  if (loading) return <div className="max-w-5xl space-y-4"><PanelSkeleton rows={3} /><PanelSkeleton rows={8} /></div>;
+
+  const set = <K extends keyof CompanyProfile>(k: K) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setProfile(p => ({ ...p, [k]: e.target.value }));
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-16 font-sans text-slate-800">
-      
-      {/* Cover image header section */}
-      <div className="relative h-60 sm:h-72 bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] overflow-hidden shadow-md">
-        {coverPreview && (
-          <img src={coverPreview} alt="Cover" className="w-full h-full object-cover opacity-90"/>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-        
-        <label
-          htmlFor="cover-img"
-          className="absolute bottom-4 right-6 flex items-center gap-2 bg-white/20 backdrop-blur-md text-white text-xs font-bold px-4 py-2 rounded-full cursor-pointer hover:bg-white/30 transition-all border border-white/30 shadow-md"
-        >
-          <Camera className="w-4 h-4" />
-          Change cover image
-          <input id="cover-img" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'cover')}/>
-        </label>
-      </div>
+    <div className="space-y-5 pb-24 text-slate-800">
+      <PageHead eyebrow="Account" title="Company profile" description="This is what candidates see on your job listings. A complete profile earns more applications." />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Logo Avatar Overlay & Navigation */}
-        <div className="relative -mt-16 mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div className="flex items-end gap-5">
-            <div className="relative">
-              <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-white bg-white shadow-xl">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo" className="w-full h-full object-cover"/>
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center text-[#0025B8] font-black text-3xl">
-                    {profile.companyName?.[0]?.toUpperCase() || 'C'}
-                  </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div className="xl:col-span-8 space-y-4">
+          <section className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="relative h-44 bg-gradient-to-br from-[#0025B8] to-[#0F9DE4]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {coverPreview && <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
+              <label htmlFor="cover-img" className="absolute bottom-3 right-3 inline-flex items-center gap-2 h-8 px-3 rounded-lg bg-white/90 text-slate-700 text-xs font-semibold cursor-pointer hover:bg-white transition-colors shadow-sm">
+                <Camera className="w-3.5 h-3.5" /> Change cover
+                <input id="cover-img" type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, 'cover')} />
+              </label>
+              {coverPreview && (
+                <button type="button" onClick={() => { setCoverFile(null); setCoverPreview(''); setRemoveCover(true); }}
+                  className="absolute bottom-3 right-36 inline-flex items-center h-8 px-3 rounded-lg bg-white/90 text-rose-600 text-xs font-semibold hover:bg-white transition-colors shadow-sm cursor-pointer">Remove</button>
+              )}
+            </div>
+            <div className="px-6 pb-5 -mt-10 flex items-end gap-4">
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 rounded-xl overflow-hidden border-4 border-white bg-white shadow-md">
+                  {logoPreview
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[#0025B8] font-semibold text-2xl">{profile.companyName?.[0]?.toUpperCase() || 'C'}</div>}
+                </div>
+                <label htmlFor="logo-img" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-lg bg-[#0025B8] text-white flex items-center justify-center cursor-pointer border-2 border-white hover:bg-[#001f9c] transition-colors" title="Change logo">
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <input id="logo-img" type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, 'logo')} />
+                </label>
+                {logoPreview && (
+                  <button type="button" onClick={() => { setLogoFile(null); setLogoPreview(''); setRemoveLogo(true); }} title="Remove logo" aria-label="Remove logo"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-white border border-rose-200 text-rose-500 text-xs font-bold flex items-center justify-center shadow hover:bg-rose-50 cursor-pointer">×</button>
                 )}
               </div>
-              <label
-                htmlFor="logo-img"
-                className="absolute -bottom-2 -right-2 w-9 h-9 bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] rounded-2xl flex items-center justify-center cursor-pointer hover:scale-105 transition-all shadow-md text-white border-2 border-white"
-              >
-                <Edit2 className="w-4 h-4" />
-                <input id="logo-img" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, 'logo')}/>
-              </label>
+              <div className="pb-1 min-w-0">
+                <h2 className="text-lg font-semibold text-slate-900 truncate">{profile.companyName || 'Your company'}</h2>
+                <p className="text-xs text-slate-500">{[profile.industry, profile.location].filter(Boolean).join(' · ') || 'Add your industry and location'}</p>
+              </div>
             </div>
-            
-            <div className="pb-2">
-              <Link href="/company/dashboard" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] transition-colors mb-1">
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
-              </Link>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                {profile.companyName || 'Company Profile'}
-              </h1>
+          </section>
+
+          <Panel title="Company details" subtitle="Name, industry and contact" icon={<Building2 className="w-3.5 h-3.5" />}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Company name" required>
+                <input value={profile.companyName} maxLength={100} onChange={e => setProfile(p => ({ ...p, companyName: stripPlace(e.target.value) }))} placeholder="Acme Ltd" className={inputCls} />
+              </Field>
+              <Field label="Industry">
+                <select value={profile.industry} onChange={set('industry')} className={selectCls}>
+                  <option value="">Select industry</option>
+                  {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </Field>
+              <Field label="Website" error={websiteError}>
+                <div className="relative"><Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="url" maxLength={200} value={profile.website} onChange={set('website')} placeholder="https://company.com" className={cx(inputCls, 'pl-9', websiteError && '!border-rose-300')} /></div>
+              </Field>
+              <Field label="Phone">
+                <div className="relative"><Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: stripPhone(e.target.value) }))} placeholder="+94 11 000 0000" className={cx(inputCls, 'pl-9')} /></div>
+              </Field>
+              <Field label="Location" className="sm:col-span-2">
+                <div className="relative"><MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input maxLength={100} value={profile.location} onChange={e => setProfile(p => ({ ...p, location: stripPlace(e.target.value) }))} placeholder="Colombo, Sri Lanka" className={cx(inputCls, 'pl-9')} /></div>
+              </Field>
+            </div>
+          </Panel>
+
+          <Panel title="About your company" subtitle="Mission, culture and what makes it a good place to work" icon={<Eye className="w-3.5 h-3.5" />}>
+            <textarea rows={7} maxLength={ABOUT_MAX} value={profile.aboutUs} onChange={set('aboutUs')} placeholder="Tell candidates who you are, what you build and how your team works." className={textareaCls} />
+            <p className={cx('text-[11px] text-right mt-1.5 tabular-nums', profile.aboutUs.length > ABOUT_MAX * 0.9 ? 'text-amber-600' : 'text-slate-400')}>{profile.aboutUs.length} / {ABOUT_MAX}</p>
+          </Panel>
+        </div>
+
+        <div className="xl:col-span-4 space-y-4 xl:sticky xl:top-24">
+          <Panel title="Profile strength" subtitle={score === 100 ? 'Complete' : `${checklist.filter(c => !c.done).length} item${checklist.filter(c => !c.done).length === 1 ? '' : 's'} left`} icon={<CheckCircle2 className="w-3.5 h-3.5" />}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className={cx('h-full rounded-full transition-all duration-500', score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500')} style={{ width: `${score}%` }} /></div>
+              <span className="text-sm font-semibold tabular-nums text-slate-900">{score}%</span>
+            </div>
+            <ul className="space-y-2">
+              {checklist.map(c => (
+                <li key={c.label} className="flex items-center gap-2.5 text-xs">
+                  <span className={cx('w-4 h-4 rounded-full flex items-center justify-center shrink-0', c.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300')}><CheckCircle2 className="w-3 h-3" /></span>
+                  <span className={c.done ? 'text-slate-600' : 'text-slate-400'}>{c.label}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          <Panel title="Listing preview" subtitle="How candidates see you" icon={<Eye className="w-3.5 h-3.5" />}>
+            <div className="rounded-lg border border-slate-200 p-3.5 flex items-center gap-3">
+              {logoPreview
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={logoPreview} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                : <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] text-white font-semibold flex items-center justify-center">{profile.companyName?.[0]?.toUpperCase() || 'C'}</span>}
+              <div className="min-w-0"><p className="text-[13px] font-semibold text-slate-900 truncate">{profile.companyName || 'Company name'}</p><p className="text-[11px] text-slate-400 truncate">{profile.location || 'Location'} · {profile.industry || 'Industry'}</p></div>
+            </div>
+          </Panel>
+
+          <Panel title="Danger zone" icon={<ShieldAlert className="w-3.5 h-3.5" />}>
+            <p className="text-xs text-slate-500 leading-relaxed mb-3">Deleting your account removes your company, jobs and applications permanently.</p>
+            <Link href="/settings/delete-account" className={cx(btnSecondary, 'text-rose-600 border-rose-200 hover:!bg-rose-50 hover:!text-rose-700')}><AlertTriangle className="w-3.5 h-3.5" /> Delete account</Link>
+          </Panel>
+        </div>
+      </div>
+
+      {/* Sticky save bar appears only when there are unsaved changes */}
+      <div className={cx('fixed bottom-0 left-0 right-0 z-40 transition-transform duration-200 pointer-events-none', dirty ? 'translate-y-0' : 'translate-y-full')}>
+        <div className="lg:pl-[248px]">
+          <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 pb-4 pointer-events-auto">
+            <div className="flex items-center justify-between gap-3 bg-slate-900 text-white rounded-xl px-5 py-3 shadow-2xl">
+              <p className="text-xs font-medium">You have unsaved changes</p>
+              <div className="flex items-center gap-2">
+                <button onClick={discard} disabled={saving} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"><Undo2 className="w-3.5 h-3.5" /> Discard</button>
+                <button onClick={handleSave} disabled={saving} className={cx(btnPrimary, '!bg-white !text-slate-900 hover:!bg-slate-100 !h-8')}><Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save changes'}</button>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Success / Error Banners */}
-        <AnimatePresence>
-          {success && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs sm:text-sm font-semibold text-emerald-800 flex items-center gap-3 shadow-sm">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> {success}
-            </motion.div>
-          )}
-          {error && (
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm font-semibold text-rose-800 flex items-center gap-3 shadow-sm">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" /> {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Main Form Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/90 backdrop-blur-xl rounded-[32px] border border-sky-100 p-8 sm:p-10 shadow-xl space-y-8"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Company name</Label>
-              <div className="relative">
-                <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={profile.companyName} 
-                  onChange={(e) => setProfile({ ...profile, companyName: e.target.value })} 
-                  placeholder="TechCorp Ltd"
-                  className="pl-10 h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Industry</Label>
-              <select
-                value={profile.industry}
-                onChange={(e) => setProfile({ ...profile, industry: e.target.value })}
-                className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs"
-              >
-                <option value="">Select industry...</option>
-                {INDUSTRIES.map((i) => <option key={i} value={i}>{i}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Website</Label>
-              <div className="relative">
-                <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={profile.website} 
-                  onChange={(e) => setProfile({ ...profile, website: e.target.value })} 
-                  placeholder="https://company.com"
-                  className="pl-10 h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Phone / Contact</Label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={profile.phone} 
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })} 
-                  placeholder="+94 11 000 0000"
-                  className="pl-10 h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50"
-                />
-              </div>
-            </div>
-
-            <div className="sm:col-span-2 space-y-2">
-              <Label className="text-xs font-bold text-slate-700">Location</Label>
-              <div className="relative">
-                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input 
-                  value={profile.location} 
-                  onChange={(e) => setProfile({ ...profile, location: e.target.value })} 
-                  placeholder="Colombo, Sri Lanka"
-                  className="pl-10 h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50"
-                />
-              </div>
-            </div>
-
-          </div>
-
-          {/* About us section */}
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-700">About us</Label>
-            <textarea
-              rows={5}
-              value={profile.aboutUs}
-              onChange={(e) => setProfile({ ...profile, aboutUs: e.target.value })}
-              placeholder="Describe your company, mission, culture, and what makes you a great place to work..."
-              className="w-full mt-1 border border-sky-100 bg-slate-50/50 rounded-2xl p-4 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 resize-none shadow-xs text-slate-800"
-            />
-            <p className="text-[11px] text-slate-400 font-medium text-right">{profile.aboutUs.length} / 1000 characters</p>
-          </div>
-
-          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-            <Button onClick={handleSave} disabled={saving} variant="gradient" className="w-full rounded-full h-12 text-xs font-bold shadow-md cursor-pointer">
-              {saving ? 'Saving changes...' : 'Save profile'}
-            </Button>
-          </motion.div>
-
-          {/* Delete account section */}
-          <div className="pt-6 border-t border-sky-100 flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-medium">Danger Zone</span>
-            <Link href="/settings/delete-account">
-              <button className="text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline transition-colors cursor-pointer">
-                Delete my account permanently
-              </button>
-            </Link>
-          </div>
-        </motion.div>
-
       </div>
+      <Toast toast={toast} />
     </div>
   );
 }

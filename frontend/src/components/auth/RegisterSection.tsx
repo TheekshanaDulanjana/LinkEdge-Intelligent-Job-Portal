@@ -12,26 +12,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
 import { motion } from 'framer-motion';
+import { personName, businessName, emailRule, newPassword, optionalPhone, optionalPlace, optionalText, optionalUrl, filter, stripName, stripPlace, stripPhone } from '@/lib/validation';
 
 const seekerSchema = z.object({
-  fullName: z.string().min(2, 'Name is required'),
-  email: z.string().email('Enter a valid email'),
-  phone: z.string().min(7).optional(),
-  location: z.string().optional(),
-  password: z.string().min(8, 'Min 8 characters'),
+  fullName: personName('Full name'),
+  email: emailRule,
+  phone: optionalPhone,
+  location: optionalPlace('Location'),
+  password: newPassword,
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match', path: ['confirmPassword'],
 });
 
 const companySchema = z.object({
-  companyName: z.string().min(2, 'Company name is required'),
-  email: z.string().email('Enter a valid email'),
-  phone: z.string().min(7).optional(),
-  location: z.string().optional(),
-  industry: z.string().optional(),
-  website: z.string().url().optional().or(z.literal('')),
-  password: z.string().min(8, 'Min 8 characters'),
+  companyName: businessName('Company name'),
+  email: emailRule,
+  phone: optionalPhone,
+  location: optionalPlace('Location'),
+  industry: optionalText('Industry', 60),
+  website: optionalUrl('Website'),
+  password: newPassword,
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, {
   message: 'Passwords do not match', path: ['confirmPassword'],
@@ -39,6 +40,11 @@ const companySchema = z.object({
 
 type SeekerForm = z.infer<typeof seekerSchema>;
 type CompanyForm = z.infer<typeof companySchema>;
+
+/** Drop empty optional fields so the server does not receive blank strings. */
+function clean<T extends Record<string, unknown>>(data: T): T {
+  return Object.fromEntries(Object.entries(data).filter(([, v]) => v !== '' && v !== undefined)) as T;
+}
 
 export default function RegisterFormSection() {
   const searchParams = useSearchParams();
@@ -63,7 +69,7 @@ export default function RegisterFormSection() {
   async function onSeekerSubmit(data: SeekerForm) {
     setLoading(true); setServerError('');
     try {
-      await api.post('/auth/register/seeker', data);
+      await api.post('/auth/register/seeker', clean(data));
       setRegisteredEmail(data.email);
     } catch (err: any) {
       setServerError(err.message || 'Registration failed');
@@ -73,7 +79,7 @@ export default function RegisterFormSection() {
   async function onCompanySubmit(data: CompanyForm) {
     setLoading(true); setServerError('');
     try {
-      await api.post('/auth/register/company', data);
+      await api.post('/auth/register/company', clean(data));
       setRegisteredEmail(data.email);
     } catch (err: any) {
       setServerError(err.message || 'Registration failed');
@@ -147,35 +153,37 @@ export default function RegisterFormSection() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Full name</Label>
-                <Input placeholder="John Doe" {...seekerForm.register('fullName')} className="h-10" />
+                <Input placeholder="John Doe" maxLength={80} autoComplete="name" {...seekerForm.register('fullName', filter(stripName))} className="h-10" />
                 {seekerForm.formState.errors.fullName && <p className="text-xs text-red-500">{seekerForm.formState.errors.fullName.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Mobile Number</Label>
-                <Input placeholder="+94 71 123 4567" {...seekerForm.register('phone')} className="h-10" />
+                <Input type="tel" inputMode="tel" placeholder="+94 71 123 4567" maxLength={20} autoComplete="tel" {...seekerForm.register('phone', filter(stripPhone))} className="h-10" />
+                {seekerForm.formState.errors.phone && <p className="text-xs text-red-500">{seekerForm.formState.errors.phone.message}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input type="email" placeholder="johndoe@example.com" {...seekerForm.register('email')} className="h-10" />
+              <Input type="email" maxLength={254} autoComplete="email" placeholder="johndoe@example.com" {...seekerForm.register('email')} className="h-10" />
               {seekerForm.formState.errors.email && <p className="text-xs text-red-500">{seekerForm.formState.errors.email.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label>Location</Label>
-              <Input placeholder="Colombo, Sri Lanka" {...seekerForm.register('location')} className="h-10" />
+              <Input placeholder="Colombo, Sri Lanka" maxLength={100} {...seekerForm.register('location', filter(stripPlace))} className="h-10" />
+              {seekerForm.formState.errors.location && <p className="text-xs text-red-500">{seekerForm.formState.errors.location.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input type="password" placeholder="Create password" {...seekerForm.register('password')} className="h-10" />
+                <Input type="password" maxLength={72} autoComplete="new-password" placeholder="Create password" {...seekerForm.register('password')} className="h-10" />
                 {seekerForm.formState.errors.password && <p className="text-xs text-red-500">{seekerForm.formState.errors.password.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Confirm Password</Label>
-                <Input type="password" placeholder="Confirm password" {...seekerForm.register('confirmPassword')} className="h-10" />
+                <Input type="password" maxLength={72} autoComplete="new-password" placeholder="Confirm password" {...seekerForm.register('confirmPassword')} className="h-10" />
                 {seekerForm.formState.errors.confirmPassword && <p className="text-xs text-red-500">{seekerForm.formState.errors.confirmPassword.message}</p>}
               </div>
             </div>
@@ -191,46 +199,49 @@ export default function RegisterFormSection() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Company name</Label>
-                <Input placeholder="Abc (Pvt) Ltd." {...companyForm.register('companyName')} className="h-10" />
+                <Input placeholder="Abc (Pvt) Ltd." maxLength={100} {...companyForm.register('companyName', filter(stripPlace))} className="h-10" />
                 {companyForm.formState.errors.companyName && <p className="text-xs text-red-500">{companyForm.formState.errors.companyName.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Industry</Label>
-                <Input placeholder="e.g. Software, Design" {...companyForm.register('industry')} className="h-10" />
+                <Input placeholder="e.g. Software, Design" maxLength={60} {...companyForm.register('industry', filter(stripPlace))} className="h-10" />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input type="email" placeholder="hr@company.com" {...companyForm.register('email')} className="h-10" />
+              <Input type="email" maxLength={254} autoComplete="email" placeholder="hr@company.com" {...companyForm.register('email')} className="h-10" />
               {companyForm.formState.errors.email && <p className="text-xs text-red-500">{companyForm.formState.errors.email.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input placeholder="+94 71 123 4567" {...companyForm.register('phone')} className="h-10" />
+                <Input type="tel" inputMode="tel" placeholder="+94 71 123 4567" maxLength={20} {...companyForm.register('phone', filter(stripPhone))} className="h-10" />
+                {companyForm.formState.errors.phone && <p className="text-xs text-red-500">{companyForm.formState.errors.phone.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Location</Label>
-                <Input placeholder="Colombo, Sri Lanka" {...companyForm.register('location')} className="h-10" />
+                <Input placeholder="Colombo, Sri Lanka" maxLength={100} {...companyForm.register('location', filter(stripPlace))} className="h-10" />
+                {companyForm.formState.errors.location && <p className="text-xs text-red-500">{companyForm.formState.errors.location.message}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Website</Label>
-              <Input placeholder="https://company.com" {...companyForm.register('website')} className="h-10" />
+              <Input type="url" maxLength={200} placeholder="https://company.com" {...companyForm.register('website')} className="h-10" />
+              {companyForm.formState.errors.website && <p className="text-xs text-red-500">{companyForm.formState.errors.website.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Password</Label>
-                <Input type="password" placeholder="Create password" {...companyForm.register('password')} className="h-10" />
+                <Input type="password" maxLength={72} autoComplete="new-password" placeholder="Create password" {...companyForm.register('password')} className="h-10" />
                 {companyForm.formState.errors.password && <p className="text-xs text-red-500">{companyForm.formState.errors.password.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Confirm Password</Label>
-                <Input type="password" placeholder="Confirm password" {...companyForm.register('confirmPassword')} className="h-10" />
+                <Input type="password" maxLength={72} autoComplete="new-password" placeholder="Confirm password" {...companyForm.register('confirmPassword')} className="h-10" />
                 {companyForm.formState.errors.confirmPassword && <p className="text-xs text-red-500">{companyForm.formState.errors.confirmPassword.message}</p>}
               </div>
             </div>

@@ -12,6 +12,7 @@ class ParsedResume(BaseModel):
     education:        List[Dict[str, str]] = []
     certifications:   List[str]        = []
     raw_text:         str              = ""
+    analysis:         Dict[str, Any]   = {}
 
 
 class JobRequirements(BaseModel):

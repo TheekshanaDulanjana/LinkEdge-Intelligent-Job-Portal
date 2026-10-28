@@ -12,6 +12,7 @@ class InterviewSession(Base):
     seeker_id = Column(String, nullable=False)
     job_id = Column(String, nullable=False)
     job_title = Column(String, nullable=False)
+    level = Column(String, nullable=True)
     status = Column(String, default="IN_PROGRESS")  # IN_PROGRESS, COMPLETED
     total_score = Column(Float, nullable=True)
     overall_feedback = Column(Text, nullable=True)
@@ -35,5 +36,6 @@ class InterviewQuestion(Base):
     answer_text = Column(Text, nullable=True)
     score = Column(Float, nullable=True)
     feedback = Column(Text, nullable=True)
+    model_answer = Column(Text, nullable=True)
 
     session = relationship("InterviewSession", back_populates="questions")

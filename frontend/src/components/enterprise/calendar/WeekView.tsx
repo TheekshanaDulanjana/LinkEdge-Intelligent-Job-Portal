@@ -23,7 +23,6 @@ export default function WeekView({
     d.setDate(weekStart.getDate() + i);
     return d;
   });
-
   const today = new Date();
 
   function eventsForSlot(day: Date, hour: number) {
@@ -35,26 +34,22 @@ export default function WeekView({
 
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[720px]">
-        {/* Day headers */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-gray-100">
+      <div className="min-w-[760px]">
+        <div className="grid grid-cols-[56px_repeat(7,1fr)] border-b border-slate-200 bg-slate-50/70 sticky top-0">
           <div />
           {days.map(d => (
-            <div key={d.toISOString()} className="text-center py-2">
-              <p className="text-xs text-gray-400">{d.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+            <div key={d.toISOString()} className="text-center py-2.5 border-l border-slate-100">
+              <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{d.toLocaleDateString('en-US', { weekday: 'short' })}</p>
               <p className={`text-sm font-semibold mt-0.5 w-7 h-7 mx-auto flex items-center justify-center rounded-full
-                ${sameDay(d, today) ? 'bg-indigo-600 text-white' : 'text-gray-700'}`}>
-                {d.getDate()}
-              </p>
+                ${sameDay(d, today) ? 'bg-[#0025B8] text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
             </div>
           ))}
         </div>
 
-        {/* Time grid */}
-        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
+        <div className="grid grid-cols-[56px_repeat(7,1fr)]">
           {HOURS.map(hour => (
             <div key={hour} className="contents">
-              <div className="text-[10px] text-gray-400 text-right pr-2 pt-1 border-r border-gray-50">
+              <div className="text-[10px] text-slate-400 text-right pr-2 pt-1 border-b border-slate-100 tabular-nums">
                 {hour % 12 === 0 ? 12 : hour % 12}{hour < 12 ? 'am' : 'pm'}
               </div>
               {days.map(day => {
@@ -65,9 +60,9 @@ export default function WeekView({
                     key={`${day.toISOString()}-${hour}`}
                     id={`slot-${slotDate.toISOString()}`}
                     date={slotDate}
-                    className="min-h-[52px] border-b border-r border-gray-50 p-0.5 space-y-0.5 cursor-pointer hover:bg-gray-50/50"
+                    className={`min-h-[56px] border-b border-l border-slate-100 p-0.5 space-y-0.5 cursor-pointer hover:bg-slate-50/60 ${sameDay(day, today) ? 'bg-sky-50/30' : ''}`}
                   >
-                    <div onClick={() => onSlotClick(slotDate)} className="min-h-[48px]">
+                    <div onClick={() => onSlotClick(slotDate)} className="min-h-[52px] space-y-0.5">
                       {eventsForSlot(day, hour).map(ev => (
                         <DraggableEvent key={ev.id} event={ev} compact={false} onClick={() => onEventClick(ev)} />
                       ))}

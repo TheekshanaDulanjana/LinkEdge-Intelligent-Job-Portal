@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { APPLICATION_LIST_SELECT } from '../lib/select';
 
 const prisma = new PrismaClient();
 
@@ -21,7 +22,7 @@ export const applicationRepository = {
   async findBySeeker(seekerId: string) {
     return prisma.application.findMany({
       where: { seekerId },
-      include: { job: true },
+      select: { ...APPLICATION_LIST_SELECT, job: true },
       orderBy: { createdAt: 'desc' },
     });
   },

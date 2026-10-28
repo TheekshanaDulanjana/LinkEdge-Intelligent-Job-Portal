@@ -3,7 +3,16 @@ import cors from 'cors';
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { authenticate, requireCompany } from './middleware/authenticate';
+import { jobSchema, statusSchema, screeningSchema, validateBody, validateParams, paging, searchTerm, isUuid } from './lib/validation';
+
+/** The screening threshold is a company-only setting; never send it to candidates. */
+function publicJob<T extends Record<string, any>>(job: T) {
+  const { autoScreen, minMatchScore, ...rest } = job;
+  return rest;
+}
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -34,30 +43,38 @@ router.get('/portal-stats', async (_req, res, next) => {
 // ─── GET /api/v1/jobs — Public job board, enriched with ATS scores ────────────
 router.get('/', async (req, res, next) => {
   try {
-    const {
-      page = 1, limit = 10, search, location, jobType, seekerId,
-      department, experienceLevel, locationType,
-    } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { location, jobType, seekerId, department, experienceLevel, locationType } = req.query;
+    const search = searchTerm(req.query.search);
+    const { page, limit, skip } = paging(req.query, 10, 50);
 
     const where: any = { status: 'ACTIVE' };
     if (search) {
+      // Match the whole phrase, or every word of it (so "UI/UX Designer" finds "UX Designer" posts)
+      const phrase = String(search).trim();
+      const words = phrase.split(/[\s/,&-]+/).filter(w => w.length > 1);
+      const fields = (w: string) => [
+        { title:       { contains: w, mode: 'insensitive' } },
+        { description: { contains: w, mode: 'insensitive' } },
+        { department:  { contains: w, mode: 'insensitive' } },
+      ];
       where.OR = [
-        { title:       { contains: search as string, mode: 'insensitive' } },
-        { description: { contains: search as string, mode: 'insensitive' } },
+        ...fields(phrase),
+        ...(words.length > 1 ? [{ AND: words.map(w => ({ OR: fields(w) })) }] : []),
       ];
     }
-    if (location)        where.location        = { contains: location as string, mode: 'insensitive' };
-    if (jobType)          where.jobType          = jobType;
-    if (department)       where.department       = department;
-    if (experienceLevel)  where.experienceLevel  = experienceLevel;
-    if (locationType)     where.locationType     = locationType;
+    if (location)        where.location        = { contains: searchTerm(location), mode: 'insensitive' };
+    const JOB_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'];
+    const LOC_TYPES = ['REMOTE', 'ON_SITE', 'HYBRID'];
+    if (typeof jobType === 'string' && JOB_TYPES.includes(jobType)) where.jobType = jobType;
+    if (typeof locationType === 'string' && LOC_TYPES.includes(locationType)) where.locationType = locationType;
+    if (typeof department === 'string' && department) where.department = searchTerm(department);
+    if (typeof experienceLevel === 'string' && experienceLevel) where.experienceLevel = searchTerm(experienceLevel);
 
     const [jobs, total] = await Promise.all([
       prisma.jobPosting.findMany({
         where,
         skip,
-        take:    Number(limit),
+        take:    limit,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.jobPosting.count({ where }),
@@ -76,7 +93,7 @@ router.get('/', async (req, res, next) => {
 
     // ATS scores — optional, never blocks the response
     let atsScores: Record<string, any> = {};
-    if (seekerId && typeof seekerId === 'string') {
+    if (isUuid(seekerId)) {
       try {
         const atsRes = await axios.post(
           `${ATS_URL}/api/v1/ats/batch-score`,
@@ -100,7 +117,7 @@ router.get('/', async (req, res, next) => {
     }
 
     const result = enriched.map((job) => ({
-      ...job,
+      ...publicJob(job),
       atsScore:      atsScores[job.id]?.overall_score  ?? null,
       atsColor:      atsScores[job.id]?.score_color    ?? null,
       atsLabel:      atsScores[job.id]?.score_label    ?? null,
@@ -113,8 +130,8 @@ router.get('/', async (req, res, next) => {
       data: {
         jobs:       result,
         total,
-        page:       Number(page),
-        totalPages: Math.ceil(total / Number(limit)),
+        page,
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (e) { next(e); }
@@ -193,36 +210,34 @@ router.get(
         return;
       }
 
-      const {
-        page = '1', limit = '10', search, status, jobType,
-        sortBy = 'createdAt', sortOrder = 'desc',
-      } = req.query;
+      const { status, jobType, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+      const search = searchTerm(req.query.search);
+      const { page, limit, skip } = paging(req.query, 10, 50);
 
       const where: any = { companyId: company.id };
 
       if (search) {
         where.OR = [
-          { title:    { contains: search as string, mode: 'insensitive' } },
-          { location: { contains: search as string, mode: 'insensitive' } },
+          { title:    { contains: search, mode: 'insensitive' } },
+          { location: { contains: search, mode: 'insensitive' } },
         ];
       }
-      if (status && status !== 'ALL')  where.status  = status;
-      if (jobType && jobType !== 'ALL') where.jobType = jobType;
+      if (typeof status === 'string' && ['ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT'].includes(status)) where.status = status;
+      if (typeof jobType === 'string' && ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'].includes(jobType)) where.jobType = jobType;
 
       const validSortFields = ['createdAt', 'title', 'deadline', 'status'];
       const orderField = validSortFields.includes(sortBy as string) ? sortBy as string : 'createdAt';
-
-      const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
       const [jobs, total] = await Promise.all([
         prisma.jobPosting.findMany({
           where,
           skip,
-          take:    parseInt(limit as string),
+          take:    limit,
           orderBy: { [orderField]: sortOrder === 'asc' ? 'asc' : 'desc' },
           select: {
             id: true, title: true, location: true, jobType: true,
             status: true, deadline: true, createdAt: true, salaryMin: true, salaryMax: true,
+            autoScreen: true, minMatchScore: true,
             _count: { select: { applications: true } },
           },
         }),
@@ -243,10 +258,12 @@ router.get(
             salaryMin: j.salaryMin,
             salaryMax: j.salaryMax,
             applicationCount: j._count.applications,
+            autoScreen: j.autoScreen,
+            minMatchScore: j.minMatchScore,
           })),
           total,
-          page: parseInt(page as string),
-          totalPages: Math.ceil(total / parseInt(limit as string)),
+          page,
+          totalPages: Math.ceil(total / limit),
         },
       });
     } catch (e) { next(e); }
@@ -276,6 +293,7 @@ router.get(
       const jobs = await prisma.jobPosting.findMany({
         where:   { companyId: company.id },
         orderBy: { createdAt: 'desc' },
+        take:    500,
         select: {
           id:        true,
           title:     true,
@@ -298,9 +316,9 @@ router.get(
 );
 
 // ─── GET /api/v1/jobs/:id — Single job detail ────────────────────────────────
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validateParams('id'), async (req, res, next) => {
   try {
-    const { id }       = req.params;
+    const id = String(req.params.id);
     const { seekerId } = req.query;
 
     const job = await prisma.jobPosting.findUnique({ where: { id } });
@@ -309,12 +327,33 @@ router.get('/:id', async (req, res, next) => {
       return;
     }
 
+    // Optional sign-in: the owning company sees drafts and its screening settings; everyone else does not.
+    let isOwner = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const me = await axios.get(`${process.env.AUTH_SERVICE_URL}/api/v1/auth/me`, {
+          headers: { Authorization: authHeader }, timeout: 5000,
+        });
+        const u = me.data?.data;
+        if (u?.role === 'COMPANY') {
+          const own = await prisma.company.findFirst({ where: { userId: u.id }, select: { id: true } });
+          isOwner = own?.id === job.companyId;
+        }
+      } catch { /* treated as anonymous */ }
+    }
+    if (job.status === 'DRAFT' && !isOwner) {
+      res.status(404).json({ success: false, message: 'Job not found' });
+      return;
+    }
+
     const company = await prisma.company.findFirst({
       where: { id: job.companyId },
+      select: { id: true, companyName: true, logoUrl: true, coverImageUrl: true, industry: true, website: true, location: true, aboutUs: true },
     });
 
     let atsData: any = null;
-    if (seekerId && typeof seekerId === 'string') {
+    if (isUuid(seekerId)) {
       try {
         const atsRes = await axios.post(
           `${ATS_URL}/api/v1/ats/score`,
@@ -333,7 +372,7 @@ router.get('/:id', async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, data: { ...job, company, atsData } });
+    res.json({ success: true, data: { ...(isOwner ? job : publicJob(job)), company, atsData } });
   } catch (e) { next(e); }
 });
 
@@ -342,30 +381,12 @@ router.post(
   '/',
   authenticate,
   requireCompany,
+  validateBody(jobSchema),
   async (req: any, res, next) => {
     try {
-      const {
-        title,
-        description,
-        requirements,       // legacy flat text (optional now — auto-derived below if missing)
-        requirementsList,   // NEW: array of requirement lines from the form
-        location,
-        jobType,
-        salaryMin,
-        salaryMax,
-        deadline,
-        department,
-        experienceLevel,
-        locationType,
-        responsibilities,
-        skills,
-      } = req.body;
+      const d = req.body; // validated + cleaned by jobSchema
 
-      // Find company ID using the authenticated user ID
-      const company = await prisma.company.findFirst({
-        where: { userId: req.user.userId },
-      });
-
+      const company = await prisma.company.findFirst({ where: { userId: req.user.userId } });
       if (!company) {
         res.status(404).json({
           success: false,
@@ -374,41 +395,43 @@ router.post(
         return;
       }
 
-      const cleanRequirementsList = Array.isArray(requirementsList)
-        ? requirementsList.filter((r: string) => r && r.trim() !== '')
-        : [];
+      // Cap how many open postings one company can create per day (spam / runaway script guard)
+      const since = new Date(Date.now() - 24 * 3600 * 1000);
+      const recent = await prisma.jobPosting.count({ where: { companyId: company.id, createdAt: { gte: since } } });
+      if (recent >= 50) {
+        res.status(429).json({ success: false, message: 'Daily job posting limit reached. Try again tomorrow.' });
+        return;
+      }
 
-      // Keep the legacy flat `requirements` string populated too — ats-service
-      // still reads this field for matching, so we derive it from the new list
-      // when the frontend sends requirementsList instead of a flat string.
-      const flatRequirements = cleanRequirementsList.length > 0
-        ? cleanRequirementsList.join('. ')
-        : (requirements || '');
+      const requirementsList: string[] = d.requirementsList ?? [];
+      // ats-service reads the flat `requirements` text, so derive it from the list.
+      const flatRequirements = requirementsList.length > 0 ? requirementsList.join('. ') : (d.requirements ?? '');
 
       const newJob = await prisma.jobPosting.create({
         data: {
-          companyId: company.id,
-          title,
-          description,
-          requirements:      flatRequirements,
-          requirementsList:  cleanRequirementsList,
-          location,
-          jobType,
-          salaryMin: salaryMin ? Number(salaryMin) : null,
-          salaryMax: salaryMax ? Number(salaryMax) : null,
-          deadline: new Date(deadline),
-          department:        department ?? null,
-          experienceLevel:   experienceLevel ?? null,
-          locationType:      locationType ?? 'REMOTE',
-          responsibilities:  Array.isArray(responsibilities) ? responsibilities : [],
-          skills:            Array.isArray(skills) ? skills : [],
+          companyId:        company.id,
+          title:            d.title,
+          description:      d.description,
+          requirements:     flatRequirements,
+          requirementsList,
+          location:         d.location,
+          jobType:          d.jobType,
+          salaryMin:        d.salaryMin ?? null,
+          salaryMax:        d.salaryMax ?? null,
+          deadline:         new Date(d.deadline),
+          department:       d.department ?? null,
+          experienceLevel:  d.experienceLevel ?? null,
+          locationType:     d.locationType ?? 'REMOTE',
+          responsibilities: d.responsibilities ?? [],
+          skills:           d.skills ?? [],
+          status:           d.status ?? 'ACTIVE',   // "Save draft" really saves a draft
+          autoScreen:       d.autoScreen ?? true,
+          minMatchScore:    d.minMatchScore ?? 35,
         },
       });
 
       res.status(201).json({ success: true, data: newJob });
-    } catch (e) {
-      next(e);
-    }
+    } catch (e) { next(e); }
   }
 );
 
@@ -417,13 +440,11 @@ router.patch(
   '/:id/status',
   authenticate,
   requireCompany,
+  validateParams('id'),
+  validateBody(statusSchema),
   async (req: any, res, next) => {
     try {
       const { status } = req.body;
-      if (!['ACTIVE', 'INACTIVE', 'CLOSED'].includes(status)) {
-        res.status(400).json({ success: false, message: 'Invalid status value' });
-        return;
-      }
 
       const job = await prisma.jobPosting.findUnique({ where: { id: req.params.id } });
       if (!job) {
@@ -439,9 +460,41 @@ router.patch(
         return;
       }
 
+      // Re-opening a job whose deadline already passed would accept nothing; make that explicit.
+      if (status === 'ACTIVE' && job.deadline.getTime() < Date.now()) {
+        res.status(400).json({ success: false, message: 'The deadline has passed. Post a new job or extend the deadline first.' });
+        return;
+      }
+
       const updated = await prisma.jobPosting.update({
         where: { id: req.params.id },
         data:  { status },
+      });
+      res.json({ success: true, data: updated });
+    } catch (e) { next(e); }
+  }
+);
+
+// ─── PATCH /api/v1/jobs/:id/screening — auto-screening settings (owner only) ───
+router.patch(
+  '/:id/screening',
+  authenticate,
+  requireCompany,
+  validateParams('id'),
+  validateBody(screeningSchema),
+  async (req: any, res, next) => {
+    try {
+      const job = await prisma.jobPosting.findUnique({ where: { id: req.params.id } });
+      if (!job) { res.status(404).json({ success: false, message: 'Job not found' }); return; }
+      const company = await prisma.company.findFirst({ where: { userId: req.user.userId } });
+      if (!company || job.companyId !== company.id) {
+        res.status(403).json({ success: false, message: 'Not your job posting' });
+        return;
+      }
+      const updated = await prisma.jobPosting.update({
+        where: { id: job.id },
+        data: { autoScreen: req.body.autoScreen, minMatchScore: req.body.minMatchScore },
+        select: { id: true, autoScreen: true, minMatchScore: true },
       });
       res.json({ success: true, data: updated });
     } catch (e) { next(e); }
@@ -453,6 +506,7 @@ router.delete(
   '/:id',
   authenticate,
   requireCompany,
+  validateParams('id'),
   async (req: any, res, next) => {
     try {
       const job = await prisma.jobPosting.findUnique({ where: { id: req.params.id } });
@@ -484,19 +538,34 @@ router.delete(
 // ─── Express App Setup & Listener ───────────────────────────────
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((o) => o.trim());
+app.use(cors({
+  origin: (origin, cb) => (!origin || allowedOrigins.includes(origin) ? cb(null, true) : cb(new Error(`CORS: origin ${origin} not allowed`))),
+  credentials: true,
+}));
+app.use(express.json({ limit: '100kb' }));
+
+const limitHandler = (_req: express.Request, res: express.Response) =>
+  res.status(429).json({ success: false, message: 'Too many requests. Please slow down and try again shortly.' });
+// Public browsing: generous. Anything that writes: tighter (limiter is keyed by IP).
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 600, standardHeaders: true, legacyHeaders: false, handler: limitHandler }));
+const writeLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false, handler: limitHandler });
+app.use('/api/v1/jobs', (req, res, next) => (req.method === 'GET' ? next() : writeLimiter(req, res, next)));
 
 // Mount the jobs router
 app.use('/api/v1/jobs', router);
 
 // Global Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err?.type === 'entity.parse.failed') { res.status(400).json({ success: false, message: 'Malformed JSON body.' }); return; }
+  if (err?.type === 'entity.too.large') { res.status(413).json({ success: false, message: 'Request body too large.' }); return; }
   console.error('Unhandled Error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
+  // Never leak internals for unexpected errors
+  const status = Number(err?.status) >= 400 && Number(err?.status) < 600 ? Number(err.status) : 500;
+  res.status(status).json({ success: false, message: status === 500 ? 'Internal Server Error' : err.message });
 });
 
 const PORT = process.env.PORT || 3002;
