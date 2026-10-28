@@ -1,9 +1,3 @@
-"""
-Endpoints:
-    POST /api/v1/ats/parse-resume        — parse & store CV
-    GET  /api/v1/ats/resume/{candidate_id}/skills  — get extracted skills
-"""
-
 import os
 import json
 import uuid
@@ -11,7 +5,7 @@ from fastapi    import APIRouter, HTTPException, BackgroundTasks
 from pydantic   import BaseModel
 from typing     import Optional
 
-from src.database.db             import get_connection
+from src.database.db           import get_connection
 from src.parsers.document_parser import document_parser
 from src.normalizers.skill_normalizer import skill_normalizer
 from src.extractors.resume_extractor  import extract_resume_data
@@ -25,7 +19,7 @@ class ParseResumeRequest(BaseModel):
     file_path:    str
 
 
-# ── DB helpers ─────────────────────────────────────────────────────────────────
+# DB helpers
 
 def _update_resume_db(
     resume_id: str,
@@ -45,17 +39,17 @@ def _update_resume_db(
         else:
             cur.execute(
                 """UPDATE candidate_resumes SET
-                       parsed_text      = %s,
-                       skills           = %s,
-                       experience_years = %s,
-                       experience       = %s,
-                       education        = %s,
-                       certifications   = %s,
-                       technologies     = %s,
-                       job_title        = %s,
-                       is_parsed        = true,
-                       parse_error      = null,
-                       last_updated     = NOW()
+                        parsed_text      = %s,
+                        skills           = %s,
+                        experience_years = %s,
+                        experience       = %s,
+                        education        = %s,
+                        certifications   = %s,
+                        technologies     = %s,
+                        job_title        = %s,
+                        is_parsed        = true,
+                        parse_error      = null,
+                        last_updated     = NOW()
                    WHERE id = %s""",
                 (
                     (parsed.raw_text or "")[:50_000],
@@ -91,7 +85,24 @@ def _invalidate_ats_scores(candidate_id: str) -> None:
         conn.close()
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
+def _get_profile_fallback(candidate_id: str) -> dict:
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT "interestArea", "professionalSummary"
+               FROM "JobSeeker" WHERE "userId" = %s""",
+            (candidate_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return {}
+        return {"interest_area": row[0], "professional_summary": row[1]}
+    finally:
+        conn.close()
+
+
+# Routes
 
 @router.post("/parse-resume")
 async def parse_resume(
@@ -100,18 +111,23 @@ async def parse_resume(
 ):
     """
     Full deterministic resume processing pipeline:
-      1  Parse document (PDF / DOCX / TXT)
-      2  Clean and normalize text
-      3  Detect resume sections
-      4  Extract structured data via taxonomy + regex
-      5  Persist to candidate_resumes table
-      6  Invalidate cached ATS scores (background task)
+      1. Parse document (PDF / DOCX / TXT)
+      2. Clean and normalize text
+      3. Detect resume sections
+      4. Extract structured data via taxonomy + regex
+      5. Persist to candidate_resumes table
+      6. Invalidate cached ATS scores (background task)
     No external API calls.
     """
     try:
         raw_text     = document_parser.parse(request.file_path)
         cleaned_text = skill_normalizer.clean_text(raw_text)
         parsed       = extract_resume_data(cleaned_text)
+
+        if not parsed.job_title:
+            fallback = _get_profile_fallback(request.candidate_id)
+            if fallback.get("interest_area"):
+                parsed.job_title = fallback["interest_area"]
 
         _update_resume_db(request.resume_id, parsed)
         bg.add_task(_invalidate_ats_scores, request.candidate_id)
@@ -151,13 +167,13 @@ async def get_resume_skills(candidate_id: str):
         if not row:
             return {"has_resume": False, "skills": [], "experience_years": 0}
         return {
-            "has_resume":       True,
-            "resume_id":        row[0],
-            "skills":           row[1] or [],
-            "experience_years": float(row[2] or 0),
-            "job_title":        row[3],
-            "is_parsed":        row[4],
-            "last_updated":     row[5].isoformat() if row[5] else None,
+            "has_resume":        True,
+            "resume_id":         row[0],
+            "skills":            row[1] or [],
+            "experience_years":  float(row[2] or 0),
+            "job_title":         row[3],
+            "is_parsed":         row[4],
+            "last_updated":      row[5].isoformat() if row[5] else None,
         }
     finally:
         conn.close()

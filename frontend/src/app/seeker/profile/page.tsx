@@ -53,6 +53,7 @@ interface SeekerProfile {
   websiteUrl?: string;
   githubUrl?: string;
   behanceUrl?: string;
+  workStyle?: 'REMOTE' | 'HYBRID' | 'ON_SITE';
 }
 
 const INTEREST_OPTIONS = [
@@ -79,6 +80,7 @@ function CombinedProfileContent() {
     websiteUrl: '',
     githubUrl: '',
     behanceUrl: '',
+    workStyle: 'REMOTE',
   });
 
   const [applications, setApplications] = useState<Application[]>([]);
@@ -117,6 +119,7 @@ function CombinedProfileContent() {
           websiteUrl: p?.websiteUrl || '',
           githubUrl: p?.githubUrl || '',
           behanceUrl: p?.behanceUrl || '',
+          workStyle: p?.workStyle || 'REMOTE',
         });
         if (p?.profileImageUrl) setImagePreview(p.profileImageUrl);
 
@@ -184,16 +187,26 @@ function CombinedProfileContent() {
     setTempLinkValue(profile[platform] || '');
   };
 
-  const handleSaveLink = () => {
+  const handleSaveLink = async () => {
     if (!activePlatform) return;
-    setProfile((prev) => ({
-      ...prev,
-      [activePlatform]: tempLinkValue.trim(),
-    }));
+    const trimmed = tempLinkValue.trim();
+
+    setProfile((prev) => ({ ...prev, [activePlatform]: trimmed }));
     setActivePlatform(null);
     setTempLinkValue('');
-    setSuccess('Portfolio link updated. Click "Save Preferences" to commit changes.');
-    setTimeout(() => setSuccess(''), 4000);
+
+    try {
+      const formData = new FormData();
+      formData.append(activePlatform, trimmed);
+      await api.patch('/auth/seeker/profile', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setSuccess('Portfolio link saved.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setError('Failed to save the link. Please try again.');
+      setTimeout(() => setError(''), 4000);
+    }
   };
 
   const getPlatformLabel = (platform: PortfolioPlatform) => {
@@ -381,7 +394,7 @@ function CombinedProfileContent() {
 
                   const STATUS_META: Record<string, { dot: string; text: string; bg: string; label: string }> = {
                     PENDING:     { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',   label: 'Pending' },
-                    REVIEWING:   { dot: 'bg-[#0F9DE4]',   text: 'text-[#0025B8]',   bg: 'bg-sky-50 border-sky-200',       label: 'Reviewing' },
+                    REVIEWING:   { dot: 'bg-[#0F9DE4]',   text: 'text-[#0025B8]',   bg: 'bg-sky-50 border-sky-200',        label: 'Reviewing' },
                     SHORTLISTED: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', label: 'Shortlisted' },
                     INTERVIEW:   { dot: 'bg-violet-500',  text: 'text-violet-700',  bg: 'bg-violet-50 border-violet-200', label: 'Interview' },
                     REJECTED:    { dot: 'bg-slate-400',   text: 'text-slate-600',   bg: 'bg-slate-100 border-slate-200',  label: 'Not selected' },
@@ -586,8 +599,6 @@ function CombinedProfileContent() {
               <div className="bg-gradient-to-br from-slate-50 to-sky-50/30 rounded-[28px] border border-sky-100 p-6 sm:p-8 space-y-6 shadow-xl">
                 <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Career Preferences</h3>
 
-
-
                 <div>
                   <Label className="text-xs font-bold text-slate-700 block mb-2">Target Roles</Label>
                   <div className="flex flex-wrap gap-2">
@@ -613,10 +624,14 @@ function CombinedProfileContent() {
 
                 <div>
                   <Label className="text-xs font-bold text-slate-700 block mb-2">Work Style</Label>
-                  <select className="w-full bg-white border border-sky-100 rounded-2xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0F9DE4] shadow-sm">
-                    <option>Remote Only</option>
-                    <option>Hybrid</option>
-                    <option>On-site</option>
+                  <select
+                    value={profile.workStyle || 'REMOTE'}
+                    onChange={(e) => setProfile({ ...profile, workStyle: e.target.value as SeekerProfile['workStyle'] })}
+                    className="w-full bg-white border border-sky-100 rounded-2xl px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#0F9DE4] shadow-sm cursor-pointer"
+                  >
+                    <option value="REMOTE">Remote Only</option>
+                    <option value="HYBRID">Hybrid</option>
+                    <option value="ON_SITE">On-site</option>
                   </select>
                 </div>
 
