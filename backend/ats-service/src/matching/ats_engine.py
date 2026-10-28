@@ -194,7 +194,10 @@ class ATSEngine:
         best_score, best_match = 0.0, "below"
 
         for edu in candidate_education:
-            edu_text  = f"{edu.get('degree', '')} {edu.get('institution', '')}"
+            edu_text  = (
+                f"{edu.get('degree', '')} {edu.get('degree_title', '')} "
+                f"{edu.get('field', '')} {edu.get('institution', '')}"
+            )
             cand_lvl  = _edu_level(edu_text)
             cand_fld  = _edu_field(edu_text)
 

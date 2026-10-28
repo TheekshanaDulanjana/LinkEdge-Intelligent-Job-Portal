@@ -1,547 +1,348 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { assetUrl } from '@/lib/assetUrl';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { motion, AnimatePresence } from 'framer-motion';
 import api, { jobApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AuthGuard from '@/components/AuthGuard';
-import { 
-  Trash2, 
-  Plus, 
-  Bold, 
-  Italic, 
-  Link as LinkIcon, 
-  List, 
-  Eye, 
-  Send,
-  Sparkles,
-  Briefcase
+import {
+  Trash2, Plus, Bold, Italic, Link as LinkIcon, List, Send, Sparkles, Briefcase, CheckCircle2, MapPin, Banknote, CalendarClock, X,
 } from 'lucide-react';
+import { Panel, Pill, cx } from '@/components/enterprise/dashboard/primitives';
+import {
+  PageHead, Field, Toast, useHideFooter, inputCls, selectCls, textareaCls, btnPrimary, btnSecondary, iconBtn,
+} from '@/components/enterprise/dashboard/kit';
 
+const TEXT_CHARS = /^[\p{L}\p{M}\p{N} &/+#.,()'’\-–]+$/u;
 const schema = z.object({
-  title: z.string().min(3, 'Job title is required'),
+  title: z.string().trim().min(3, 'Job title must be at least 3 characters').max(100, 'Job title must be at most 100 characters')
+    .regex(TEXT_CHARS, 'Job title contains characters that are not allowed').regex(/\p{L}/u, 'Job title must contain letters'),
   department: z.string().min(1, 'Department is required'),
   jobType: z.enum(['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE']),
   experienceLevel: z.string().min(1, 'Experience level is required'),
   locationType: z.enum(['REMOTE', 'ON_SITE', 'HYBRID']),
-  location: z.string().min(2, 'Office location is required'),
-  salaryMin: z.string().optional(),
-  salaryMax: z.string().optional(),
-  description: z.string().min(20, 'Description must be at least 20 characters'),
-  deadline: z.string().min(1, 'Deadline required'),
+  location: z.string().trim().min(2, 'Office location is required').max(100, 'Location must be at most 100 characters')
+    .regex(TEXT_CHARS, 'Location contains characters that are not allowed'),
+  salaryMin: z.string().regex(/^\d{0,9}$/, 'Numbers only (max 9 digits)').optional(),
+  salaryMax: z.string().regex(/^\d{0,9}$/, 'Numbers only (max 9 digits)').optional(),
+  description: z.string().trim().min(20, 'Description must be at least 20 characters').max(10000, 'Description must be at most 10,000 characters'),
+  deadline: z.string().min(1, 'Deadline required').refine(v => {
+    const d = new Date(v); const max = Date.now() + 2 * 366 * 86400000;
+    return !Number.isNaN(d.getTime()) && d.getTime() <= max;
+  }, 'Deadline is too far ahead (max 2 years)'),
+}).refine(d => !d.salaryMin || !d.salaryMax || Number(d.salaryMin) <= Number(d.salaryMax), {
+  message: 'Maximum salary must be at least the minimum',
+  path: ['salaryMax'],
 });
 
 type FormData = z.infer<typeof schema>;
 
+const DEPARTMENTS = ['Engineering', 'Design', 'Product', 'Marketing', 'Sales', 'Operations', 'Finance', 'Human Resources', 'Customer Support', 'Other'];
+const SKILL_SUGGESTIONS = ['React', 'TypeScript', 'Node.js', 'Python', 'SQL', 'Figma', 'AWS', 'Docker', 'Java', 'Communication'];
+const SECTIONS = [
+  { id: 'basic-info', label: 'Basics' },
+  { id: 'location-salary', label: 'Location and salary' },
+  { id: 'job-description', label: 'Description' },
+  { id: 'requirements', label: 'Requirements and skills' },
+];
+
+const label = (s: string) => s.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
+
 function PostJobPageContent() {
+  useHideFooter();
   const router = useRouter();
   const [serverError, setServerError] = useState('');
-  const [loading, setLoading] = useState(false);
-  
-  const [companyName, setCompanyName] = useState<string>('Company');
-  const [companyLogo, setCompanyLogo] = useState<string>('');
+  const [loading, setLoading] = useState<'ACTIVE' | 'DRAFT' | null>(null);
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null);
+
+  const [companyName, setCompanyName] = useState('Company');
+  const [companyLogo, setCompanyLogo] = useState('');
 
   const [responsibilities, setResponsibilities] = useState<string[]>(['']);
   const [requirementsList, setRequirementsList] = useState<string[]>(['']);
-  const [skills, setSkills] = useState<string[]>(['React', 'TypeScript', 'Node.js', 'Next.js']);
+  const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
-
-  // Footer eka hide kirima me page ekedi
-  useEffect(() => {
-    const footerElement = document.querySelector('footer');
-    if (footerElement) {
-      footerElement.style.display = 'none';
-    }
-    return () => {
-      if (footerElement) {
-        footerElement.style.display = '';
-      }
-    };
-  }, []);
+  const [autoScreen, setAutoScreen] = useState(true);
+  const [minMatch, setMinMatch] = useState(35);
+  const [activeSection, setActiveSection] = useState(SECTIONS[0].id);
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      department: 'Engineering',
-      jobType: 'REMOTE',
-      experienceLevel: 'Entry Level',
-      locationType: 'REMOTE',
-      location: 'Colombo, Sri Lanka',
-      description: '',
-    }
+      department: 'Engineering', jobType: 'FULL_TIME', experienceLevel: 'Entry Level',
+      locationType: 'ON_SITE', location: 'Colombo, Sri Lanka', description: '',
+    },
   });
 
   useEffect(() => {
-    async function loadCompanyProfile() {
-      try {
-        const res = await api.get('/auth/me');
-        const p = res.data?.data?.profile || res.data?.company || res.data?.profile;
-        if (p?.companyName) setCompanyName(p.companyName);
-        if (p?.logoUrl) setCompanyLogo(p.logoUrl);
-      } catch (err) {
-        console.error('Failed to load company info', err);
-      }
-    }
-    loadCompanyProfile();
+    api.get('/auth/me').then(res => {
+      const p = res.data?.data?.profile || res.data?.company || res.data?.profile;
+      if (p?.companyName) setCompanyName(p.companyName);
+      if (p?.logoUrl) setCompanyLogo(assetUrl(p.logoUrl));
+    }).catch(err => console.error('Failed to load company info', err));
   }, []);
 
-  const watchTitle = watch('title', 'Senior Full-Stack Engineer');
-  const watchJobType = watch('jobType', 'REMOTE');
-  const watchLocationType = watch('locationType', 'REMOTE');
-  const watchDescription = watch('description', '');
+  // Highlight the section currently in view
+  useEffect(() => {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) setActiveSection(e.target.id); });
+    }, { rootMargin: '-20% 0px -65% 0px' });
+    SECTIONS.forEach(s => { const el = document.getElementById(s.id); if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, []);
 
-  const applyFormat = (syntaxPrefix: string, syntaxSuffix: string = syntaxPrefix) => {
-    const textarea = document.getElementById('job-description-textarea') as HTMLTextAreaElement;
-    if (!textarea) return;
+  const w = watch();
+  const cleanResp = responsibilities.filter(r => r.trim());
+  const cleanReq = requirementsList.filter(r => r.trim());
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = textarea.value.substring(start, end);
-    const replacement = `${syntaxPrefix}${selectedText || 'text'}${syntaxSuffix}`;
-    
-    const newText = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-    setValue('description', newText);
+  const checklist = useMemo(() => [
+    { label: 'Job title', done: (w.title ?? '').trim().length >= 3 },
+    { label: 'Deadline', done: !!w.deadline },
+    { label: 'Salary range', done: !!w.salaryMin && !!w.salaryMax },
+    { label: 'Description (20+ chars)', done: (w.description ?? '').trim().length >= 20 },
+    { label: 'Responsibilities', done: cleanResp.length > 0 },
+    { label: 'Requirements', done: cleanReq.length > 0 },
+    { label: 'Skills', done: skills.length > 0 },
+  ], [w.title, w.deadline, w.salaryMin, w.salaryMax, w.description, cleanResp.length, cleanReq.length, skills.length]);
+  const done = checklist.filter(c => c.done).length;
+
+  const applyFormat = (prefix: string, suffix: string = prefix) => {
+    const ta = document.getElementById('job-description-textarea') as HTMLTextAreaElement | null;
+    if (!ta) return;
+    const { selectionStart: s, selectionEnd: e, value } = ta;
+    setValue('description', `${value.slice(0, s)}${prefix}${value.slice(s, e) || 'text'}${suffix}${value.slice(e)}`, { shouldDirty: true });
   };
 
-  // ── Responsibilities list handlers ──────────────────────────────
-  const handleAddResponsibility = () => {
-    setResponsibilities([...responsibilities, '']);
-  };
-
-  const handleRemoveResponsibility = (index: number) => {
-    setResponsibilities(responsibilities.filter((_, i) => i !== index));
-  };
-
-  const handleResponsibilityChange = (index: number, value: string) => {
-    const updated = [...responsibilities];
-    updated[index] = value;
-    setResponsibilities(updated);
-  };
-
-  // ── Requirements list handlers (mirrors Responsibilities) ───────
-  const handleAddRequirement = () => {
-    setRequirementsList([...requirementsList, '']);
-  };
-
-  const handleRemoveRequirement = (index: number) => {
-    setRequirementsList(requirementsList.filter((_, i) => i !== index));
-  };
-
-  const handleRequirementChange = (index: number, value: string) => {
-    const updated = [...requirementsList];
-    updated[index] = value;
-    setRequirementsList(updated);
-  };
-
-  // ── Required Skills (chip tags) handlers ────────────────────────
-  const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && skillInput.trim()) {
-      e.preventDefault();
-      if (!skills.includes(skillInput.trim())) {
-        setSkills([...skills, skillInput.trim()]);
-      }
-      setSkillInput('');
-    }
-  };
-
-  const handleRemoveSkill = (skillToRemove: string) => {
-    setSkills(skills.filter((s) => s !== skillToRemove));
+  const updateAt = (list: string[], set: (l: string[]) => void, i: number, v: string) => { const n = [...list]; n[i] = v; set(n); };
+  const addSkill = (raw: string) => {
+    const s = raw.replace(/[^\p{L}\p{M}\p{N} .+#/&'\-()]/gu, '').trim().slice(0, 40);
+    if (!s) return;
+    if (skills.length >= 30) { setServerError('You can add at most 30 skills.'); return; }
+    if (!skills.some(x => x.toLowerCase() === s.toLowerCase())) setSkills([...skills, s]);
   };
 
   async function submitJob(data: FormData, status: 'ACTIVE' | 'DRAFT') {
-    setLoading(true);
     setServerError('');
-
-    const cleanResponsibilities = responsibilities.filter((r) => r.trim() !== '');
-    const cleanRequirements = requirementsList.filter((r) => r.trim() !== '');
-
+    if (cleanReq.length === 0) { setServerError('Add at least one requirement so candidates can be matched.'); return; }
+    setLoading(status);
     try {
       await jobApi.post('/jobs', {
         ...data,
         status,
-        responsibilities: cleanResponsibilities,
-        requirementsList: cleanRequirements,
-        requirements: cleanRequirements.join('. '), // legacy flat string, backend also derives this itself
-        skills: skills,
+        responsibilities: cleanResp,
+        requirementsList: cleanReq,
+        requirements: cleanReq.join('. '), // legacy flat string, backend also derives this itself
+        skills,
+        autoScreen,
+        minMatchScore: minMatch,
         salaryMin: data.salaryMin ? parseInt(data.salaryMin) : undefined,
         salaryMax: data.salaryMax ? parseInt(data.salaryMax) : undefined,
       });
-      router.push('/company/dashboard');
+      setToast({ type: 'ok', msg: status === 'ACTIVE' ? 'Job published.' : 'Draft saved.' });
+      setTimeout(() => router.push('/company/jobs'), 700);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setServerError(error.response?.data?.message || 'Failed to post job');
-    } finally {
-      setLoading(false);
+      const e = err as { response?: { data?: { message?: string } } };
+      setServerError(e.response?.data?.message || 'Failed to post the job.');
+      setLoading(null);
     }
   }
 
-  const onSubmit = (data: FormData) => submitJob(data, 'ACTIVE');
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
 
-  return (
-    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-8 text-slate-800 font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Top Header & Action Buttons */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 sm:p-8 rounded-[28px] border border-sky-100 shadow-xl">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Post a New Position</h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">Fill in the details to reach top-tier talent in our exclusive network.</p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={handleSubmit((d) => submitJob(d, 'DRAFT'))}
-              className="rounded-full h-11 px-5 border-sky-200 text-[#0025B8] hover:bg-sky-50 font-bold text-xs cursor-pointer shadow-xs"
-            >
-              Save Draft
-            </Button>
-            <Button type="button" variant="outline" className="rounded-full h-11 px-5 border-sky-200 text-[#0025B8] bg-sky-50/50 hover:bg-sky-100 gap-2 font-bold text-xs cursor-pointer shadow-xs">
-              <Eye className="w-4 h-4 text-[#0F9DE4]" /> Preview
-            </Button>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button 
-                onClick={handleSubmit(onSubmit)} 
-                disabled={loading}
-                variant="gradient"
-                className="rounded-full h-11 px-6 text-white gap-2 font-bold text-xs shadow-md cursor-pointer"
-              >
-                <Send className="w-4 h-4" /> Post New Job
-              </Button>
-            </motion.div>
-          </div>
+  const ListEditor = ({ items, setItems, placeholder, addLabel }: { items: string[]; setItems: (l: string[]) => void; placeholder: string; addLabel: string }) => (
+    <div className="space-y-2">
+      {items.map((v, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0F9DE4] shrink-0" />
+          <input value={v} maxLength={300} onChange={e => updateAt(items, setItems, i, e.target.value)} placeholder={placeholder} className={inputCls} />
+          {items.length > 1 && <button type="button" onClick={() => setItems(items.filter((_, k) => k !== i))} className={cx(iconBtn, 'hover:!bg-rose-50 hover:!text-rose-600')} aria-label="Remove"><Trash2 className="w-4 h-4" /></button>}
         </div>
+      ))}
+      {items.length < 30 && <button type="button" onClick={() => setItems([...items, ''])} className="text-xs font-semibold text-[#0025B8] hover:underline inline-flex items-center gap-1.5 cursor-pointer pt-1"><Plus className="w-3.5 h-3.5" />{addLabel}</button>}
+    </div>
+  );
 
-        {serverError && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs sm:text-sm font-semibold text-rose-800 shadow-sm">
-            {serverError}
+  return (
+    <div className="space-y-5 pb-10 text-slate-800">
+      <PageHead
+        eyebrow="Recruitment"
+        title="Post a job"
+        description="Describe the role. The more specific you are, the better Smart Rank can match candidates."
+        actions={<>
+          <Link href="/company/jobs" className={btnSecondary}>Cancel</Link>
+          <button type="button" disabled={!!loading} onClick={handleSubmit(d => submitJob(d, 'DRAFT'))} className={btnSecondary}>{loading === 'DRAFT' ? 'Saving…' : 'Save draft'}</button>
+          <button type="button" disabled={!!loading} onClick={handleSubmit(d => submitJob(d, 'ACTIVE'))} className={btnPrimary}><Send className="w-3.5 h-3.5" />{loading === 'ACTIVE' ? 'Publishing…' : 'Publish job'}</button>
+        </>}
+      />
+
+      {serverError && <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-medium text-rose-800">{serverError}</div>}
+      {Object.keys(errors).length > 0 && <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-800">Some fields need attention. Check the highlighted messages below.</div>}
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
+        <nav className="xl:col-span-2 hidden xl:block sticky top-24">
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2 px-3">Sections</p>
+          <ul className="space-y-0.5">
+            {SECTIONS.map(s => (
+              <li key={s.id}>
+                <a href={`#${s.id}`} className={cx('block px-3 py-2 text-xs font-semibold rounded-lg border-l-2 transition-colors',
+                  activeSection === s.id ? 'border-[#0025B8] bg-white text-[#0025B8] shadow-sm' : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-white')}>{s.label}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="xl:col-span-6 space-y-4">
+          <div id="basic-info" className="scroll-mt-24">
+            <Panel title="Basics" subtitle="Title, type and deadline" icon={<Briefcase className="w-3.5 h-3.5" />}>
+              <div className="space-y-4">
+                <Field label="Job title" required error={errors.title?.message}><input maxLength={100} placeholder="e.g. Senior Full-Stack Engineer" className={inputCls} {...register('title')} /></Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Department"><select {...register('department')} className={selectCls}>{DEPARTMENTS.map(d => <option key={d}>{d}</option>)}</select></Field>
+                  <Field label="Employment type"><select {...register('jobType')} className={selectCls}>
+                    {['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'].map(t => <option key={t} value={t}>{label(t)}</option>)}</select></Field>
+                  <Field label="Experience level"><select {...register('experienceLevel')} className={selectCls}>
+                    {['Entry Level', 'Mid Level', 'Senior Level'].map(t => <option key={t}>{t}</option>)}</select></Field>
+                  <Field label="Application deadline" required error={errors.deadline?.message}><input type="date" min={minDate} className={inputCls} {...register('deadline')} /></Field>
+                </div>
+              </div>
+            </Panel>
           </div>
-        )}
 
-        {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Sidebar Navigation Links */}
-          <div className="lg:col-span-3 hidden lg:block sticky top-28">
-            <div className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 shadow-xl space-y-3">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Sections</p>
-              <nav className="space-y-1.5">
-                <a href="#basic-info" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-[#0025B8] text-[#0025B8] bg-sky-50 rounded-r-2xl">Basic Info</a>
-                <a href="#location-salary" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Location & Salary</a>
-                <a href="#job-description" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Job Description</a>
-                <a href="#requirements" className="flex items-center px-4 py-2.5 text-xs font-bold border-l-4 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-r-2xl transition-all">Requirements & Skills</a>
-              </nav>
-            </div>
-          </div>
-
-          {/* Center Form Section */}
-          <div className="lg:col-span-6 space-y-6">
-            
-            {/* Basic Info */}
-            <div id="basic-info" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-5">
-              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Basic Info</h2>
-              
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700">Job Title</Label>
-                <Input placeholder="Enter the job title" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('title')} />
-                {errors.title && <p className="text-xs text-rose-600 font-semibold mt-1">{errors.title.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Department</Label>
-                  <select {...register('department')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
-                    <option value="Engineering">Engineering</option>
-                    <option value="Design">Design</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Sales">Sales</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Employment Type</Label>
-                  <select {...register('jobType')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
-                    <option value="REMOTE">Remote</option>
-                    <option value="FULL_TIME">Full Time</option>
-                    <option value="PART_TIME">Part Time</option>
-                    <option value="CONTRACT">Contract</option>
-                    <option value="INTERNSHIP">Internship</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Experience Level</Label>
-                  <select {...register('experienceLevel')} className="w-full h-12 border border-sky-100 rounded-2xl px-4 text-xs font-medium bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/20 cursor-pointer text-slate-800 shadow-xs">
-                    <option value="Entry Level">Entry Level</option>
-                    <option value="Mid Level">Mid Level</option>
-                    <option value="Senior Level">Senior Level</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Application Deadline</Label>
-                  <Input type="date" min={minDate} className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('deadline')} />
-                </div>
-              </div>
-            </div>
-
-            {/* Location & Salary */}
-            <div id="location-salary" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-5">
-              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Location & Salary</h2>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700">Location Type</Label>
-                <div className="flex items-center gap-6 mt-2">
-                  {['Remote', 'On-Site', 'Hybrid'].map((type) => {
-                    const value = type.toUpperCase().replace('-', '_');
-                    return (
-                      <label key={type} className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                        <input
-                          type="radio"
-                          value={value}
-                          {...register('locationType')}
-                          className="text-[#0025B8] focus:ring-[#0F9DE4]"
-                        />
-                        {type}
+          <div id="location-salary" className="scroll-mt-24">
+            <Panel title="Location and salary" subtitle="Roles with a visible salary get more applications" icon={<MapPin className="w-3.5 h-3.5" />}>
+              <div className="space-y-4">
+                <div>
+                  <span className="text-xs font-semibold text-slate-700 block mb-1.5">Work arrangement</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[{ v: 'ON_SITE', l: 'On-site' }, { v: 'HYBRID', l: 'Hybrid' }, { v: 'REMOTE', l: 'Remote' }].map(o => (
+                      <label key={o.v} className={cx('flex items-center justify-center h-9 rounded-lg border text-xs font-semibold cursor-pointer transition-colors',
+                        w.locationType === o.v ? 'border-[#0025B8] bg-blue-50 text-[#0025B8]' : 'border-slate-200 text-slate-600 hover:bg-slate-50')}>
+                        <input type="radio" value={o.v} {...register('locationType')} className="sr-only" />{o.l}
                       </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-bold text-slate-700">Office Location</Label>
-                <Input placeholder="Colombo, Sri Lanka" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('location')} />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Min. Salary ( Monthly )</Label>
-                  <Input placeholder="LKR 0.00" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('salaryMin')} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Max. Salary ( Monthly )</Label>
-                  <Input placeholder="LKR 0.00" className="h-12 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50" {...register('salaryMax')} />
-                </div>
-              </div>
-            </div>
-
-            {/* Job Description */}
-            <div id="job-description" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-4">
-              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Job Description</h2>
-
-              <div className="border border-sky-100 rounded-2xl overflow-hidden shadow-xs">
-                <div className="bg-sky-50/70 px-4 py-2.5 border-b border-sky-100 flex items-center gap-3 text-slate-600">
-                  <button type="button" onClick={() => applyFormat('**', '**')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><Bold className="w-4 h-4 text-[#0025B8]" /></button>
-                  <button type="button" onClick={() => applyFormat('*', '*')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><Italic className="w-4 h-4 text-[#0025B8]" /></button>
-                  <button type="button" onClick={() => applyFormat('[', '](https://)')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><LinkIcon className="w-4 h-4 text-[#0025B8]" /></button>
-                  <button type="button" onClick={() => applyFormat('\n- ')} className="p-1.5 hover:bg-sky-100 rounded-xl transition-colors cursor-pointer"><List className="w-4 h-4 text-[#0025B8]" /></button>
-                </div>
-                <textarea
-                  id="job-description-textarea"
-                  rows={6}
-                  placeholder="Describe the role, impact, and who you're looking for..."
-                  {...register('description')}
-                  className="w-full p-4 text-xs sm:text-sm focus:outline-none resize-none bg-slate-50/30 text-slate-800 font-medium"
-                />
-              </div>
-              {errors.description && <p className="text-xs text-rose-600 font-semibold">{errors.description.message}</p>}
-            </div>
-
-            {/* Requirements & Skills — now 3 clearly separated subsections */}
-            <div id="requirements" className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 sm:p-8 shadow-xl space-y-8">
-              <h2 className="text-base font-bold text-slate-900 border-b border-sky-100 pb-3">Requirements & Skills</h2>
-
-              {/* 01. Responsibilities */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">01</span>
-                  <Label className="text-xs font-bold text-slate-700">Responsibilities</Label>
-                </div>
-                <p className="text-[11px] text-slate-400 font-medium pl-8">Add one responsibility per line (e.g. &ldquo;Design intuitive UI/UX for websites and mobile applications.&rdquo;)</p>
-                <div className="space-y-3 mt-2 pl-8">
-                  {responsibilities.map((resp, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#0F9DE4] shrink-0"></span>
-                      <Input
-                        value={resp}
-                        onChange={(e) => handleResponsibilityChange(idx, e.target.value)}
-                        placeholder="Add a key responsibility..."
-                        className="h-11 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50 flex-1"
-                      />
-                      {responsibilities.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveResponsibility(idx)}
-                          className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddResponsibility}
-                  className="mt-2 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] hover:underline flex items-center gap-1.5 cursor-pointer pl-8"
-                >
-                  <Plus className="w-4 h-4" /> Add Another Responsibility
-                </button>
-              </div>
-
-              {/* 02. Requirements */}
-              <div className="space-y-2 pt-6 border-t border-sky-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">02</span>
-                  <Label className="text-xs font-bold text-slate-700">Requirements</Label>
-                </div>
-                <p className="text-[11px] text-slate-400 font-medium pl-8">Add one requirement per line (e.g. &ldquo;3+ years of UI/UX design experience.&rdquo;)</p>
-                <div className="space-y-3 mt-2 pl-8">
-                  {requirementsList.map((req, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#0F9DE4] shrink-0"></span>
-                      <Input
-                        value={req}
-                        onChange={(e) => handleRequirementChange(idx, e.target.value)}
-                        placeholder="Add a requirement..."
-                        className="h-11 text-xs font-medium rounded-2xl border-sky-100 bg-slate-50/50 flex-1"
-                      />
-                      {requirementsList.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRequirement(idx)}
-                          className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddRequirement}
-                  className="mt-2 text-xs font-bold text-[#0025B8] hover:text-[#0F9DE4] hover:underline flex items-center gap-1.5 cursor-pointer pl-8"
-                >
-                  <Plus className="w-4 h-4" /> Add Another Requirement
-                </button>
-              </div>
-
-              {/* 03. Required Skills */}
-              <div className="space-y-2 pt-6 border-t border-sky-100">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-[#0025B8] text-white text-[10px] font-extrabold flex items-center justify-center shrink-0">03</span>
-                  <Label className="text-xs font-bold text-slate-700">Required Skills</Label>
-                </div>
-                <p className="text-[11px] text-slate-400 font-medium pl-8">Type a tool/technology and press Enter (e.g. React, Node, Python, Figma, PHP)</p>
-                <div className="border border-sky-100 rounded-2xl p-3 mt-2 flex flex-wrap gap-2 items-center bg-slate-50/50 min-h-[52px] shadow-xs pl-8">
-                  {skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white text-xs px-3 py-1.5 rounded-xl flex items-center gap-2 font-bold shadow-xs"
-                    >
-                      {skill}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSkill(skill)}
-                        className="hover:text-cyan-200 text-xs font-bold cursor-pointer"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    type="text"
-                    value={skillInput}
-                    onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyDown={handleAddSkill}
-                    placeholder="Type and press enter..."
-                    className="border-none outline-none text-xs font-medium flex-1 min-w-[150px] p-2 bg-transparent text-slate-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4">
-              <span className="text-xs text-slate-400 font-medium">Draft autosaved securely.</span>
-              <div className="flex items-center gap-3">
-                <Button type="button" variant="outline" className="rounded-full h-11 px-6 border-sky-200 text-[#0025B8] hover:bg-sky-50 font-bold text-xs cursor-pointer shadow-xs">
-                  Cancel
-                </Button>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button onClick={handleSubmit(onSubmit)} disabled={loading} variant="gradient" className="rounded-full h-11 px-7 text-white font-bold text-xs shadow-md cursor-pointer">
-                    Post This Job
-                  </Button>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Preview Sidebar (3 Columns) */}
-          <div className="lg:col-span-3 space-y-6 sticky top-28">
-            <div className="bg-sky-50/80 border border-sky-200 rounded-[28px] p-5 shadow-sm space-y-2">
-              <h3 className="text-xs font-extrabold text-[#0025B8] uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[#0F9DE4]" /> Recruiter Pro-Tip
-              </h3>
-              <p className="text-xs text-slate-700 font-medium leading-relaxed">
-                &ldquo;Job posts with explicit salary ranges and hybrid policies receive 3x more high-quality applications.&rdquo;
-              </p>
-            </div>
-
-            <div className="bg-white/90 backdrop-blur-xl rounded-[28px] border border-sky-100 p-6 shadow-xl space-y-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Post Preview</p>
-              
-              <div className="border border-sky-100 rounded-2xl p-4 shadow-sm bg-slate-50/50 space-y-3">
-                <div className="flex items-center gap-2.5">
-                  {companyLogo ? (
-                    <img src={companyLogo} alt={companyName} className="w-8 h-8 rounded-xl object-cover shadow-xs border border-sky-100" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#0025B8] to-[#0F9DE4] flex items-center justify-center text-white text-xs font-black shadow-xs">
-                      {companyName?.[0]?.toUpperCase() || 'C'}
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 truncate max-w-[130px]">{companyName || 'Company Name'}</h4>
-                    <p className="text-[10px] font-bold text-[#0F9DE4] uppercase">HIRING NOW</p>
+                    ))}
                   </div>
                 </div>
-
-                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">{watchTitle || 'Senior Full-Stack Engineer'}</h3>
-
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="text-[10px] font-bold bg-[#0025B8] text-white px-2.5 py-1 rounded-full shadow-xs">{watchJobType}</span>
-                  <span className="text-[10px] font-bold bg-sky-100 text-[#0025B8] px-2.5 py-1 rounded-full shadow-xs">{watchLocationType}</span>
-                  <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full shadow-xs">Closing soon</span>
+                <Field label="Office location" required error={errors.location?.message}><input maxLength={100} placeholder="Colombo, Sri Lanka" className={inputCls} {...register('location')} /></Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field label="Minimum salary" hint="LKR / month" error={errors.salaryMin?.message}><input inputMode="numeric" maxLength={9} placeholder="150000" className={inputCls} {...register('salaryMin', { onChange: e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9); } })} /></Field>
+                  <Field label="Maximum salary" hint="LKR / month" error={errors.salaryMax?.message}><input inputMode="numeric" maxLength={9} placeholder="250000" className={inputCls} {...register('salaryMax', { onChange: e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9); } })} /></Field>
                 </div>
-
-                {watchDescription && (
-                  <p className="text-xs text-slate-600 font-medium line-clamp-3 pt-2 border-t border-sky-100 whitespace-pre-wrap leading-relaxed">
-                    {watchDescription}
-                  </p>
-                )}
-
-                <Button className="w-full text-xs font-bold rounded-full h-9 bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] text-white hover:opacity-90 transition-all shadow-md mt-2 cursor-pointer">
-                  APPLY NOW
-                </Button>
               </div>
-            </div>
+            </Panel>
           </div>
 
+          <div id="job-description" className="scroll-mt-24">
+            <Panel title="Description" subtitle="What the role is and who it is for" icon={<Sparkles className="w-3.5 h-3.5" />}>
+              <div className="border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-[#0F9DE4]/25 focus-within:border-[#0F9DE4] transition-colors">
+                <div className="bg-slate-50 px-2 py-1.5 border-b border-slate-200 flex items-center gap-0.5">
+                  {[
+                    { i: <Bold className="w-4 h-4" />, f: () => applyFormat('**'), t: 'Bold' },
+                    { i: <Italic className="w-4 h-4" />, f: () => applyFormat('*'), t: 'Italic' },
+                    { i: <LinkIcon className="w-4 h-4" />, f: () => applyFormat('[', '](https://)'), t: 'Link' },
+                    { i: <List className="w-4 h-4" />, f: () => applyFormat('\n- ', ''), t: 'Bullet' },
+                  ].map(b => <button key={b.t} type="button" title={b.t} onClick={b.f} className={iconBtn}>{b.i}</button>)}
+                  <span className="ml-auto text-[11px] text-slate-400 pr-2 tabular-nums">{(w.description ?? '').length} chars</span>
+                </div>
+                <textarea id="job-description-textarea" rows={8} maxLength={10000} placeholder="Describe the role, the team and the impact this person will have." {...register('description')}
+                  className="w-full p-3 text-[13px] focus:outline-none resize-y bg-white text-slate-800" />
+              </div>
+              {errors.description && <p className="text-[11px] text-rose-600 font-medium mt-1.5">{errors.description.message}</p>}
+            </Panel>
+          </div>
+
+          <div id="requirements" className="scroll-mt-24">
+            <Panel title="Requirements and skills" subtitle="Smart Rank compares CVs against these" icon={<CheckCircle2 className="w-3.5 h-3.5" />}>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700 mb-2">Responsibilities</p>
+                  <ListEditor items={responsibilities} setItems={setResponsibilities} placeholder="e.g. Design and ship new product features" addLabel="Add responsibility" />
+                </div>
+                <div className="pt-5 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-700 mb-2">Requirements</p>
+                  <ListEditor items={requirementsList} setItems={setRequirementsList} placeholder="e.g. 3+ years of frontend experience" addLabel="Add requirement" />
+                </div>
+                <div className="pt-5 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-700 mb-2">Required skills</p>
+                  <div className="border border-slate-200 rounded-lg p-2 flex flex-wrap gap-1.5 items-center min-h-[42px] focus-within:ring-2 focus-within:ring-[#0F9DE4]/25 focus-within:border-[#0F9DE4]">
+                    {skills.map(s => (
+                      <span key={s} className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 text-xs font-medium pl-2.5 pr-1.5 py-1 rounded-md">
+                        {s}<button type="button" onClick={() => setSkills(skills.filter(x => x !== s))} className="text-slate-400 hover:text-rose-600 cursor-pointer" aria-label={`Remove ${s}`}><X className="w-3 h-3" /></button>
+                      </span>
+                    ))}
+                    <input value={skillInput} maxLength={40} onChange={e => setSkillInput(e.target.value.replace(/[^\p{L}\p{M}\p{N} .+#/&'\-()]/gu, ''))}
+                      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ',') && skillInput.trim()) { e.preventDefault(); addSkill(skillInput); setSkillInput(''); } if (e.key === 'Backspace' && !skillInput && skills.length) setSkills(skills.slice(0, -1)); }}
+                      placeholder={skills.length ? 'Add another…' : 'Type a skill and press Enter'} className="flex-1 min-w-[140px] outline-none text-[13px] bg-transparent px-1.5 py-1" />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    {SKILL_SUGGESTIONS.filter(s => !skills.some(x => x.toLowerCase() === s.toLowerCase())).slice(0, 8).map(s => (
+                      <button key={s} type="button" onClick={() => addSkill(s)} className="text-[11px] font-medium px-2 py-1 rounded-md border border-dashed border-slate-300 text-slate-500 hover:border-[#0F9DE4] hover:text-[#0025B8] cursor-pointer transition-colors">+ {s}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Panel>
+          </div>
         </div>
+
+        <aside className="xl:col-span-4 space-y-4 xl:sticky xl:top-24">
+          <Panel title="Ready to publish?" subtitle={`${done} of ${checklist.length} complete`} icon={<CheckCircle2 className="w-3.5 h-3.5" />}>
+            <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-3.5"><div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(done / checklist.length) * 100}%` }} /></div>
+            <ul className="space-y-1.5">
+              {checklist.map(c => (
+                <li key={c.label} className="flex items-center gap-2.5 text-xs">
+                  <span className={cx('w-4 h-4 rounded-full flex items-center justify-center shrink-0', c.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300')}><CheckCircle2 className="w-3 h-3" /></span>
+                  <span className={c.done ? 'text-slate-600' : 'text-slate-400'}>{c.label}</span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+
+          <Panel title="Auto-screening" subtitle="Reject poor matches automatically" icon={<Sparkles className="w-3.5 h-3.5" />}>
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input type="checkbox" checked={autoScreen} onChange={e => setAutoScreen(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#0025B8]" />
+              <span className="text-xs text-slate-600 leading-relaxed"><span className="font-semibold text-slate-800">Screen applicants automatically.</span> Each CV is scored against this job. Candidates below the minimum are rejected by the system with an explanation. You can still shortlist or interview any of them.</span>
+            </label>
+            <div className={cx('mt-4 transition-opacity', !autoScreen && 'opacity-40 pointer-events-none')}>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="min-match" className="text-xs font-semibold text-slate-700">Minimum match</label>
+                <span className="text-xs font-semibold text-[#0025B8] tabular-nums">{minMatch}%</span>
+              </div>
+              <input id="min-match" type="range" min={0} max={90} step={5} value={minMatch} onChange={e => setMinMatch(Number(e.target.value))} className="w-full accent-[#0025B8]" />
+              <p className="text-[11px] text-slate-400 mt-1.5">{minMatch === 0 ? 'Nobody is rejected.' : minMatch <= 35 ? 'Lenient: only clearly unrelated CVs are rejected.' : minMatch <= 60 ? 'Balanced: CVs missing key requirements are rejected.' : 'Strict: only strong matches stay in the list.'}</p>
+            </div>
+          </Panel>
+
+          <Panel title="Live preview" subtitle="As candidates will see it" icon={<Briefcase className="w-3.5 h-3.5" />}>
+            <div className="rounded-lg border border-slate-200 p-4 space-y-3 bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                {companyLogo
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={companyLogo} alt="" className="w-9 h-9 rounded-lg object-cover border border-slate-200" />
+                  : <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] flex items-center justify-center text-white text-sm font-semibold">{companyName?.[0]?.toUpperCase() || 'C'}</span>}
+                <div className="min-w-0"><p className="text-xs font-semibold text-slate-900 truncate">{companyName}</p><p className="text-[10.5px] font-semibold text-[#0F9DE4] uppercase tracking-wide">Hiring</p></div>
+              </div>
+              <h3 className="text-sm font-semibold text-slate-900">{w.title || 'Job title'}</h3>
+              <div className="flex flex-wrap gap-1.5">
+                <Pill tone="blue">{label(w.jobType ?? '')}</Pill><Pill tone="sky">{label(w.locationType ?? '')}</Pill>
+                {w.experienceLevel && <Pill tone="slate">{w.experienceLevel}</Pill>}
+              </div>
+              <div className="text-[11px] text-slate-500 space-y-1">
+                <p className="flex items-center gap-1.5"><MapPin className="w-3 h-3" />{w.location || 'Location'}</p>
+                <p className="flex items-center gap-1.5"><Banknote className="w-3 h-3" />{w.salaryMin || w.salaryMax ? `LKR ${Number(w.salaryMin || 0).toLocaleString()} – ${Number(w.salaryMax || 0).toLocaleString()}` : 'Salary not shown'}</p>
+                <p className="flex items-center gap-1.5"><CalendarClock className="w-3 h-3" />{w.deadline ? `Apply by ${new Date(w.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'No deadline set'}</p>
+              </div>
+              {w.description && <p className="text-xs text-slate-600 line-clamp-4 whitespace-pre-wrap leading-relaxed pt-2 border-t border-slate-200">{w.description}</p>}
+              {skills.length > 0 && <div className="flex flex-wrap gap-1">{skills.slice(0, 6).map(s => <span key={s} className="text-[10.5px] font-medium px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600">{s}</span>)}{skills.length > 6 && <span className="text-[10.5px] text-slate-400 py-0.5">+{skills.length - 6}</span>}</div>}
+            </div>
+          </Panel>
+        </aside>
       </div>
+      <Toast toast={toast} />
     </div>
   );
 }

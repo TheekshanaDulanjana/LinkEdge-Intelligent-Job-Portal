@@ -84,6 +84,8 @@ model JobPosting {
   salaryMax        Int?
   deadline         DateTime
   status           JobStatus         @default(ACTIVE)
+  autoScreen       Boolean           @default(true)
+  minMatchScore    Int               @default(35)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   applications     Application[]
@@ -114,9 +116,15 @@ model Application {
   aiScore           Float?
   atsScore          Float?
   atsBreakdown      Json?
+  autoRejected      Boolean           @default(false)
+  companyOverride   Boolean           @default(false)
+  screenedAt        DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   job               JobPosting        @relation(fields: [jobId], references: [id])
+
+  @@index([jobId, seekerId])
+  @@index([status])
 }
 
 // ─── Resume & ATS ───────────────────────────────────────────────

@@ -10,6 +10,9 @@ export interface CandidateRow {
   appliedDate: string;
   interviewDate: string | null;
   cvUrl: string;
+  autoRejected?: boolean;      // rejected by the system's auto-screening
+  companyOverride?: boolean;   // company moved a system-rejected candidate forward
+  rejectionReason?: string | null;
 }
 
 export interface CandidatesSummary {
@@ -76,10 +79,72 @@ export async function fetchCandidateCvFile(seekerId: string): Promise<Blob> {
   const res = await authApi.get(`/auth/candidate/${seekerId}/resume/file`, {
     responseType: 'arraybuffer',
   });
-  const contentType = res.headers?.['content-type'] || 'application/pdf';
-  return new Blob([res.data], { type: contentType });
+  const contentType = String(res.headers?.['content-type'] || 'application/pdf');
+  return new Blob([res.data as BlobPart], { type: contentType });
 }
 
 export async function updateCandidateStage(applicationId: string, status: string) {
   return applicationApi.patch(`/applications/company/candidates/${applicationId}/stage`, { status });
+}
+
+/* ───────────── Full CV analysis (parser + ATS + AI match) ───────────── */
+
+export interface CvExperience {
+  title: string; company: string; location: string; employment_type: string;
+  start: string; end: string; current: boolean; months: number;
+  duration: string; duration_label: string;
+  bullets: string[]; description: string; skills: string[];
+}
+export interface CvEducation {
+  degree: string; degree_title: string; field: string; institution: string;
+  year: string; start_year: string; grade: string; notes: string; in_progress: boolean;
+}
+export interface CvHealthCheck { id: string; label: string; weight: number; passed: boolean; detail: string }
+
+export interface CvAnalysis {
+  name: string; headline: string; location: string;
+  contact: { email: string; phone: string; linkedin: string; github: string; links: string[] };
+  summary: string; seniority: string; experience_years: number;
+  experience: CvExperience[]; education: CvEducation[];
+  skills: string[]; skill_items: Array<{ name: string; in_experience: number }>;
+  skills_by_category: Record<string, string[]>;
+  additional_skills: string[]; soft_skills: string[];
+  certifications: Array<{ name: string; issuer: string; year: string }>;
+  projects: Array<{ name: string; description: string; bullets: string[]; skills: string[]; link: string }>;
+  languages: string[]; sections_found: string[];
+  cv_health: { score: number; checks: CvHealthCheck[]; words: number; quantified_bullets: number };
+  parse_confidence: number;
+}
+
+export interface AtsResult {
+  overall_score: number; score_label: string; score_color: string;
+  breakdown: {
+    technical_score: number; experience_score: number; education_score: number;
+    certification_score: number; keyword_score: number;
+    matched_skills: string[]; missing_skills: string[];
+    explanation: Record<string, string>;
+  };
+}
+
+export interface AiMatchResult {
+  score: number; label: string; color: string; recommendation: string;
+  components: { skills: number; role: number; experience: number; evidence: number };
+  matched_skills: string[]; missing_skills: string[];
+  related_skills: Array<{ required: string; has: string }>;
+  strengths: string[]; gaps: string[];
+}
+
+export type CandidateAnalysisData =
+  | { hasResume: false }
+  | {
+      hasResume: true;
+      analysis: CvAnalysis;
+      ats: AtsResult;
+      aiMatch: AiMatchResult;
+      job: { required_skills: string[]; preferred_skills: string[]; experience_required: number; education_required: string; seniority_level: string };
+    };
+
+export async function fetchCandidateAnalysis(applicationId: string): Promise<CandidateAnalysisData> {
+  const res = await applicationApi.get(`/applications/company/candidates/${applicationId}/analysis`);
+  return res.data.data;
 }

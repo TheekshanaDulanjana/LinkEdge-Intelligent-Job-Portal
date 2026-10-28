@@ -70,6 +70,26 @@ export function globalErrorHandler(serviceName: string) {
       });
     }
 
+    // Upload and body-parsing problems are the client's fault: answer 4xx, not 500
+    const anyErr = err as any;
+    if (err.name === 'MulterError') {
+      const tooBig = anyErr.code === 'LIMIT_FILE_SIZE';
+      return res.status(tooBig ? 413 : 400).json({
+        success: false,
+        message: tooBig ? 'The file is too large.' : 'Invalid file upload.',
+        requestId,
+      });
+    }
+    if (anyErr.type === 'entity.too.large') {
+      return res.status(413).json({ success: false, message: 'Request body too large.', requestId });
+    }
+    if (anyErr.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+      return res.status(400).json({ success: false, message: 'Malformed request body.', requestId });
+    }
+    if (/^Only (PDF|real)/.test(err.message || '')) {
+      return res.status(400).json({ success: false, message: err.message, requestId });
+    }
+
     // Unknown errors — NEVER expose internal details
     logger.error('Unhandled error', {
       name: err.name,

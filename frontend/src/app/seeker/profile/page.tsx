@@ -1,5 +1,8 @@
 'use client';
 
+import { assetUrl } from '@/lib/assetUrl';
+import { z } from 'zod';
+import { personName, optionalPhone, optionalPlace, optionalText, optionalUrl, stripName, stripPhone, stripPlace } from '@/lib/validation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
@@ -88,6 +91,7 @@ function CombinedProfileContent() {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [removeImage, setRemoveImage] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -109,19 +113,19 @@ function CombinedProfileContent() {
 
         const p = profileRes.data?.data?.profile;
         setProfile({
-          fullName: p?.fullName || 'John Smith',
-          phone: p?.phone || '+94 71 123 4567',
-          location: p?.location || 'Colombo, Sri Lanka',
-          interestArea: p?.interestArea || 'Inter UX/UI',
+          fullName: p?.fullName || '',
+          phone: p?.phone || '',
+          location: p?.location || '',
+          interestArea: p?.interestArea || '',
           workStatus: p?.workStatus || 'UNEMPLOYED',
-          professionalSummary: p?.professionalSummary || 'Intern UX/UI Engineer',
+          professionalSummary: p?.professionalSummary || '',
           profileImageUrl: p?.profileImageUrl || '',
           websiteUrl: p?.websiteUrl || '',
           githubUrl: p?.githubUrl || '',
           behanceUrl: p?.behanceUrl || '',
           workStyle: p?.workStyle || 'REMOTE',
         });
-        if (p?.profileImageUrl) setImagePreview(p.profileImageUrl);
+        if (p?.profileImageUrl) setImagePreview(assetUrl(p.profileImageUrl));
 
         const apps: Application[] = appsRes.data?.data || [];
         setApplications(apps);
@@ -147,15 +151,69 @@ function CombinedProfileContent() {
     loadData();
   }, []);
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const basicSchema = z.object({
+  fullName: personName('Full name'),
+  phone: optionalPhone,
+  location: optionalPlace('Location'),
+  professionalSummary: optionalText('Summary', 2000),
+});
+const linkSchema = optionalUrl('Link');
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Image must be under 2MB');
+    if (!IMAGE_TYPES.includes(file.type)) {
+      setError('Use a JPG, PNG or WEBP image.');
+      e.target.value = '';
       return;
     }
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be under 5MB');
+      e.target.value = '';
+      return;
+    }
+    setError('');
+    const blobUrl = URL.createObjectURL(file);
+    const previous = imagePreview;
+    setImagePreview(blobUrl);
+    e.target.value = '';
+    // Save immediately so the photo survives a refresh (no need to open "Edit Profile").
+    void uploadPhoto(file, previous, blobUrl);
+  }
+
+  async function uploadPhoto(file: File, previous: string, blobUrl: string) {
+    try {
+      const fd = new FormData();
+      fd.append('profileImage', file);
+      const res = await api.patch('/auth/seeker/profile', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setImagePreview(assetUrl(res.data?.data?.profileImageUrl));
+      setProfile((p) => ({ ...p, profileImageUrl: res.data?.data?.profileImageUrl || '' }));
+      setImageFile(null);
+      setRemoveImage(false);
+      setSuccess('Profile photo updated');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: unknown) {
+      setImagePreview(previous);
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Could not upload the photo. Please try again.');
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  }
+
+  async function removePhoto() {
+    try {
+      const fd = new FormData();
+      fd.append('removeProfileImage', 'true');
+      await api.patch('/auth/seeker/profile', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setImagePreview('');
+      setImageFile(null);
+      setRemoveImage(false);
+      setProfile((p) => ({ ...p, profileImageUrl: '' }));
+    } catch {
+      setError('Could not remove the photo. Please try again.');
+    }
   }
 
   async function handleSave() {
@@ -163,20 +221,37 @@ function CombinedProfileContent() {
     setError('');
     setSuccess('');
     try {
+      const check = basicSchema.safeParse({
+        fullName: profile.fullName, phone: profile.phone ?? '', location: profile.location ?? '',
+        professionalSummary: profile.professionalSummary ?? '',
+      });
+      if (!check.success) {
+        setError(check.error.issues[0]?.message || 'Please check your details.');
+        setSaving(false);
+        return;
+      }
       const formData = new FormData();
-      Object.entries(profile).forEach(([k, v]) => {
-        if (v) formData.append(k, v as string);
+      // Empty optional fields are sent as '' so they can be cleared.
+      (['fullName', 'phone', 'location', 'professionalSummary', 'interestArea', 'workStatus', 'workStyle'] as const).forEach((k) => {
+        const v: unknown = profile[k];
+        if (typeof v === 'string' && (v !== '' || k !== 'fullName')) formData.append(k, v.trim());
       });
       if (imageFile) formData.append('profileImage', imageFile);
+      else if (removeImage) formData.append('removeProfileImage', 'true');
 
-      await api.patch('/auth/seeker/profile', formData, {
+      const res = await api.patch('/auth/seeker/profile', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      // Show what the server actually stored (a permanent URL), not the temporary browser preview.
+      setImagePreview(assetUrl(res.data?.data?.profileImageUrl));
+      setImageFile(null);
+      setRemoveImage(false);
       setSuccess('Profile updated successfully!');
       setIsEditing(false);
       setTimeout(() => setSuccess(''), 3000);
-    } catch {
-      setError('Failed to save profile');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Failed to save profile');
     } finally {
       setSaving(false);
     }
@@ -190,6 +265,12 @@ function CombinedProfileContent() {
   const handleSaveLink = async () => {
     if (!activePlatform) return;
     const trimmed = tempLinkValue.trim();
+    const linkCheck = linkSchema.safeParse(trimmed);
+    if (!linkCheck.success) {
+      setError(linkCheck.error.issues[0]?.message || 'Enter a valid link.');
+      setTimeout(() => setError(''), 4000);
+      return;
+    }
 
     setProfile((prev) => ({ ...prev, [activePlatform]: trimmed }));
     setActivePlatform(null);
@@ -290,12 +371,17 @@ function CombinedProfileContent() {
                   <Pencil className="w-3.5 h-3.5 text-[#0F9DE4]" />
                   <input id="profile-img" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                 </label>
+                {imagePreview && (
+                  <button type="button" onClick={removePhoto}
+                    className="absolute -top-1 -right-1 w-6 h-6 bg-white border border-rose-200 rounded-full text-rose-500 text-xs font-bold flex items-center justify-center shadow hover:bg-rose-50 cursor-pointer"
+                    title="Remove photo" aria-label="Remove photo">×</button>
+                )}
               </div>
 
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{profile.fullName || 'User Name'}</h1>
                 <p className="text-xs font-medium text-slate-500 mt-1">
-                  {profile.professionalSummary || 'Intern UX/UI Engineer'} • {profile.location || 'Location'}
+                  {profile.professionalSummary || 'Add a short title'} • {profile.location || 'Add your location'}
                 </p>
                 <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-block mt-3">
                   <Button
@@ -333,19 +419,19 @@ function CombinedProfileContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <Label className="text-xs font-bold text-slate-700">Full Name</Label>
-                  <Input value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                  <Input value={profile.fullName} maxLength={80} onChange={(e) => setProfile({ ...profile, fullName: stripName(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
                 </div>
                 <div>
                   <Label className="text-xs font-bold text-slate-700">Phone</Label>
-                  <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                  <Input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: stripPhone(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
                 </div>
                 <div>
                   <Label className="text-xs font-bold text-slate-700">Location</Label>
-                  <Input value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                  <Input maxLength={100} value={profile.location} onChange={(e) => setProfile({ ...profile, location: stripPlace(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
                 </div>
                 <div>
                   <Label className="text-xs font-bold text-slate-700">Title / Short Summary</Label>
-                  <Input value={profile.professionalSummary} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                  <Input maxLength={2000} value={profile.professionalSummary} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
                 </div>
               </div>
               <Button onClick={handleSave} disabled={saving} variant="gradient" className="rounded-full px-6 h-11 text-xs font-bold text-white shadow-md cursor-pointer">
@@ -719,6 +805,7 @@ function CombinedProfileContent() {
                   </Label>
                   <Input
                     type="url"
+                    maxLength={200}
                     placeholder={`https://${activePlatform === 'githubUrl' ? 'github.com/username' : activePlatform === 'behanceUrl' ? 'behance.net/username' : 'yourwebsite.com'}`}
                     value={tempLinkValue}
                     onChange={(e) => setTempLinkValue(e.target.value)}
