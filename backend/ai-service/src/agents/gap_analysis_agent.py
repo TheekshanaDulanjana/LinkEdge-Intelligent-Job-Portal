@@ -1,26 +1,95 @@
-import os
-import json
 import re
-from google.genai import Client
+from typing import List
+from urllib.parse import quote_plus
+from pydantic import BaseModel
 from src.models.state import CVAnalysisState
+from src.tools.llm_json import generate_json
 
 
-# Create the new Gemini client (UNCHANGED)
-client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+class _Course(BaseModel):
+    title: str
+    platform: str
+    reason: str
 
 
-def clean_json_response(raw: str) -> str:
-    raw = raw.strip()
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    return raw.strip()
+class _GapResult(BaseModel):
+    matching_skills: List[str]
+    missing_skills: List[str]
+    gap_summary: str
+    course_suggestions: List[_Course]
+
+
+# Common short forms, so "JS" in the CV and "JavaScript" in the answer count as the same skill
+_ALIASES = {
+    "js": "javascript", "ts": "typescript", "node": "nodejs", "node.js": "nodejs",
+    "reactjs": "react", "react.js": "react", "vue.js": "vue", "vuejs": "vue",
+    "nextjs": "next.js", "postgres": "postgresql", "mongo": "mongodb", "k8s": "kubernetes",
+    "ml": "machine learning", "ai": "artificial intelligence", "ux": "ux design",
+    "ui": "ui design", "py": "python", "golang": "go",
+}
+
+
+def _norm(skill: str) -> str:
+    s = re.sub(r"\s+", " ", str(skill).strip().lower())
+    s = re.sub(r"\(.*?\)", "", s).strip()
+    return _ALIASES.get(s, s)
+
+
+def _has_skill(skill: str, owned_norm: List[str]) -> bool:
+    n = _norm(skill)
+    if not n:
+        return False
+    for o in owned_norm:
+        if n == o:
+            return True
+        # "react" vs "react native" are different, but "figma" vs "figma prototyping" are the same tool
+        if len(n) > 3 and len(o) > 3 and (n in o.split() or o in n.split()):
+            return True
+    return False
+
+
+def _unique(items: List[str], limit: int) -> List[str]:
+    seen, out = set(), []
+    for it in items:
+        text = str(it).strip()
+        key = _norm(text)
+        if text and key not in seen:
+            seen.add(key)
+            out.append(text)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _course_url(title: str, platform: str) -> str:
+    """Search links are built here from known patterns. Model written URLs are never trusted."""
+    q = quote_plus(title)
+    p = platform.lower()
+    if "coursera" in p:
+        return f"https://www.coursera.org/search?query={q}"
+    if "udemy" in p:
+        return f"https://www.udemy.com/courses/search/?q={q}"
+    if "youtube" in p:
+        return f"https://www.youtube.com/results?search_query={q}"
+    if "microsoft" in p:
+        return f"https://learn.microsoft.com/en-us/search/?terms={q}"
+    if "freecodecamp" in p:
+        return f"https://www.freecodecamp.org/news/search/?query={q}"
+    if "google" in p:
+        return "https://grow.google/certificates/"
+    if "aws" in p or "amazon" in p:
+        return "https://aws.amazon.com/training/"
+    if "edx" in p:
+        return f"https://www.edx.org/search?q={q}"
+    return f"https://www.google.com/search?q={quote_plus(title + ' ' + platform)}"
 
 
 def gap_analysis_agent(state: CVAnalysisState) -> CVAnalysisState:
     """
     Agent 2: Gap Analysis Agent
-    Now includes course URLs for frontend clickable navigation
+    Compares the candidate's skills with the desired role. The answer is checked afterwards:
+    skills the candidate already has are never reported as missing, and course links are
+    generated from the platform instead of being taken from the model.
     """
     print(">> [Agent 2] Gap analysis agent started")
 
@@ -36,110 +105,90 @@ def gap_analysis_agent(state: CVAnalysisState) -> CVAnalysisState:
             "current_step": "gap_analysis_skipped",
         }
 
-    skills_text = (
-        ", ".join(state["extracted_skills"])
-        if state["extracted_skills"]
-        else "No skills were extracted from the CV"
-    )
+    extracted = [s for s in state.get("extracted_skills", []) if str(s).strip()]
+    skills_text = ", ".join(extracted) if extracted else "No skills were extracted from the CV"
 
     prompt = f"""You are a senior career coach and technical recruiter with 15 years of experience.
 
-Analyze this candidate's profile against their desired role and produce a detailed skills gap analysis.
+Analyze this candidate's profile against their desired role and produce an accurate skills gap analysis.
 
 CANDIDATE PROFILE:
 - Current skills: {skills_text}
 - Work experience: {state.get("extracted_experience", "Not available")}
 - Education: {state.get("extracted_education", "Not available")}
-- Additional context: {state.get("additional_skills", "None provided")}
+- Additional context from the candidate: {state.get("additional_skills", "None provided")}
 
 DESIRED ROLE: {state["desired_role"]}
 
-Return ONLY a valid JSON object. No markdown, no code blocks, no explanation.
-Start directly with {{ and end with }}.
-
-{{
-    "matching_skills": [
-        "List skills the candidate already has that are relevant to the desired role"
-    ],
-    "missing_skills": [
-        "List the most important skills needed for the role that the candidate lacks"
-    ],
-    "gap_summary": "Write 2 to 3 encouraging but honest sentences explaining where the candidate stands and what they should focus on to reach their goal",
-    "course_suggestions": [
-        {{
-            "title": "Specific course or certification name",
-            "platform": "Platform name (Coursera, Udemy, YouTube, Google, Microsoft Learn, etc.)",
-            "reason": "One sentence explaining exactly how this course helps bridge their specific gap",
-            "url": "Real working URL (search page or platform link)"
-        }}
-    ]
-}}
-
 Rules:
-- matching_skills: include 3 to 6 relevant skills they already have
-- missing_skills: list the 5 to 7 most critical gaps, ordered by importance
-- course_suggestions: provide exactly 4 specific, real courses
-
-CRITICAL URL rules:
-- url must be real and working
-- Coursera: https://www.coursera.org/search?query=COURSE+NAME
-- Udemy: https://www.udemy.com/courses/search/?q=COURSE+NAME
-- YouTube: https://www.youtube.com/results?search_query=COURSE+NAME
-- Google: https://grow.google/certificates/
-- freeCodeCamp: https://www.freecodecamp.org/learn
-- Microsoft Learn: https://learn.microsoft.com/en-us/training/
-- AWS: https://aws.amazon.com/training/
-- Replace spaces with +
-- DO NOT invent fake URLs
-
-- gap_summary: be motivating, acknowledge what they have, then guide improvement
-- Be specific to the actual desired role, not generic"""
+- matching_skills: 3 to 8 skills taken from the candidate's current skills (use the candidate's own wording) that matter for the desired role. Never list a skill the candidate does not have.
+- missing_skills: the 5 to 7 most important skills a hiring manager expects for this exact role that are NOT in the candidate's skills or additional context. Treat short forms as the same skill (JS = JavaScript, K8s = Kubernetes). Order by importance. Use short skill names, not sentences.
+- gap_summary: 2 to 3 sentences. Say honestly where the candidate stands for this role, mention one real strength, and say what to focus on first.
+- course_suggestions: exactly 4 real, well known courses or certifications that each close one of the missing skills. Give the exact course or certification title and the platform name (Coursera, Udemy, YouTube, Google, Microsoft Learn, freeCodeCamp, AWS, edX). Do not write any URL.
+- reason (per course): one sentence naming the missing skill it covers.
+- Be specific to the desired role and the candidate's level. Do not give generic advice."""
 
     try:
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-            contents=prompt,
-            config={
-                "temperature": 0.2,
-                "max_output_tokens": 3000,
-            }
+        data = generate_json(
+            prompt,
+            _GapResult,
+            temperature=0.1,
+            max_tokens=8192,
+            thinking_budget=1024,
+            validate=lambda d: isinstance(d, dict) and d.get("missing_skills") and d.get("gap_summary"),
+            label="gap-analysis",
         )
 
-        raw = clean_json_response(response.text)
-        data = json.loads(raw)
+        owned = [_norm(s) for s in extracted]
+        extra = state.get("additional_skills") or ""
+        extra_norm = [_norm(x) for x in re.split(r"[,;\n]", extra) if x.strip()]
+        owned_all = owned + extra_norm
 
-        print(f"   Matching skills: {len(data.get('matching_skills', []))}")
-        print(f"   Missing skills: {len(data.get('missing_skills', []))}")
-        print(f"   Course suggestions: {len(data.get('course_suggestions', []))}")
+        matching = [s for s in data.get("matching_skills", []) if _has_skill(s, owned)]
+        matching = _unique(matching, 8)
+        # Model gave nothing usable: fall back to the first CV skills so the section is never empty
+        if not matching:
+            matching = _unique(extracted, 5)
+
+        missing = [s for s in data.get("missing_skills", []) if not _has_skill(s, owned_all)]
+        missing = _unique(missing, 7)
+
+        courses, seen_titles = [], set()
+        for c in data.get("course_suggestions", []):
+            title = str(c.get("title", "")).strip()
+            platform = str(c.get("platform", "")).strip() or "Web"
+            if not title or title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+            courses.append({
+                "title": title,
+                "platform": platform,
+                "reason": str(c.get("reason", "")).strip(),
+                "url": _course_url(title, platform),
+            })
+            if len(courses) == 4:
+                break
+
+        print(f"   Matching skills: {len(matching)}")
+        print(f"   Missing skills: {len(missing)}")
+        print(f"   Course suggestions: {len(courses)}")
 
         return {
             **state,
-            "matching_skills": data.get("matching_skills", []),
-            "missing_skills": data.get("missing_skills", []),
-            "gap_summary": data.get("gap_summary", ""),
-            "course_suggestions": data.get("course_suggestions", []),
+            "matching_skills": matching,
+            "missing_skills": missing,
+            "gap_summary": str(data.get("gap_summary", "")).strip(),
+            "course_suggestions": courses,
             "current_step": "gap_analysis_complete",
-        }
-
-    except json.JSONDecodeError as e:
-        print(f"   JSON parse error: {e}")
-        return {
-            **state,
-            "matching_skills": state.get("extracted_skills", [])[:3],
-            "missing_skills": [],
-            "gap_summary": "Gap analysis encountered a formatting issue. Please try again.",
-            "course_suggestions": [],
-            "current_step": "gap_analysis_failed",
-            "error": f"Gap analysis JSON error: {str(e)}",
         }
 
     except Exception as e:
         print(f"   Gap analysis error: {e}")
         return {
             **state,
-            "matching_skills": [],
+            "matching_skills": _unique(extracted, 5),
             "missing_skills": [],
-            "gap_summary": "Gap analysis could not be completed.",
+            "gap_summary": "The skills gap analysis is temporarily unavailable. Your CV was read successfully, so please try the analysis again in a moment.",
             "course_suggestions": [],
             "current_step": "gap_analysis_failed",
             "error": f"Gap analysis failed: {str(e)}",

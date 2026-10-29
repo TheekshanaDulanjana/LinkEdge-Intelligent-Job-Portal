@@ -39,6 +39,7 @@ export default function RegisterHero() {
               alt="LinkEdge Logo" 
               width={180} 
               height={40}
+              style={{ width: 180, height: 'auto' }}
               className="mb-12 xl:mb-16" 
             />
           </Link>

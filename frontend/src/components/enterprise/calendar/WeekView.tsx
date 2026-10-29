@@ -39,9 +39,9 @@ export default function WeekView({
           <div />
           {days.map(d => (
             <div key={d.toISOString()} className="text-center py-2.5 border-l border-slate-100">
-              <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{d.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{d.toLocaleDateString('en-US', { weekday: 'short' })}</p>
               <p className={`text-sm font-semibold mt-0.5 w-7 h-7 mx-auto flex items-center justify-center rounded-full
-                ${sameDay(d, today) ? 'bg-[#0025B8] text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
+                ${sameDay(d, today) ? 'bg-[#0063CE] text-white' : 'text-slate-700'}`}>{d.getDate()}</p>
             </div>
           ))}
         </div>
@@ -49,7 +49,7 @@ export default function WeekView({
         <div className="grid grid-cols-[56px_repeat(7,1fr)]">
           {HOURS.map(hour => (
             <div key={hour} className="contents">
-              <div className="text-[10px] text-slate-400 text-right pr-2 pt-1 border-b border-slate-100 tabular-nums">
+              <div className="text-xs text-slate-500 text-right pr-2 pt-1 border-b border-slate-100 tabular-nums">
                 {hour % 12 === 0 ? 12 : hour % 12}{hour < 12 ? 'am' : 'pm'}
               </div>
               {days.map(day => {
@@ -60,7 +60,7 @@ export default function WeekView({
                     key={`${day.toISOString()}-${hour}`}
                     id={`slot-${slotDate.toISOString()}`}
                     date={slotDate}
-                    className={`min-h-[56px] border-b border-l border-slate-100 p-0.5 space-y-0.5 cursor-pointer hover:bg-slate-50/60 ${sameDay(day, today) ? 'bg-sky-50/30' : ''}`}
+                    className={`min-h-[56px] border-b border-l border-slate-100 p-0.5 space-y-0.5 cursor-pointer hover:bg-slate-50/60 ${sameDay(day, today) ? 'bg-brand-50/40' : ''}`}
                   >
                     <div onClick={() => onSlotClick(slotDate)} className="min-h-[52px] space-y-0.5">
                       {eventsForSlot(day, hour).map(ev => (

@@ -43,15 +43,15 @@ function ScreeningPanel({ jobId, initialOn, initialMin, onSaved, onError }: {
   return (
     <Panel title="Auto-screening" subtitle="Applies to new applications" icon={<Sparkles className="w-3.5 h-3.5" />}>
       <label className="flex items-start gap-2.5 cursor-pointer">
-        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#0025B8]" />
+        <input type="checkbox" checked={on} onChange={e => setOn(e.target.checked)} className="mt-0.5 w-4 h-4 accent-[#0063CE]" />
         <span className="text-xs text-slate-600 leading-relaxed">Reject applicants below the minimum match automatically. They are told why, and you can still interview or shortlist them.</span>
       </label>
       <div className={cx('mt-4 transition-opacity', !on && 'opacity-40 pointer-events-none')}>
         <div className="flex items-center justify-between mb-1.5">
           <label htmlFor="min-match" className="text-xs font-semibold text-slate-700">Minimum match</label>
-          <span className="text-xs font-semibold text-[#0025B8] tabular-nums">{min}%</span>
+          <span className="text-xs font-semibold text-[#0063CE] tabular-nums">{min}%</span>
         </div>
-        <input id="min-match" type="range" min={0} max={90} step={5} value={min} onChange={e => setMin(Number(e.target.value))} className="w-full accent-[#0025B8]" />
+        <input id="min-match" type="range" min={0} max={90} step={5} value={min} onChange={e => setMin(Number(e.target.value))} className="w-full accent-[#0063CE]" />
       </div>
       <button onClick={save} disabled={!dirty || saving} className={cx(btnPrimary, 'mt-4 w-full justify-center', (!dirty || saving) && 'opacity-50')}>{saving ? 'Saving…' : 'Save settings'}</button>
     </Panel>
@@ -153,12 +153,12 @@ export default function JobDetailPage() {
   const top = [...applicants].sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1)).slice(0, 5);
   const reqs = job?.requirementsList?.length ? job.requirementsList : job?.requirements ? job.requirements.split(/\.\s+/).filter(Boolean) : [];
 
-  if (error) return <div className="pt-16"><ErrorNote text="Could not load this job. It may have been deleted." onRetry={load} /><div className="text-center mt-2"><Link href="/company/jobs" className="text-xs font-semibold text-[#0025B8] hover:underline">Back to jobs</Link></div></div>;
+  if (error) return <div className="pt-16"><ErrorNote text="Could not load this job. It may have been deleted." onRetry={load} /><div className="text-center mt-2"><Link href="/company/jobs" className="text-xs font-semibold text-[#0063CE] hover:underline">Back to jobs</Link></div></div>;
 
   return (
     <div className="space-y-5 pb-10 text-slate-800">
       <PageHead
-        breadcrumb={<Link href="/company/jobs" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 hover:text-[#0025B8] mb-1"><ArrowLeft className="w-3 h-3" /> All jobs</Link>}
+        breadcrumb={<Link href="/company/jobs" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0063CE] mb-1"><ArrowLeft className="w-3 h-3" /> All jobs</Link>}
         eyebrow={job ? `${nice(job.jobType)} · ${nice(job.locationType)}` : 'Job'}
         title={job?.title ?? 'Loading…'}
         description={job ? `Posted ${new Date(job.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} · #${job.id.slice(0, 8)}` : undefined}
@@ -191,7 +191,7 @@ export default function JobDetailPage() {
                   const n = stageCounts[s] ?? 0;
                   return (
                     <div key={s}>
-                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-slate-600">{STAGE_META[s].label}</span><span className="tabular-nums text-slate-500"><b className="text-slate-900">{n}</b> · {Math.round((n / applicants.length) * 100)}%</span></div>
+                      <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-slate-600">{STAGE_META[s].label}</span><span className="tabular-nums text-slate-600"><b className="text-slate-900">{n}</b> · {Math.round((n / applicants.length) * 100)}%</span></div>
                       <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${(n / applicants.length) * 100}%`, background: STAGE_META[s].color }} /></div>
                     </div>
                   );
@@ -206,19 +206,19 @@ export default function JobDetailPage() {
                 <p className="text-[13px] text-slate-600 leading-relaxed whitespace-pre-wrap">{job?.description}</p>
                 {!!job?.responsibilities?.length && (
                   <div>
-                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><ListChecks className="w-3.5 h-3.5 text-[#0F9DE4]" /> Responsibilities</p>
-                    <ul className="space-y-1.5">{job.responsibilities.map((r, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2.5"><span className="w-1.5 h-1.5 rounded-full bg-[#0F9DE4] mt-2 shrink-0" />{r}</li>)}</ul>
+                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><ListChecks className="w-3.5 h-3.5 text-[#0084DA]" /> Responsibilities</p>
+                    <ul className="space-y-1.5">{job.responsibilities.map((r, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2.5"><span className="w-1.5 h-1.5 rounded-full bg-[#0084DA] mt-2 shrink-0" />{r}</li>)}</ul>
                   </div>
                 )}
                 {reqs.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><CheckCircle2 className="w-3.5 h-3.5 text-[#0F9DE4]" /> Requirements</p>
+                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><CheckCircle2 className="w-3.5 h-3.5 text-[#0084DA]" /> Requirements</p>
                     <ul className="space-y-1.5">{reqs.map((r, i) => <li key={i} className="text-[13px] text-slate-600 flex gap-2.5"><span className="w-1.5 h-1.5 rounded-full bg-slate-300 mt-2 shrink-0" />{r}</li>)}</ul>
                   </div>
                 )}
                 {!!job?.skills?.length && (
                   <div>
-                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><Wrench className="w-3.5 h-3.5 text-[#0F9DE4]" /> Required skills</p>
+                    <p className="text-xs font-semibold text-slate-900 flex items-center gap-1.5 mb-2"><Wrench className="w-3.5 h-3.5 text-[#0084DA]" /> Required skills</p>
                     <div className="flex flex-wrap gap-1.5">{job.skills.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-700">{s}</span>)}</div>
                   </div>
                 )}
@@ -229,7 +229,7 @@ export default function JobDetailPage() {
 
         <div className="xl:col-span-4 space-y-4">
           <Panel title="Top applicants" subtitle="By AI match score" icon={<Sparkles className="w-3.5 h-3.5" />} noPad
-            actions={<Link href={`/company/jobs/${id}/applicants`} className="text-[11px] font-semibold text-[#0025B8] hover:underline">See all</Link>}>
+            actions={<Link href={`/company/jobs/${id}/applicants`} className="text-xs font-semibold text-[#0063CE] hover:underline">See all</Link>}>
             {loading ? <div className="p-5"><PanelSkeleton rows={4} /></div> : top.length === 0 ? <EmptyNote text="Nobody has applied yet." /> : (
               <ul className="divide-y divide-slate-100">
                 {top.map(a => (
@@ -237,7 +237,7 @@ export default function JobDetailPage() {
                     <Avatar name={names[a.seekerId]?.name} src={names[a.seekerId]?.img} size={32} />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-semibold text-slate-900 truncate">{names[a.seekerId]?.name ?? `Candidate ${a.seekerId.slice(0, 6)}`}</p>
-                      <div className="flex items-center gap-2 mt-0.5"><StagePill status={a.status} /><span className="text-[10.5px] text-slate-400">{relTime(a.createdAt)}</span></div>
+                      <div className="flex items-center gap-2 mt-0.5"><StagePill status={a.status} /><span className="text-xs text-slate-500">{relTime(a.createdAt)}</span></div>
                     </div>
                     <ScoreRing value={a.aiScore} />
                   </li>
@@ -262,8 +262,8 @@ export default function JobDetailPage() {
                   { k: 'Last updated', v: job ? relTime(job.updatedAt) : '–', i: <Clock className="w-3.5 h-3.5" /> },
                 ].map(r => (
                   <div key={r.k} className="flex items-start gap-2.5">
-                    <span className="w-7 h-7 rounded-md bg-slate-50 text-slate-400 flex items-center justify-center shrink-0">{r.i}</span>
-                    <div className="min-w-0"><dt className="text-slate-400">{r.k}</dt><dd className="font-semibold text-slate-800 mt-0.5">{r.v}</dd></div>
+                    <span className="w-7 h-7 rounded-md bg-slate-50 text-slate-500 flex items-center justify-center shrink-0">{r.i}</span>
+                    <div className="min-w-0"><dt className="text-slate-500">{r.k}</dt><dd className="font-semibold text-slate-800 mt-0.5">{r.v}</dd></div>
                   </div>
                 ))}
               </dl>
@@ -271,7 +271,7 @@ export default function JobDetailPage() {
           </Panel>
 
           <Panel title="Danger zone" icon={<Trash2 className="w-3.5 h-3.5" />}>
-            <p className="text-xs text-slate-500 leading-relaxed mb-3">Deleting removes this job and every application attached to it.</p>
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">Deleting removes this job and every application attached to it.</p>
             <button onClick={() => setConfirmDel(true)} className={cx(btnSecondary, 'text-rose-600 hover:!text-rose-700 hover:!bg-rose-50 border-rose-200')}><Trash2 className="w-3.5 h-3.5" /> Delete job</button>
           </Panel>
         </div>

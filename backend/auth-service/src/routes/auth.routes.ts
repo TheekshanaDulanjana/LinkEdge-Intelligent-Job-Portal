@@ -9,6 +9,7 @@ import { authenticate } from '../middleware/authenticate';
 import { validate } from '../middleware/validate';
 import * as V from '../validation/fields';
 import { AppError } from '../../../shared/middleware/errorHandler';
+import { loginLimiter } from '../../../shared/security/rateLimiter';
 
 import { saveImage, deleteImage, MAX_IMAGE_BYTES } from '../services/storage.service';
 
@@ -137,7 +138,7 @@ router.post('/resend-verification', validate(emailOnlySchema), async (req, res, 
   } catch (e) { next(e); }
 });
 
-router.post('/login', validate(loginSchema), async (req, res, next) => {
+router.post('/login', loginLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const result = await authService.login(email, password);
@@ -177,6 +178,13 @@ router.get('/me', authenticate, async (req, res, next) => {
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
     const profile = user.role === 'SEEKER' ? user.seeker : user.company;
     res.json({ success: true, data: { id: user.id, email: user.email, role: user.role, profile } });
+  } catch (e) { next(e); }
+});
+
+router.post('/refresh-token', authenticate, async (req: any, res, next) => {
+  try {
+    const data = await authService.refreshSession(req.user.userId);
+    res.json({ success: true, data });
   } catch (e) { next(e); }
 });
 
