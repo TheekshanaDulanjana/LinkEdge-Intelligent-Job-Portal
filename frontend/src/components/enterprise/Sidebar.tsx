@@ -79,7 +79,7 @@ export default function Sidebar({
       <div className={cx('pt-4', compact ? 'px-3' : 'px-4')}>
         <Link href="/company/post-job"
           title="Post a job"
-          className={cx('flex items-center justify-center gap-2 h-9 rounded-lg bg-[#0025B8] text-white text-xs font-semibold shadow-sm hover:bg-[#001f9c] transition-colors',
+          className={cx('flex items-center justify-center gap-2 h-9 rounded-lg bg-[#0063CE] text-white text-xs font-semibold shadow-sm hover:bg-[#0052AB] transition-colors',
             compact && 'px-0')}>
           <Plus className="w-4 h-4" />{!compact && 'Post a job'}
         </Link>
@@ -88,7 +88,7 @@ export default function Sidebar({
       <nav className={cx('flex-1 overflow-y-auto py-4 space-y-5', compact ? 'px-3' : 'px-3')}>
         {GROUPS.map(g => (
           <div key={g.label}>
-            {!compact && <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{g.label}</p>}
+            {!compact && <p className="px-3 mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">{g.label}</p>}
             <ul className="space-y-0.5">
               {g.items.map(({ label, href, icon: Icon }) => {
                 const active = pathname === href || pathname.startsWith(href + '/') || (href === '/company/jobs' && pathname.startsWith('/company/post-job'));
@@ -97,9 +97,9 @@ export default function Sidebar({
                     <Link href={href} title={compact ? label : undefined}
                       className={cx('group relative flex items-center gap-3 rounded-lg text-[13px] font-medium transition-colors',
                         compact ? 'justify-center h-10' : 'px-3 h-9',
-                        active ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900')}>
-                      {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-[#0025B8]" />}
-                      <Icon className={cx('w-[17px] h-[17px] shrink-0', active ? 'text-[#0025B8]' : 'text-slate-400 group-hover:text-slate-600')} strokeWidth={2} />
+                        active ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900')}>
+                      {active && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-[#0063CE]" />}
+                      <Icon className={cx('w-[17px] h-[17px] shrink-0', active ? 'text-[#0063CE]' : 'text-slate-500 group-hover:text-slate-600')} strokeWidth={2} />
                       {!compact && <span className="truncate">{label}</span>}
                     </Link>
                   </li>
@@ -115,25 +115,25 @@ export default function Sidebar({
           {logoUrl
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={logoUrl} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
-            : <span className="w-8 h-8 rounded-md bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] text-white text-xs font-semibold flex items-center justify-center shrink-0">{companyName?.[0]?.toUpperCase() ?? 'C'}</span>}
+            : <span className="w-8 h-8 rounded-md bg-gradient-to-br from-[#0063CE] to-[#0084DA] text-white text-xs font-semibold flex items-center justify-center shrink-0">{companyName?.[0]?.toUpperCase() ?? 'C'}</span>}
           {!compact && (
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-slate-800 truncate">{companyName}</p>
-              <p className="text-[10.5px] text-slate-400">Employer account</p>
+              <p className="text-xs text-slate-500">Employer account</p>
             </div>
           )}
           {!compact && (
-            <button onClick={handleLogout} title="Sign out" className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+            <button onClick={handleLogout} title="Sign out" className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
               <LogOut className="w-4 h-4" />
             </button>
           )}
         </div>
         {compact && (
-          <button onClick={handleLogout} title="Sign out" className="w-full h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+          <button onClick={handleLogout} title="Sign out" className="w-full h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
             <LogOut className="w-4 h-4" />
           </button>
         )}
-        <button onClick={toggle} className="hidden lg:flex w-full h-8 items-center justify-center gap-2 rounded-lg text-[11px] font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer">
+        <button onClick={toggle} className="hidden lg:flex w-full h-8 items-center justify-center gap-2 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-600 transition-colors cursor-pointer">
           {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <><PanelLeftClose className="w-4 h-4" /> Collapse</>}
         </button>
       </div>
@@ -156,7 +156,7 @@ export default function Sidebar({
           <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 h-full w-[268px] shadow-2xl">
             <button onClick={() => setMobileOpen(false)} aria-label="Close menu"
-              className="absolute top-4 right-3 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-md z-10 cursor-pointer">
+              className="absolute top-4 right-3 w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-700 rounded-md z-10 cursor-pointer">
               <X className="w-4 h-4" />
             </button>
             {content(false)}

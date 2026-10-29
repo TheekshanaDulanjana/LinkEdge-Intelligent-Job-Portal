@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/enterprise/Sidebar';
 import TopHeader from '@/components/enterprise/TopHeader';
 import api from '@/lib/api';
+import AuthGuard from '@/components/AuthGuard';
 
 export default function CompanyDashboardLayout({ children }: { children: React.ReactNode }) {
   const [company, setCompany] = useState<{ companyName: string; logoUrl?: string } | null>(null);
@@ -17,7 +18,8 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <AuthGuard requiredRole="COMPANY">
+    <div className="flex min-h-screen bg-[#F5F8FC]">
       <Sidebar companyName={company?.companyName ?? 'Company'} logoUrl={company?.logoUrl} />
       <div className="flex-1 flex flex-col min-w-0">
         <TopHeader userName={company?.companyName ?? 'Loading…'} userAvatar={company?.logoUrl} />
@@ -26,5 +28,6 @@ export default function CompanyDashboardLayout({ children }: { children: React.R
         </main>
       </div>
     </div>
+    </AuthGuard>
   );
 }

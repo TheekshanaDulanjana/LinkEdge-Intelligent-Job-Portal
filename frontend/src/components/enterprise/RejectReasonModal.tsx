@@ -51,7 +51,7 @@ export default function RejectReasonModal({
             {r}
           </label>
         ))}
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg p-3 leading-relaxed mt-3">
+        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 leading-relaxed mt-3">
           A personalised explanation based on this candidate’s CV is generated and emailed to them.
         </p>
       </form>

@@ -198,7 +198,7 @@ export default function CandidatesPage() {
   const Link_ = ({ href, icon, label }: { href?: string | null; icon: React.ReactNode; label: string }) =>
     href ? (
       <a href={href} target="_blank" rel="noreferrer"
-        className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#0F9DE4] hover:text-[#0025B8] transition-colors">
+        className="inline-flex items-center gap-2 h-8 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:border-[#0084DA] hover:text-[#0063CE] transition-colors">
         {icon}{label}<ExternalLink className="w-3 h-3 text-slate-300" />
       </a>
     ) : (
@@ -237,7 +237,7 @@ export default function CandidatesPage() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Search candidates" className={cx(inputCls, 'pl-9 sm:w-64')} />
             </div>
             <select value={sort} onChange={e => setSort(e.target.value as 'recent' | 'score')} className={cx(selectCls, 'sm:w-40')}>
@@ -267,16 +267,16 @@ export default function CandidatesPage() {
                 <tbody className="divide-y divide-slate-100">
                   {view_rows.map(c => (
                     <tr key={c.applicationId} onClick={() => openCandidate(c)}
-                      className={cx('cursor-pointer hover:bg-slate-50/80 transition-colors', selected?.applicationId === c.applicationId && 'bg-sky-50/50')}>
+                      className={cx('cursor-pointer hover:bg-slate-50/80 transition-colors', selected?.applicationId === c.applicationId && 'bg-brand-50/60')}>
                       <td className={tdCls}>
                         <div className="flex items-center gap-2.5">
                           <Avatar name={names[c.seekerId]?.name} src={names[c.seekerId]?.img} size={32} />
                           <div className="min-w-0">
                             <p className="text-[13px] font-semibold text-slate-900 truncate">{nameOf(c)}
-                              {c.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">System rejected</span>}
-                              {c.companyOverride && !c.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Override</span>}
+                              {c.autoRejected && <span className="ml-2 align-middle text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">System rejected</span>}
+                              {c.companyOverride && !c.autoRejected && <span className="ml-2 align-middle text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Override</span>}
                             </p>
-                            {names[c.seekerId]?.location && <p className="text-[11px] text-slate-400 truncate">{names[c.seekerId]?.location}</p>}
+                            {names[c.seekerId]?.location && <p className="text-xs text-slate-500 truncate">{names[c.seekerId]?.location}</p>}
                           </div>
                         </div>
                       </td>
@@ -284,8 +284,8 @@ export default function CandidatesPage() {
                       <td className={tdCls}><div className="flex justify-center"><ScoreRing value={c.aiScore} /></div></td>
                       <td className={tdCls}><div className="flex justify-center"><ScoreRing value={c.atsScore} /></div></td>
                       <td className={tdCls}><StagePill status={c.status} /></td>
-                      <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>{relTime(c.appliedDate)}</td>
-                      <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>
+                      <td className={cx(tdCls, 'text-slate-600 whitespace-nowrap')}>{relTime(c.appliedDate)}</td>
+                      <td className={cx(tdCls, 'text-slate-600 whitespace-nowrap')}>
                         {c.interviewDate ? new Date(c.interviewDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : <span className="text-slate-300">–</span>}
                       </td>
                     </tr>
@@ -304,10 +304,10 @@ export default function CandidatesPage() {
                         <span className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                           <span className="w-2 h-2 rounded-full" style={{ background: STAGE_META[col].color }} />{STAGE_META[col].label}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-400 tabular-nums">{items.length}</span>
+                        <span className="text-xs font-semibold text-slate-500 tabular-nums">{items.length}</span>
                       </div>
                       <div className="p-2 space-y-2 overflow-y-auto">
-                        {items.length === 0 && <p className="text-[11px] text-slate-300 text-center py-6">Empty</p>}
+                        {items.length === 0 && <p className="text-xs text-slate-300 text-center py-6">Empty</p>}
                         {items.map(c => (
                           <div key={c.applicationId} className="bg-white rounded-lg border border-slate-200 p-3 hover:border-slate-300 hover:shadow-sm transition-all">
                             <button onClick={() => openCandidate(c)} className="w-full text-left cursor-pointer">
@@ -315,13 +315,13 @@ export default function CandidatesPage() {
                                 <Avatar name={names[c.seekerId]?.name} src={names[c.seekerId]?.img} size={26} />
                                 <p className="text-xs font-semibold text-slate-900 truncate">{nameOf(c)}</p>
                               </div>
-                              <p className="text-[11px] text-slate-500 mt-1.5 truncate">{c.jobTitle}</p>
+                              <p className="text-xs text-slate-600 mt-1.5 truncate">{c.jobTitle}</p>
                             </button>
                             <div className="flex items-center justify-between mt-2.5">
                               <div className="flex items-center gap-1.5"><ScoreRing value={c.aiScore} size={30} /><ScoreRing value={c.atsScore} size={30} /></div>
                               {MOVABLE.includes(c.status) && (
                                 <select value={c.status} onChange={e => moveStage(c, e.target.value)} onClick={e => e.stopPropagation()}
-                                  className="h-7 text-[11px] rounded-md border border-slate-200 bg-white px-1.5 text-slate-600 cursor-pointer focus:outline-none">
+                                  className="h-7 text-xs rounded-md border border-slate-200 bg-white px-1.5 text-slate-600 cursor-pointer focus:outline-none">
                                   {MOVABLE.map(s => <option key={s} value={s}>{STAGE_META[s].label}</option>)}
                                 </select>
                               )}
@@ -333,7 +333,7 @@ export default function CandidatesPage() {
                   );
                 })}
               </div>
-              {stage === 'ALL' && total > rows.length && <p className="text-[11px] text-slate-400 mt-3">Showing this page only. Use the pager below for more.</p>}
+              {stage === 'ALL' && total > rows.length && <p className="text-xs text-slate-500 mt-3">Showing this page only. Use the pager below for more.</p>}
             </div>
           )}
         {!loading && !error && <Pagination page={page} totalPages={totalPages} total={total} pageSize={PAGE_SIZE} onPage={setPage} />}
@@ -351,8 +351,8 @@ export default function CandidatesPage() {
                     <h3 className="text-base font-semibold text-slate-900">{p?.fullName ?? nameOf(selected)}</h3>
                     <StagePill status={selected.status} />
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Applied for <b className="text-slate-700">{selected.jobTitle}</b> · {relTime(selected.appliedDate)}</p>
-                  <div className="flex items-center gap-3 mt-1.5 text-[11px] text-slate-400 flex-wrap">
+                  <p className="text-xs text-slate-600 mt-0.5">Applied for <b className="text-slate-700">{selected.jobTitle}</b> · {relTime(selected.appliedDate)}</p>
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500 flex-wrap">
                     {p?.location && <span className="inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{p.location}</span>}
                     {p?.phone && <span className="inline-flex items-center gap-1"><Mail className="w-3 h-3" />{p.phone}</span>}
                   </div>
@@ -360,10 +360,10 @@ export default function CandidatesPage() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
-                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.aiScore} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">AI match</p><p className="text-xs font-semibold text-slate-800">{selected.aiScore != null ? `${selected.aiScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
-                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.atsScore} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">ATS score</p><p className="text-xs font-semibold text-slate-800">{selected.atsScore != null ? `${selected.atsScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
-                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={ana?.analysis.cv_health.score} size={40} /><div><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">CV quality</p><p className="text-xs font-semibold text-slate-800">{ana ? `${ana.analysis.cv_health.score}%` : analysisLoading ? 'Reading…' : '–'}</p></div></div>
-                <div className="bg-white rounded-lg border border-slate-200 p-3"><p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">Experience</p><p className="text-sm font-semibold text-slate-800 mt-1">{ana ? (ana.analysis.experience_years > 0 ? `${ana.analysis.experience_years} yrs` : 'Entry level') : r?.experienceYears ? `${r.experienceYears}+ yrs` : '–'}</p></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.aiScore} size={40} /><div><p className="text-xs uppercase tracking-wide font-semibold text-slate-500">AI match</p><p className="text-xs font-semibold text-slate-800">{selected.aiScore != null ? `${selected.aiScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={selected.atsScore} size={40} /><div><p className="text-xs uppercase tracking-wide font-semibold text-slate-500">ATS score</p><p className="text-xs font-semibold text-slate-800">{selected.atsScore != null ? `${selected.atsScore.toFixed(0)}%` : analysisLoading ? 'Scoring…' : 'No CV'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-2.5"><ScoreRing value={ana?.analysis.cv_health.score} size={40} /><div><p className="text-xs uppercase tracking-wide font-semibold text-slate-500">CV quality</p><p className="text-xs font-semibold text-slate-800">{ana ? `${ana.analysis.cv_health.score}%` : analysisLoading ? 'Reading…' : '–'}</p></div></div>
+                <div className="bg-white rounded-lg border border-slate-200 p-3"><p className="text-xs uppercase tracking-wide font-semibold text-slate-500">Experience</p><p className="text-sm font-semibold text-slate-800 mt-1">{ana ? (ana.analysis.experience_years > 0 ? `${ana.analysis.experience_years} yrs` : 'Entry level') : r?.experienceYears ? `${r.experienceYears}+ yrs` : '–'}</p></div>
               </div>
 
               {selected.status === 'REJECTED' && selected.autoRejected && (
@@ -397,7 +397,7 @@ export default function CandidatesPage() {
               {TABS.map(t => (
                 <button key={t} onClick={() => setTab(t)}
                   className={cx('px-3 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors cursor-pointer whitespace-nowrap',
-                    tab === t ? 'border-[#0025B8] text-[#0025B8]' : 'border-transparent text-slate-400 hover:text-slate-700')}>{t}</button>
+                    tab === t ? 'border-[#0063CE] text-[#0063CE]' : 'border-transparent text-slate-500 hover:text-slate-700')}>{t}</button>
               ))}
             </div>
 
@@ -411,30 +411,30 @@ export default function CandidatesPage() {
                 </>
               ) : profileLoading ? <PanelSkeleton rows={6} /> : (
                 <>
-                  {analysisError && <p className="mb-4 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">Detailed CV analysis is unavailable (is the ATS service on port 8003 running?). Showing the saved profile instead.</p>}
-                  {analysis && !analysis.hasResume && <p className="mb-4 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">This candidate has no parsed CV yet, so there is no AI or ATS score.</p>}
+                  {analysisError && <p className="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">Detailed CV analysis is unavailable (is the ATS service on port 8003 running?). Showing the saved profile instead.</p>}
+                  {analysis && !analysis.hasResume && <p className="mb-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">This candidate has no parsed CV yet, so there is no AI or ATS score.</p>}
                   {tab === 'Overview' && (
                     <div className="space-y-5">
                       <div>
-                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Professional summary</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Professional summary</p>
                         <p className="text-[13px] text-slate-600 leading-relaxed">{p?.professionalSummary || <span className="text-slate-300">No summary added.</span>}</p>
                       </div>
                       <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-400">Work status</p><p className="font-semibold text-slate-800 mt-0.5">{p?.workStatus?.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || '–'}</p></div>
-                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-400">Interest area</p><p className="font-semibold text-slate-800 mt-0.5">{p?.interestArea || '–'}</p></div>
-                        {selected.interviewDate && <div className="rounded-lg border border-sky-200 bg-sky-50/50 p-3 col-span-2"><p className="text-sky-700">Interview scheduled</p><p className="font-semibold text-slate-800 mt-0.5">{new Date(selected.interviewDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>}
+                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-500">Work status</p><p className="font-semibold text-slate-800 mt-0.5">{p?.workStatus?.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()) || '–'}</p></div>
+                        <div className="rounded-lg border border-slate-200 p-3"><p className="text-slate-500">Interest area</p><p className="font-semibold text-slate-800 mt-0.5">{p?.interestArea || '–'}</p></div>
+                        {selected.interviewDate && <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3 col-span-2"><p className="text-brand-700">Interview scheduled</p><p className="font-semibold text-slate-800 mt-0.5">{new Date(selected.interviewDate).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</p></div>}
                       </div>
                       <div>
-                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Links</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Links</p>
                         <div className="flex flex-wrap gap-2">
-                          <Link_ href={p?.websiteUrl} icon={<Globe className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="Website" />
-                          <Link_ href={p?.githubUrl} icon={<Code2 className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="GitHub" />
-                          <Link_ href={p?.behanceUrl} icon={<Palette className="w-3.5 h-3.5 text-[#0F9DE4]" />} label="Behance" />
+                          <Link_ href={p?.websiteUrl} icon={<Globe className="w-3.5 h-3.5 text-[#0084DA]" />} label="Website" />
+                          <Link_ href={p?.githubUrl} icon={<Code2 className="w-3.5 h-3.5 text-[#0084DA]" />} label="GitHub" />
+                          <Link_ href={p?.behanceUrl} icon={<Palette className="w-3.5 h-3.5 text-[#0084DA]" />} label="Behance" />
                         </div>
                       </div>
                       <div className="rounded-lg border border-slate-200 p-3.5 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3"><span className="w-9 h-9 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center"><FileText className="w-4 h-4" /></span>
-                          <div><p className="text-xs font-semibold text-slate-800">{r?.originalName ?? 'No resume uploaded'}</p>{r && <p className="text-[11px] text-slate-400">{(r.fileSize / 1024).toFixed(0)} KB · {r.isParsed ? 'Parsed' : 'Not parsed yet'}</p>}</div></div>
+                        <div className="flex items-center gap-3"><span className="w-9 h-9 rounded-lg bg-slate-50 text-slate-500 flex items-center justify-center"><FileText className="w-4 h-4" /></span>
+                          <div><p className="text-xs font-semibold text-slate-800">{r?.originalName ?? 'No resume uploaded'}</p>{r && <p className="text-xs text-slate-500">{(r.fileSize / 1024).toFixed(0)} KB · {r.isParsed ? 'Parsed' : 'Not parsed yet'}</p>}</div></div>
                         <button onClick={openCv} disabled={!r} className={btnSecondary}>Preview</button>
                       </div>
                     </div>
@@ -444,10 +444,10 @@ export default function CandidatesPage() {
                     : <ol className="relative border-l border-slate-200 ml-2 space-y-5">
                         {r.experience.map((e, i) => (
                           <li key={i} className="pl-5 relative">
-                            <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#0F9DE4] ring-4 ring-white" />
+                            <span className="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#0084DA] ring-4 ring-white" />
                             <p className="text-[13px] font-semibold text-slate-900">{e.title ?? 'Role'}</p>
-                            <p className="text-xs text-slate-500">{[e.company, e.duration].filter(Boolean).join(' · ')}</p>
-                            {e.description && <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{e.description}</p>}
+                            <p className="text-xs text-slate-600">{[e.company, e.duration].filter(Boolean).join(' · ')}</p>
+                            {e.description && <p className="text-xs text-slate-600 leading-relaxed mt-1.5">{e.description}</p>}
                           </li>
                         ))}
                       </ol>)}
@@ -455,21 +455,21 @@ export default function CandidatesPage() {
                     ? <EmptyNote text="No education found on the parsed resume." icon={<GraduationCap className="w-6 h-6" />} />
                     : <ul className="space-y-3">{r.education.map((e, i) => (
                         <li key={i} className="flex gap-3 rounded-lg border border-slate-200 p-3.5">
-                          <span className="w-9 h-9 rounded-lg bg-slate-50 text-[#0025B8] flex items-center justify-center shrink-0"><GraduationCap className="w-4 h-4" /></span>
-                          <div><p className="text-[13px] font-semibold text-slate-900">{e.degree ?? 'Degree'}</p><p className="text-xs text-slate-500">{[e.institution, e.year].filter(Boolean).join(' · ')}</p></div>
+                          <span className="w-9 h-9 rounded-lg bg-slate-50 text-[#0063CE] flex items-center justify-center shrink-0"><GraduationCap className="w-4 h-4" /></span>
+                          <div><p className="text-[13px] font-semibold text-slate-900">{e.degree ?? 'Degree'}</p><p className="text-xs text-slate-600">{[e.institution, e.year].filter(Boolean).join(' · ')}</p></div>
                         </li>))}</ul>)}
                   {tab === 'Skills' && (
                     <div className="space-y-5">
                       <div>
-                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" /> Skills</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5"><Wrench className="w-3.5 h-3.5" /> Skills</p>
                         {r?.skills?.length ? <div className="flex flex-wrap gap-1.5">{r.skills.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-slate-100 text-slate-700">{s}</span>)}</div> : <p className="text-xs text-slate-300">No skills extracted.</p>}
                       </div>
                       {!!r?.technologies?.length && <div>
-                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Technologies</p>
-                        <div className="flex flex-wrap gap-1.5">{r.technologies.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-blue-50 text-blue-700">{s}</span>)}</div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Technologies</p>
+                        <div className="flex flex-wrap gap-1.5">{r.technologies.map(s => <span key={s} className="text-xs font-medium px-2.5 py-1 rounded-md bg-brand-50 text-brand-700">{s}</span>)}</div>
                       </div>}
                       <div>
-                        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1.5"><Award className="w-3.5 h-3.5" /> Certifications</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5"><Award className="w-3.5 h-3.5" /> Certifications</p>
                         {r?.certifications?.length ? <div className="flex flex-wrap gap-1.5">{r.certifications.map(c => <span key={c} className="text-xs font-medium px-2.5 py-1 rounded-md bg-amber-50 text-amber-800">{c}</span>)}</div> : <p className="text-xs text-slate-300">None listed.</p>}
                       </div>
                     </div>
@@ -494,9 +494,9 @@ export default function CandidatesPage() {
 
       <Modal open={cvOpen} onClose={closeCv} title={`${p?.fullName ?? 'Candidate'} · CV`} width="max-w-4xl">
         <div className="h-[70vh] bg-slate-100 rounded-lg overflow-hidden">
-          {cvLoading ? <div className="h-full flex items-center justify-center text-xs text-slate-400">Loading CV…</div>
+          {cvLoading ? <div className="h-full flex items-center justify-center text-xs text-slate-500">Loading CV…</div>
             : cvUrl ? <iframe src={cvUrl} title="CV preview" className="w-full h-full bg-white" />
-            : <div className="h-full flex items-center justify-center text-xs text-slate-400">Could not load the CV.</div>}
+            : <div className="h-full flex items-center justify-center text-xs text-slate-500">Could not load the CV.</div>}
         </div>
       </Modal>
       <Toast toast={toast} />

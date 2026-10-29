@@ -11,28 +11,32 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const router = useRouter();
-  const { isAuthenticated, user, loadFromStorage } = useAuthStore();
+  const { isAuthenticated, isHydrated, user, loadFromStorage } = useAuthStore();
 
   useEffect(() => {
-    // Restore session from storage on first render
+    // Restore the saved session once, when the page first opens
     loadFromStorage();
   }, [loadFromStorage]);
 
   useEffect(() => {
+    // Wait until the saved session has been read. Without this the guard sees
+    // "not signed in" on the first render and sends a signed-in user to /login.
+    if (!isHydrated) return;
+
     if (!isAuthenticated) {
       router.replace('/login');
       return;
     }
 
     if (requiredRole && user?.role !== requiredRole) {
-      // Wrong role — send to their correct dashboard
+      // Wrong role: send to their correct dashboard
       router.replace(
         user?.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
       );
     }
-  }, [isAuthenticated, user, requiredRole, router]);
+  }, [isHydrated, isAuthenticated, user, requiredRole, router]);
 
-  if (!isAuthenticated) {
+  if (!isHydrated || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />

@@ -40,16 +40,22 @@ function createApiInstance(baseURL: string): AxiosInstance {
   instance.interceptors.response.use(
     (response) => response,
     (error) => {
-      // Clear token and redirect on unauthorized error (401)
-      if (error.response?.status === 401) {
+      // 401 on a request that carried a token means the session has ended.
+      // Clear it, and send the user to the login page only when they are on a
+      // page that needs a login (public pages such as the job board stay open).
+      const hadToken = !!error.config?.headers?.Authorization;
+      if (error.response?.status === 401 && hadToken) {
         secureStorage.clear();
 
-        if (
-          typeof window !== 'undefined' &&
-          !window.location.pathname.startsWith('/login') &&
-          !window.location.pathname.startsWith('/register')
-        ) {
-          window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname;
+          const needsLogin =
+            path.startsWith('/seeker') ||
+            path.startsWith('/settings') ||
+            /^\/company\/(dashboard|jobs|candidates|analytics|calendar|post-job|profile)(\/|$)/.test(path);
+          if (needsLogin) {
+            window.location.href = '/login?reason=expired';
+          }
         }
       }
 
