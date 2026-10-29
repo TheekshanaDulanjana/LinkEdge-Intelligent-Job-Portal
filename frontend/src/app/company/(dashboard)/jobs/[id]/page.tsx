@@ -76,7 +76,9 @@ interface Job {
   salaryMin?: number | null;
   salaryMax?: number | null;
   deadline: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT';
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT' | 'HIDDEN';
+  moderationReason?: string | null;
+  moderatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -165,13 +167,23 @@ export default function JobDetailPage() {
         actions={job && <>
           <JobStatusPill status={job.status} />
           <Link href={`/jobs/${job.id}`} target="_blank" className={btnSecondary}><ExternalLink className="w-3.5 h-3.5" /> Public page</Link>
+          {job.status === 'HIDDEN' ? null : <>
           {job.status === 'ACTIVE' && <button disabled={busy} onClick={() => setStatus('INACTIVE')} className={btnSecondary}><PauseCircle className="w-3.5 h-3.5" /> Pause</button>}
           {job.status === 'INACTIVE' && <button disabled={busy} onClick={() => setStatus('ACTIVE')} className={btnSecondary}><PlayCircle className="w-3.5 h-3.5" /> Resume</button>}
           {job.status !== 'CLOSED' && job.status !== 'DRAFT' && <button disabled={busy} onClick={() => setConfirmClose(true)} className={btnSecondary}><Lock className="w-3.5 h-3.5" /> Close</button>}
           {job.status === 'CLOSED' && <button disabled={busy} onClick={() => setStatus('ACTIVE')} className={btnSecondary}><PlayCircle className="w-3.5 h-3.5" /> Reopen</button>}
+          </>}
           <Link href={`/company/jobs/${job.id}/applicants`} className={btnPrimary}><Users className="w-3.5 h-3.5" /> Review applicants</Link>
         </>}
       />
+
+      {job?.status === 'HIDDEN' && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          <p className="font-semibold">This job was hidden by an administrator and is not visible to job seekers.</p>
+          {job.moderationReason && <p className="mt-1">Reason: {job.moderationReason}</p>}
+          <p className="mt-1 text-xs text-rose-700">You can’t change its status. If you think this is a mistake, contact support.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile label="Applicants" icon={<Users className="w-3.5 h-3.5" />} loading={loading} value={fmtNum(applicants.length)} hint="Total received" />

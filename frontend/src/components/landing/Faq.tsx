@@ -3,48 +3,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, CheckCircle2, HeartHandshake, Sparkles } from 'lucide-react';
+import type { FaqContent } from '@/lib/siteContent';
 
-interface FAQItem {
-  question: string;
-  answer: string;
-}
-
-const FAQ_QUESTIONS: FAQItem[] = [
-  {
-    question: "How does SkillSync's AI smart matching work?",
-    answer: "SkillSync uses advanced AI and Natural Language Processing (NLP) to read and analyze your CV, extracting your core skills, experience, and projects to match you instantly with the most relevant job openings."
-  },
-  {
-    question: "Is SkillSync free for job seekers?",
-    answer: "Yes! Job seekers can create a profile, upload resumes, run skill gap analyses, and practice with the AI interview simulator completely free of charge."
-  },
-  {
-    question: "How do I prepare for an interview using the platform?",
-    answer: "Our AI Interview Simulator allows you to practice answering role-specific questions in real-time. It evaluates your speech, tone, and answers, providing instant feedback and scores to boost your confidence."
-  },
-  {
-    question: "How does the platform help recruiters save time?",
-    answer: "For recruiters and companies, SkillSync automatically ranks incoming applicants from highest to lowest suitability based on the specific job description, filtering out unqualified candidates instantly."
-  },
-  {
-    question: "Can I register as both a job seeker and a company?",
-    answer: "Accounts are designated by role (Seeker or Company) during registration to provide tailored dashboards. However, you can register separate accounts using different email addresses if you need to use both features."
-  },
-  {
-    question: "What is a Skill Gap Analysis?",
-    answer: "Our skill gap analysis compares your current profile against market demands for your dream role, highlighting missing skills and recommending specific courses or paths to bridge that gap."
-  },
-  {
-    question: "How secure is my personal and professional data?",
-    answer: "We prioritize your privacy. All data, resumes, and company communications are securely encrypted and stored following industry-standard security protocols."
-  },
-  {
-    question: "How can companies post job vacancies?",
-    answer: "Companies can sign up by selecting the 'Company' role, complete their company profile, and access a dedicated dashboard to post vacancies, manage applicants, and review AI rankings."
-  }
-];
-
-export default function FAQSection() {
+export default function FAQSection({ content }: { content: FaqContent }) {
+  const FAQ_QUESTIONS = content.items;
   const [activeIndex, setActiveIndex] = useState<number | null>(0);
 
   const toggleAccordion = (index: number) => {
@@ -68,13 +30,13 @@ export default function FAQSection() {
           className="text-center space-y-3 max-w-3xl mx-auto"
         >
           <span className="inline-block text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-sm">
-            Got Questions?
+            {content.tag}
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
-            Frequently Asked Questions
+            {content.title}
           </h2>
           <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-            Everything you need to know about how SkillSync transforms recruitment and career growth.
+            {content.description}
           </p>
         </motion.div>
 

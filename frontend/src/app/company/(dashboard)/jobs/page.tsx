@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { value: 'INACTIVE', label: 'Paused' },
   { value: 'CLOSED', label: 'Closed' },
   { value: 'DRAFT', label: 'Draft' },
+  { value: 'HIDDEN', label: 'Hidden' },
 ];
 const TYPE_OPTIONS = ['ALL', 'FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'];
 const PAGE_SIZE = 10;

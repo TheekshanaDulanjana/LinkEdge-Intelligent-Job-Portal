@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User & Auth ────────────────────────────────────────────────
+// NOTE: application-service does not own User/JobSeeker/Company data —
+// declared here only so Prisma can resolve relations. Kept in sync
+// with auth-service field-for-field.
+
+model User {
+  id                    String           @id @default(uuid())
+  email                 String           @unique
+  passwordHash          String?
+  role                  Role             @default(SEEKER)
+  isEmailVerified       Boolean          @default(false)
+  googleId              String?          @unique
+  authProvider          AuthProvider     @default(LOCAL)
+  verificationCode      String?
+  verificationExpiresAt DateTime?
+  resetToken            String?
+  resetTokenExpiresAt   DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  seeker                JobSeeker?
+  company               Company?
+  sentNotifications     Notification[]   @relation("NotificationSender")
+  receivedNotifications Notification[]   @relation("NotificationReceiver")
+  resume                CandidateResume?
+}
+
+model JobSeeker {
+  id                  String     @id @default(uuid())
+  userId              String     @unique
+  user                User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName            String
+  phone               String?
+  location            String?
+  profileImageUrl     String?
+  interestArea        String?
+  workStatus          WorkStatus @default(UNEMPLOYED)
+  professionalSummary String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model Company {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName   String
+  industry      String?
+  website       String?
+  location      String?
+  phone         String?
+  logoUrl       String?
+  coverImageUrl String?
+  aboutUs       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Jobs ───────────────────────────────────────────────────────
+
+model JobPosting {
+  id               String            @id @default(uuid())
+  companyId        String
+  title            String
+  department       String?
+  experienceLevel  String?
+  description      String
+  requirements     String
+  requirementsList String[] @default([])
+  responsibilities String[]          @default([])
+  skills           String[]          @default([])
+  locationType     LocationType      @default(REMOTE)
+  location         String
+  jobType          JobType           @default(FULL_TIME)
+  salaryMin        Int?
+  salaryMax        Int?
+  deadline         DateTime
+  status           JobStatus         @default(ACTIVE)
+  autoScreen       Boolean           @default(true)
+  minMatchScore    Int               @default(35)
+  // Admin moderation (set when an admin hides a job; cleared when it is restored)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  statusBeforeHide JobStatus?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  applications     Application[]
+}
+
+enum LocationType {
+  REMOTE
+  ON_SITE
+  HYBRID
+}
+
+// ─── Applications ───────────────────────────────────────────────
+
+model Application {
+  id                String            @id @default(uuid())
+  jobId             String
+  seekerId          String
+  cvUrl             String
+  cvTextSnapshot    String?
+  coverLetter       String?
+  status            ApplicationStatus @default(PENDING)
+  rejectionReason   String?
+  rejectionMessage  String?
+  interviewDate     DateTime?
+  interviewTime     String?
+  interviewVenue    String?
+  practiceExpiresAt DateTime?
+  aiScore           Float?
+  atsScore          Float?
+  atsBreakdown      Json?
+  autoRejected      Boolean           @default(false)
+  companyOverride   Boolean           @default(false)
+  screenedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  job               JobPosting        @relation(fields: [jobId], references: [id])
+
+  @@index([jobId, seekerId])
+  @@index([status])
+}
+
+// ─── Resume & ATS ───────────────────────────────────────────────
+// NOTE: application-service does not own resume data — declared here
+// only so Prisma can resolve relations (candidates.routes, jobApplicants
+// controller read from this table). Kept in sync with auth-service.
+
+model CandidateResume {
+  id              String     @id @default(uuid())
+  candidateId     String     @unique @map("candidate_id")
+  filePath        String     @map("file_path")
+  originalName    String     @map("original_name")
+  fileSize        Int        @map("file_size")
+  mimeType        String     @map("mime_type")
+  uploadedDate    DateTime   @default(now()) @map("uploaded_date")
+  parsedText      String?    @map("parsed_text")
+  skills          String[]   @default([])
+  experienceYears Float?     @map("experience_years")
+  experience      Json?
+  education       Json?
+  certifications  String[]   @default([])
+  technologies    String[]   @default([])
+  jobTitle        String?    @map("job_title")
+  isParsed        Boolean    @default(false) @map("is_parsed")
+  parseError      String?    @map("parse_error")
+  lastUpdated     DateTime   @updatedAt @map("last_updated")
+  atsScores       ATSScore[]
+  user            User       @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_resumes")
+}
+
+model ATSScore {
+  id                 String          @id @default(uuid())
+  resumeId           String          @map("resume_id")
+  jobId              String          @map("job_id")
+  overallScore       Float           @map("overall_score")
+  technicalScore     Float           @map("technical_score")
+  experienceScore    Float           @map("experience_score")
+  educationScore     Float           @map("education_score")
+  certificationScore Float           @map("certification_score")
+  keywordScore       Float           @map("keyword_score")
+  matchedSkills      String[]        @default([]) @map("matched_skills")
+  missingSkills      String[]        @default([]) @map("missing_skills")
+  breakdown          Json
+  calculatedAt       DateTime        @default(now()) @map("calculated_at")
+  resume             CandidateResume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@unique([resumeId, jobId])
+  @@index([jobId])
+  @@index([resumeId])
+  @@map("ats_scores")
+}
+
+// ─── Calendar ───────────────────────────────────────────────────
+
+model CalendarEvent {
+  id            String            @id @default(uuid())
+  companyId     String
+  title         String
+  description   String?
+  eventType     CalendarEventType @default(MEETING)
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  color         String?           @default("indigo")
+  applicationId String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([companyId])
+  @@index([startTime])
+}
+
+enum CalendarEventType {
+  INTERVIEW
+  MEETING
+  DEADLINE
+  REMINDER
+}
+
+// ─── Notifications ──────────────────────────────────────────────
+
+model Notification {
+  id         String           @id @default(uuid())
+  senderId   String?
+  receiverId String
+  type       NotificationType
+  title      String
+  message    String
+  isRead     Boolean          @default(false)
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+  sender     User?            @relation("NotificationSender", fields: [senderId], references: [id])
+  receiver   User             @relation("NotificationReceiver", fields: [receiverId], references: [id])
+}
+
+// ─── Enums ──────────────────────────────────────────────────────
+
+enum Role {
+  SEEKER
+  COMPANY
+  ADMIN
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+enum WorkStatus {
+  EMPLOYED
+  UNEMPLOYED
+}
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  REMOTE
+}
+
+enum JobStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+  DRAFT
+  HIDDEN
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWING
+  SHORTLISTED
+  INTERVIEW
+  REJECTED
+}
+
+enum NotificationType {
+  NEW_APPLICATION
+  APPLICATION_SHORTLISTED
+  INTERVIEW_SCHEDULED
+  APPLICATION_REJECTED
+  STATUS_UPDATE
+  SYSTEM
+}

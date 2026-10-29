@@ -1,0 +1,328 @@
+{
+  "hero": {
+    "badge": "SkillSync - AI POWERED JOB PORTAL",
+    "titleLine1": "Your Career Edge,",
+    "titleLine2": "Powered by Intelligence",
+    "description": "Experience a recruitment portal that does more than just list jobs. SkillSync analyzes your potential, recommends paths for growth, and streamlines hiring with AI-powered insights.",
+    "primaryButton": {
+      "label": "Find New Job",
+      "href": "/jobs"
+    },
+    "secondaryButton": {
+      "label": "Post New Job",
+      "href": "/register?role=company"
+    },
+    "pathsTitle": "Career Paths",
+    "pathsSubtitle": "Explore Roles",
+    "paths": [
+      "Software Engineer",
+      "AI/ML Engineer",
+      "Full Stack Developer",
+      "UI/UX Designer",
+      "DevOps",
+      "Digital Marketer",
+      "Cloud Engineer",
+      "Data Scientist",
+      "QA Analyst",
+      "Product Manager",
+      "Data Engineer",
+      "Cybersecurity Analyst",
+      "Business Analyst"
+    ]
+  },
+  "whySeekers": {
+    "tag": "GOT TALENT?",
+    "title": "Why Job Seekers Love SkillSync",
+    "learnMoreUrl": "/seeker",
+    "registerUrl": "/register?role=seeker",
+    "features": [
+      {
+        "icon": "Search",
+        "title": "Smart Matching",
+        "description": "Stop searching and start discovering. Our AI reads your CV to find the best jobs for your specific skills."
+      },
+      {
+        "icon": "GraduationCap",
+        "title": "Skill Gap Analysis",
+        "description": "We show you exactly what is missing from your profile and suggest the right courses to help you qualify for your dream role."
+      },
+      {
+        "icon": "Mic",
+        "title": "Interview Confidence",
+        "description": "Practice with our AI Interviewer. Get real feedback and scores before you meet the actual company."
+      }
+    ]
+  },
+  "whyRecruiters": {
+    "tag": "NEED TALENT?",
+    "title": "Why Recruiters Love SkillSync",
+    "learnMoreUrl": "/companies",
+    "registerUrl": "/register?role=company",
+    "features": [
+      {
+        "icon": "BarChart3",
+        "title": "Automated Ranking",
+        "description": "Save hours of manual work. Our system automatically ranks every applicant from highest to lowest suitability based on your JD."
+      },
+      {
+        "icon": "ShieldCheck",
+        "title": "Quality Over Quantity",
+        "description": "We don't just send you resumes; we send you candidates who are actually prepared for the role."
+      },
+      {
+        "icon": "ClipboardCheck",
+        "title": "Smart Interview Prep",
+        "description": "Use our platform to ensure your candidates are ready. View their practice scores to make better hiring decisions faster."
+      }
+    ]
+  },
+  "careerPaths": {
+    "tag": "Explore Opportunities",
+    "title": "Choose Your Career Path",
+    "description": "Explore thousands of job openings across 20+ specialized industries and find the perfect match for your expertise.",
+    "paths": [
+      "Software Engineer",
+      "Frontend Developer",
+      "Backend Developer",
+      "Full Stack Developer",
+      "Mobile App Developer",
+      "QA Engineer",
+      "DevOps Engineer",
+      "Cybersecurity Analyst",
+      "UI/UX Designer",
+      "Product Designer",
+      "Graphic Designer",
+      "Motion Graphics Artist",
+      "Data Scientist",
+      "AI/Machine Learning Engineer",
+      "Data Analyst",
+      "Project Manager",
+      "Business Analyst",
+      "Digital Marketer",
+      "Cloud Engineer",
+      "Database Administrator",
+      "Technical Writer"
+    ]
+  },
+  "testimonials": {
+    "tag": "COMMUNITY SUCCESS STORIES",
+    "titleLine1": "Careers found.",
+    "titleLine2": "Teams built.",
+    "description": "Real experiences from professionals who transformed their hiring and job hunting journey with SkillSync.",
+    "items": [
+      {
+        "category": "JOB SEEKER",
+        "name": "Akindu Perera",
+        "designation": "Software Engineer at Virtusa",
+        "feedback": "I got my tech job on SkillSync through AI matching in just a few days! The platform read my CV instantly and matched my exact skills.",
+        "image": ""
+      },
+      {
+        "category": "RECRUITER",
+        "name": "Chamathka Silva",
+        "designation": "Head of HR, TechCorp Solutions",
+        "feedback": "Half of the high-quality hires we made this quarter came from SkillSync. The automated candidate ranking saves our HR team hours of manual screening.",
+        "image": ""
+      },
+      {
+        "category": "JOB SEEKER",
+        "name": "Sanduni Fernando",
+        "designation": "UI/UX Designer",
+        "feedback": "The AI Interview practice gave me the real confidence I needed. Getting instant feedback on my responses changed everything for my career.",
+        "image": ""
+      },
+      {
+        "category": "RECRUITER",
+        "name": "Nuwan Jayasinghe",
+        "designation": "Tech Lead & Hiring Manager",
+        "feedback": "I can't imagine our recruitment process without SkillSync anymore. It bridges the gap between top talent and fast-growing companies seamlessly.",
+        "image": ""
+      }
+    ]
+  },
+  "faq": {
+    "tag": "Got Questions?",
+    "title": "Frequently Asked Questions",
+    "description": "Everything you need to know about how SkillSync transforms recruitment and career growth.",
+    "items": [
+      {
+        "question": "How does SkillSync's AI smart matching work?",
+        "answer": "SkillSync uses advanced AI and Natural Language Processing (NLP) to read and analyze your CV, extracting your core skills, experience, and projects to match you instantly with the most relevant job openings."
+      },
+      {
+        "question": "Is SkillSync free for job seekers?",
+        "answer": "Yes! Job seekers can create a profile, upload resumes, run skill gap analyses, and practice with the AI interview simulator completely free of charge."
+      },
+      {
+        "question": "How do I prepare for an interview using the platform?",
+        "answer": "Our AI Interview Simulator allows you to practice answering role-specific questions in real-time. It evaluates your speech, tone, and answers, providing instant feedback and scores to boost your confidence."
+      },
+      {
+        "question": "How does the platform help recruiters save time?",
+        "answer": "For recruiters and companies, SkillSync automatically ranks incoming applicants from highest to lowest suitability based on the specific job description, filtering out unqualified candidates instantly."
+      },
+      {
+        "question": "Can I register as both a job seeker and a company?",
+        "answer": "Accounts are designated by role (Seeker or Company) during registration to provide tailored dashboards. However, you can register separate accounts using different email addresses if you need to use both features."
+      },
+      {
+        "question": "What is a Skill Gap Analysis?",
+        "answer": "Our skill gap analysis compares your current profile against market demands for your dream role, highlighting missing skills and recommending specific courses or paths to bridge that gap."
+      },
+      {
+        "question": "How secure is my personal and professional data?",
+        "answer": "We prioritize your privacy. All data, resumes, and company communications are securely encrypted and stored following industry-standard security protocols."
+      },
+      {
+        "question": "How can companies post job vacancies?",
+        "answer": "Companies can sign up by selecting the 'Company' role, complete their company profile, and access a dedicated dashboard to post vacancies, manage applicants, and review AI rankings."
+      }
+    ]
+  },
+  "pageSeeker": {
+    "heroTag": "For Ambitious Professionals",
+    "heroTitle": "Supercharge Your Career with AI Insights",
+    "heroDescription": "Discover roles tailored to your exact skills, practice interviews with real-time AI feedback, and close skill gaps faster than ever.",
+    "sections": [
+      {
+        "tag": "01. Intelligent Matching",
+        "title": "Never wonder why you weren't called for an interview",
+        "description": "Our Smart Apply and CV Analyzer scans your resume against thousands of active job requirements, providing exact match percentages and identifying missing skill gaps instantly.",
+        "points": [
+          "Automated skill extraction and categorization",
+          "Instant compatibility scoring per position",
+          "Actionable recommendations to boost interview callbacks"
+        ]
+      },
+      {
+        "tag": "02. Interview Mastery",
+        "title": "Practice under real conditions and eliminate anxiety",
+        "description": "Got shortlisted for an interview? Use our AI Interview Simulator to practice role-specific questions. Get immediate feedback on tone, clarity, and depth before facing real hiring managers.",
+        "points": [
+          "Role-specific mock interview sessions",
+          "Real-time evaluation and scoring metrics",
+          "Confidence-building constructive feedback"
+        ]
+      },
+      {
+        "tag": "03. Continuous Growth",
+        "title": "Bridge your skill gaps with curated learning paths",
+        "description": "When target roles require competencies you haven't mastered yet, SkillSync points you directly to recommended courses from top platforms so you can upskill rapidly.",
+        "points": [
+          "Automated skill gap identification",
+          "Direct links to top-rated online courses",
+          "Track progress as you acquire new competencies"
+        ]
+      }
+    ]
+  },
+  "pageCompanies": {
+    "heroTag": "For Enterprises & Recruiters",
+    "heroTitle": "Scale Your Hiring Pipeline with AI Intelligence",
+    "heroDescription": "Automate applicant screening, rank incoming talent instantly based on job descriptions, and secure top-tier professionals faster.",
+    "sections": [
+      {
+        "tag": "01. Automated Screening",
+        "title": "Cut resume review time by 75% with semantic ranking",
+        "description": "Stop manually sorting through hundreds of unqualified applications. SkillSync automatically evaluates incoming resumes and ranks candidates from highest to lowest suitability for each vacancy.",
+        "points": [
+          "Automated ATS scoring and suitability sorting",
+          "Instant identification of top-tier matching candidates",
+          "Elimination of manual resume bottlenecking"
+        ]
+      },
+      {
+        "tag": "02. Centralized Hub",
+        "title": "Manage postings, applicants, and interviews in one dashboard",
+        "description": "Our intuitive company portal gives your HR team complete control over active vacancies, applicant status updates, rejection notes, and interview schedules.",
+        "points": [
+          "Dedicated job vacancy creation and management",
+          "Seamless applicant status tracking and feedback notes",
+          "Direct interview scheduling and venue coordination"
+        ]
+      },
+      {
+        "tag": "03. Verified Talent",
+        "title": "Make confident hiring decisions backed by verified data",
+        "description": "Access rich candidate profiles complete with verified portfolio links, GitHub repositories, Behance showcases, and structured core competencies.",
+        "points": [
+          "Access to pre-screened professional profiles",
+          "Direct visibility into candidate portfolios & code repositories",
+          "High-confidence hiring with reduced onboarding risk"
+        ]
+      }
+    ]
+  },
+  "pageOverview": {
+    "hero": {
+      "badge": "The Intelligence Layer for Global Hiring",
+      "title": "Architecting the Future of Work",
+      "description": "We remove recruitment guesswork through deep neural profile analysis, automated ATS ranking, and precision career pathing."
+    },
+    "about": {
+      "tag": "01 / About Us",
+      "title": "Built for high-velocity teams and ambitious professionals",
+      "body": "SkillSync operates as a modern recruitment infrastructure. Since our inception, we have focused on streamlining the connection between technical excellence and enterprise demand. By replacing friction with structured data and automated vetting, we ensure every placement creates mutual, long-term value.",
+      "stats": [
+        {
+          "stat": "10+",
+          "label": "Years of engineering & recruitment domain insight"
+        },
+        {
+          "stat": "1,200+",
+          "label": "Successful candidate placements completed to date"
+        },
+        {
+          "stat": "4,500+",
+          "label": "Active verified technical profiles in our repository"
+        },
+        {
+          "stat": "96.4%",
+          "label": "Long-term retention rate across enterprise partners"
+        }
+      ]
+    },
+    "partners": {
+      "label": "Trusted by engineering teams and hyper-growth enterprises",
+      "names": [
+        "Vercel Stack",
+        "Supabase Cloud",
+        "NextJS Ecosystem",
+        "Prisma Data",
+        "Tailwind Labs",
+        "Cloudflare Workers"
+      ]
+    },
+    "capabilities": {
+      "tag": "02 / Capabilities Catalog",
+      "title": "A comprehensive suite of intelligent modules",
+      "description": "Every tool in our suite is designed to maximize clarity, reduce time-to-hire, and accelerate professional growth.",
+      "items": [
+        {
+          "tag": "Candidate Matching",
+          "title": "Smart CV & ATS Analyzer",
+          "description": "Parses documents, extracts core skill sets, and scores candidates instantly against position requirements."
+        },
+        {
+          "tag": "Skill Assessment",
+          "title": "AI Interview Simulator",
+          "description": "Interactive mock practice sessions tailored to target job descriptions with live speech and confidence scoring."
+        },
+        {
+          "tag": "Career Growth",
+          "title": "Skill Gap & Path Finder",
+          "description": "Pinpoints missing competencies and recommends certified learning paths to bridge career deficiencies."
+        }
+      ]
+    },
+    "workflow": {
+      "tag": "03 / Workflow",
+      "title": "How we work with you",
+      "description": "We maintain absolute transparency at every phase of the recruitment or career development lifecycle. Here is our 5-stage operational pipeline:"
+    },
+    "impact": {
+      "tag": "04 / Tailored Impact",
+      "title": "Built for both sides of the hiring table"
+    }
+  }
+}

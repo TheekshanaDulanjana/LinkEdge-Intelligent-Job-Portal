@@ -22,7 +22,7 @@ export interface LoginInput {
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: 'SEEKER' | 'COMPANY';
+  role: 'SEEKER' | 'COMPANY' | 'ADMIN';
 }
 
 export interface AuthResponse {

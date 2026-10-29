@@ -3,36 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Search, GraduationCap, Mic, BarChart3, ShieldCheck, ClipboardCheck } from "lucide-react";
+import { iconFor } from "./icons";
+import type { WhyContent } from "@/lib/siteContent";
 import { Button } from "@/components/ui/button";
 
-const SECTIONS = [
-  {
-    tag: "GOT TALENT?",
-    title: "Why Job Seekers Love SkillSync",
-    learnMoreUrl: "/seeker",
-    registerUrl: "/register?role=seeker",
-    features: [
-      { icon: Search, t: "Smart Matching", d: "Stop searching and start discovering. Our AI reads your CV to find the best jobs for your specific skills." },
-      { icon: GraduationCap, t: "Skill Gap Analysis", d: "We show you exactly what is missing from your profile and suggest the right courses to help you qualify for your dream role." },
-      { icon: Mic, t: "Interview Confidence", d: "Practice with our AI Interviewer. Get real feedback and scores before you meet the actual company." }
-    ]
-  },
-  {
-    tag: "NEED TALENT?",
-    title: "Why Recruiters Love SkillSync",
-    learnMoreUrl: "/companies",
-    registerUrl: "/register?role=company",
-    className: "md:pl-10 lg:pl-16",
-    features: [
-      { icon: BarChart3, t: "Automated Ranking", d: "Save hours of manual work. Our system automatically ranks every applicant from highest to lowest suitability based on your JD." },
-      { icon: ShieldCheck, t: "Quality Over Quantity", d: "We don't just send you resumes; we send you candidates who are actually prepared for the role." },
-      { icon: ClipboardCheck, t: "Smart Interview Prep", d: "Use our platform to ensure your candidates are ready. View their practice scores to make better hiring decisions faster." }
-    ]
-  }
-];
-
-export default function LinkEdgeLanding() {
+export default function LinkEdgeLanding({ seekers, recruiters }: { seekers: WhyContent; recruiters: WhyContent }) {
+  const SECTIONS = [
+    { ...seekers, className: "" },
+    { ...recruiters, className: "md:pl-10 lg:pl-16" },
+  ];
   return (
     <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 relative items-stretch">
@@ -63,7 +42,9 @@ export default function LinkEdgeLanding() {
 
               {/* Features List */}
               <div className="space-y-6">
-                {sec.features.map((f, j) => (
+ {sec.features.map((f, j) => {
+                  const Icon = iconFor(f.icon);
+                  return (
                   <motion.div 
                     key={j} 
                     whileHover={{ x: 4 }}
@@ -71,18 +52,19 @@ export default function LinkEdgeLanding() {
                     className="flex gap-4 sm:gap-5 items-start p-3 rounded-2xl hover:bg-white/80 transition-colors"
                   >
                     <div className="flex-shrink-0 w-11 h-11 rounded-2xl bg-[#0F9DE4]/10 flex items-center justify-center shadow-inner">
-                      <f.icon className="w-5 h-5 text-[#0F9DE4]" />
+                      <Icon className="w-5 h-5 text-[#0F9DE4]" />
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-base font-semibold text-gray-900">
-                        {f.t}
+                        {f.title}
                       </h4>
                       <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">
-                        {f.d}
+                        {f.description}
                       </p>
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

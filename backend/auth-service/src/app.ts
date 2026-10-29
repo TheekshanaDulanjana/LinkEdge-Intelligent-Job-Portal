@@ -14,6 +14,11 @@ import { requestIdMiddleware, httpLogger } from '../../shared/logger/logger';
 import { globalErrorHandler } from '../../shared/middleware/errorHandler';
 import { generalLimiter, authLimiter } from '../../shared/security/rateLimiter';
 import authRoutes from './routes/auth.routes';
+import contentRoutes from './routes/content.routes';
+import adminRoutes from './admin/admin.routes';
+import { seedContent } from './admin/content';
+import { ensureOwnerAccount } from './admin/bootstrap';
+import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { absolutizeStoredUrls } from './services/storage.service';
 
@@ -57,6 +62,17 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '..', 'uploads'), { maxAge: '365d', immutable: true, index: false }));
 
+// -- Admin back-office --
+// Mounted before the global 10kb body parser: content blocks (FAQ, testimonials) are larger than that.
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => { res.status(429).json({ success: false, message: 'Too many requests. Please slow down.' }); },
+});
+app.use('/api/v1/admin', adminLimiter, express.json({ limit: '256kb' }), adminRoutes);
+
 // -- Body parsing --
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
@@ -74,6 +90,7 @@ app.get('/health', (req, res) => {
 });
 
 // -- Routes --
+app.use('/api/v1/content', contentRoutes);
 app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/auth/resume', resumeRoutes);
 app.use('/api/v1/auth/candidate', candidateRoutes);
@@ -93,6 +110,9 @@ const PORT = parseInt(env.PORT);
 app.listen(PORT, () => {
   // Old rows stored relative paths (/uploads/...). Make them full URLs once.
   absolutizeStoredUrls(new PrismaClient()).catch(() => undefined);
+  // Make sure the editable site content exists and that there is an owner admin to sign in with.
+  seedContent().catch((e) => console.error('Content seeding failed:', e?.message));
+  ensureOwnerAccount().catch((e) => console.error('Owner admin bootstrap failed:', e?.message));
   console.log(
     JSON.stringify({
       timestamp: new Date().toISOString(),

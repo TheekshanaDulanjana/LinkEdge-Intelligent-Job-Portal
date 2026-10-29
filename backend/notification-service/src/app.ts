@@ -112,6 +112,28 @@ app.post('/send/application-received', handler(async (b) => {
   await emailService.sendApplicationReceived(emailAddress(b.to), text(b.companyName, 'companyName', 100), text(b.seekerName, 'seekerName', 80), text(b.jobTitle, 'jobTitle', 100));
 }));
 
+// Where replies to admin notices should land: SUPPORT_EMAIL, otherwise the address the mail is sent from.
+function supportAddress(): string {
+  const raw = process.env.SUPPORT_EMAIL || process.env.EMAIL_FROM || '';
+  const m = raw.match(/<([^>]+)>/);
+  return (m ? m[1] : raw).trim();
+}
+
+app.post('/send/admin-notice', handler(async (b) => {
+  const ctaUrl = b.ctaUrl ? httpUrl(b.ctaUrl, 'ctaUrl') : undefined;
+  await emailService.sendAdminNotice(emailAddress(b.to), {
+    name: text(b.name, 'name', 100),
+    heading: text(b.heading, 'heading', 120),
+    message: longText(b.message, 'message', 2000),
+    reason: longText(b.reason, 'reason', 1000),
+    code: b.code ? text(b.code, 'code', 12) : undefined,
+    ctaLabel: ctaUrl ? text(b.ctaLabel, 'ctaLabel', 40) : undefined,
+    ctaUrl,
+    footer: b.footer ? longText(b.footer, 'footer', 300) : undefined,
+    discuss: b.discuss === true ? { email: supportAddress(), subject: String(b.discussSubject || 'Re: your SkillSync notice').replace(CONTROL, '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150) } : undefined,
+  });
+}));
+
 app.use((_req, res) => res.status(404).json({ success: false, message: 'Route not found' }));
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

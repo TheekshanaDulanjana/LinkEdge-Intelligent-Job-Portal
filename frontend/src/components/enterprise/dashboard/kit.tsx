@@ -107,7 +107,8 @@ export function StagePill({ status }: { status: string }) {
 }
 
 export function JobStatusPill({ status }: { status: string }) {
-  const tone = status === 'ACTIVE' ? 'green' : status === 'CLOSED' ? 'rose' : status === 'DRAFT' ? 'amber' : 'slate';
+  const tone = status === 'ACTIVE' ? 'green' : status === 'CLOSED' ? 'rose' : status === 'DRAFT' ? 'amber' : status === 'HIDDEN' ? 'rose' : 'slate';
+  if (status === 'HIDDEN') return <Pill tone={tone}>Hidden by admin</Pill>;
   return <Pill tone={tone}>{status.charAt(0) + status.slice(1).toLowerCase()}</Pill>;
 }
 

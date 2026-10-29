@@ -31,3 +31,16 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-inter) !important;
 }
+/* ---- Landing page: testimonials marquee ---- */
+.testimonial-row { overflow: hidden; }
+.testimonial-track { display: flex; width: max-content; will-change: transform; }
+.testimonial-track > div { margin-right: 1.25rem; }
+.testimonial-left { animation: testimonial-left linear infinite; }
+.testimonial-right { animation: testimonial-right linear infinite; }
+.testimonial-row:hover .testimonial-track { animation-play-state: paused; }
+@keyframes testimonial-left { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes testimonial-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .testimonial-track { animation: none !important; }
+  .testimonial-row { overflow-x: auto; }
+}

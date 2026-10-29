@@ -3,123 +3,104 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Quote, Sparkles } from 'lucide-react';
+import type { TestimonialsContent, Testimonial } from '@/lib/siteContent';
 
-const TESTIMONIALS = [
-  {
-    role: "JOB SEEKER",
-    name: "Akindu Perera",
-    title: "Software Engineer at Virtusa",
-    quote: "I got my tech job on SkillSync through AI matching in just a few days! The platform read my CV instantly and matched my exact skills.",
-    accentColor: "from-[#0025B8] to-[#0F9DE4]"
-  },
-  {
-    role: "RECRUITER",
-    name: "Chamathka Silva",
-    title: "Head of HR, TechCorp Solutions",
-    quote: "Half of the high-quality hires we made this quarter came from SkillSync. The automated candidate ranking saves our HR team hours of manual screening.",
-    accentColor: "from-[#0F9DE4] to-cyan-400"
-  },
-  {
-    role: "JOB SEEKER",
-    name: "Sanduni Fernando",
-    title: "UI/UX Designer",
-    quote: "The AI Interview practice gave me the real confidence I needed. Getting instant feedback on my responses changed everything for my career.",
-    accentColor: "from-[#0025B8] to-[#0F9DE4]"
-  },
-  {
-    role: "RECRUITER",
-    name: "Nuwan Jayasinghe",
-    title: "Tech Lead & Hiring Manager",
-    quote: "I can't imagine our recruitment process without SkillSync anymore. It bridges the gap between top talent and fast-growing companies seamlessly.",
-    accentColor: "from-[#0F9DE4] to-blue-600"
-  }
-];
+/** Repeat the list until it is long enough to fill a row twice over (the loop needs two identical halves). */
+function fill(items: Testimonial[], min = 6): Testimonial[] {
+  if (items.length === 0) return [];
+  const out: Testimonial[] = [];
+  while (out.length < min) out.push(...items);
+  return out;
+}
 
-export default function TestimonialsSection() {
+function Card({ item }: { item: Testimonial }) {
   return (
-    <section className="relative w-full py-28 px-4 sm:px-6 lg:px-8 font-sans overflow-hidden bg-gradient-to-b from-white via-sky-50/40 to-white">
-      
-      {/* Decorative Glow Blobs */}
+    <figure className="w-[300px] sm:w-[360px] h-[250px] shrink-0 rounded-2xl bg-white border border-sky-100 shadow-md p-5 sm:p-6 flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-full bg-sky-50 text-[#0F9DE4] border border-sky-100 truncate">
+          {item.category}
+        </span>
+        <Quote className="w-5 h-5 text-[#0F9DE4]/60 rotate-180 shrink-0" aria-hidden />
+      </div>
+      <blockquote className="text-slate-700 text-sm leading-relaxed line-clamp-4">&ldquo;{item.feedback}&rdquo;</blockquote>
+      <figcaption className="mt-auto pt-3 border-t border-slate-100 flex items-center gap-3">
+        {item.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.image} alt={item.name} className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-100" />
+        ) : (
+          <span className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] flex items-center justify-center text-white font-bold text-sm shrink-0">
+            {item.name.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="block text-slate-900 font-semibold text-sm truncate">{item.name}</span>
+          <span className="block text-slate-500 text-xs truncate">{item.designation}</span>
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
+function Row({ items, direction, className = '' }: { items: Testimonial[]; direction: 'left' | 'right'; className?: string }) {
+  // Speed stays the same no matter how many cards there are (about 6 seconds per card).
+  const seconds = Math.max(30, items.length * 6);
+  return (
+    <div className={`testimonial-row ${className}`}>
+      <div
+        className={`testimonial-track ${direction === 'left' ? 'testimonial-left' : 'testimonial-right'}`}
+        style={{ animationDuration: `${seconds}s` }}
+      >
+        {[...items, ...items].map((item, i) => (
+          <div key={i} aria-hidden={i >= items.length ? true : undefined}>
+            <Card item={item} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function TestimonialsSection({ content }: { content: TestimonialsContent }) {
+  const all = content.items;
+  // Two rows with different cards when there are enough, otherwise the same cards in opposite order.
+  const rowA = fill(all.length >= 8 ? all.filter((_, i) => i % 2 === 0) : all);
+  const rowB = fill(all.length >= 8 ? all.filter((_, i) => i % 2 === 1) : [...all].reverse());
+
+  return (
+    <section className="relative w-full py-20 lg:py-24 font-sans overflow-hidden bg-gradient-to-b from-white via-sky-50/40 to-white">
       <div className="absolute top-1/3 left-10 w-72 h-72 bg-sky-200/40 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-200/40 rounded-full blur-[140px] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-20">
-        
-        {/* Header Section */}
+      <div className="relative z-10 max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-6 items-center">
+        {/* Left: heading */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center space-y-4 max-w-3xl mx-auto"
+          className="lg:col-span-4 xl:col-span-3 space-y-4 text-center lg:text-left"
         >
-          <div className="inline-flex items-center gap-2 text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-4 py-1.5 rounded-full border border-sky-100 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-            <span>COMMUNITY SUCCESS STORIES</span>
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3 py-1.5 rounded-full border border-sky-100 shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{content.tag}</span>
           </div>
-          
-          <h2 className="text-3xl sm:text-5xl font-bold text-slate-900 tracking-tight leading-tight">
-            Careers found. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0025B8] to-[#0F9DE4]">
-              Teams built.
-            </span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
+            {content.titleLine1} <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0025B8] to-[#0F9DE4]">{content.titleLine2}</span>
           </h2>
-          
-          <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
-            Real experiences from professionals who transformed their hiring and job hunting journey with SkillSync.
-          </p>
+          <p className="text-slate-600 text-sm sm:text-base leading-relaxed">{content.description}</p>
         </motion.div>
 
-        {/* Unique Asymmetric Grid Layout with Smooth Hover Motion */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10 items-center">
-          {TESTIMONIALS.map((item, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7, delay: index * 0.15 }}
-              whileHover={{ y: -6, scale: 1.01 }}
-              className={`relative p-8 sm:p-10 rounded-[2rem] bg-white/80 backdrop-blur-xl border border-sky-100 shadow-xl hover:shadow-2xl transition-all duration-300 group ${
-                index % 2 === 1 ? 'md:translate-y-6' : ''
-              }`}
-            >
-              {/* Top accent glow line */}
-              <div className={`absolute top-0 left-8 right-8 h-1 rounded-full bg-gradient-to-r ${item.accentColor} opacity-70`} />
-
-              <div className="space-y-6">
-                
-                {/* Role Badge & Quote Icon */}
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-extrabold tracking-wider uppercase px-3 py-1 rounded-full bg-sky-50 text-[#0F9DE4] border border-sky-100">
-                    {item.role}
-                  </span>
-                  <div className="w-10 h-10 rounded-2xl bg-sky-50 flex items-center justify-center text-[#0F9DE4] group-hover:bg-[#0F9DE4] group-hover:text-white transition-colors duration-300">
-                    <Quote className="w-5 h-5 rotate-180" />
-                  </div>
-                </div>
-
-                {/* Quote Text */}
-                <p className="text-slate-800 text-base sm:text-lg font-medium leading-relaxed">
-                  &ldquo;{item.quote}&rdquo;
-                </p>
-
-                {/* Author Info */}
-                <div className="pt-4 border-t border-slate-100 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] flex items-center justify-center text-white font-bold text-sm shadow-inner">
-                    {item.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="text-slate-900 font-semibold text-sm">{item.name}</h4>
-                    <p className="text-slate-500 text-xs">{item.title}</p>
-                  </div>
-                </div>
-
-              </div>
-            </motion.div>
-          ))}
+        {/* Right: two rows moving in opposite directions */}
+        <div className="lg:col-span-8 xl:col-span-9 relative min-w-0">
+          <div className="space-y-5 py-3">
+            <Row items={rowA} direction="left" />
+            <Row items={rowB} direction="right" />
+          </div>
+          {/* White-to-transparent edges */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-28 bg-gradient-to-r from-white via-white/80 to-transparent z-10" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-28 bg-gradient-to-l from-white via-white/80 to-transparent z-10" />
         </div>
-
       </div>
     </section>
   );

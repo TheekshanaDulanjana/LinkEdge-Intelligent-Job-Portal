@@ -5,6 +5,7 @@ import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../../../shared/middleware/errorHandler';
 import { createLogger } from '../../../shared/logger/logger';
+import { purgeUser } from './accountPurge';
 
 const prisma = new PrismaClient();
 const logger = createLogger('auth-service');
@@ -45,6 +46,9 @@ async function notifyEmail(endpoint: string, data: object) {
 }
 
 export const authService = {
+
+  /** Issue an access + refresh token pair (used by the admin sign-in too). */
+  issueTokens: generateTokens,
 
   // ── Registration ──────────────────────────────────────────────
 
@@ -210,18 +214,28 @@ export const authService = {
     });
 
     const dummy = '$2a$12$LCKShjkKqpDHzIJANhlyXuPzRm3VPz4c5Jib5tMjFiMjNAhXxTqnO';
-    const hash = user?.passwordHash || dummy;
+    // Administrators sign in only through /admin/auth/login; here they look like any unknown account.
+    const usable = user && user.role !== 'ADMIN' ? user : null;
+    const hash = usable?.passwordHash || dummy;
     const match = await bcrypt.compare(password, hash);
 
-    if (!user || !match) {
+    if (!user || !usable || !match) {
       logger.security('Failed login', { email });
       throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
+    }
+
+    if (user.status === 'DISABLED') {
+      throw new AppError(
+        `Your account has been disabled by an administrator.${user.statusReason ? ` Reason: ${user.statusReason}` : ''}`,
+        403, 'ACCOUNT_DISABLED',
+      );
     }
 
     if (!user.isEmailVerified) {
       throw new AppError('Please verify your email before logging in.', 403, 'EMAIL_NOT_VERIFIED');
     }
 
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     logger.security('Login success', { userId: user.id });
 
     const tokens = generateTokens({
@@ -237,6 +251,7 @@ export const authService = {
   async refreshSession(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError('Account not found.', 401, 'UNAUTHORIZED');
+    if (user.status === 'DISABLED') throw new AppError('Your account has been disabled.', 403, 'ACCOUNT_DISABLED');
     const { accessToken } = generateTokens({
       userId: user.id, email: user.email, role: user.role,
     });
@@ -291,6 +306,13 @@ export const authService = {
       });
       logger.security('Google OAuth new user', { userId: user.id, role });
     } else {
+      if (user.role === 'ADMIN') throw new AppError('Google sign-in is not available for this account.', 403, 'FORBIDDEN');
+      if (user.status === 'DISABLED') {
+        throw new AppError(
+          `Your account has been disabled by an administrator.${user.statusReason ? ` Reason: ${user.statusReason}` : ''}`,
+          403, 'ACCOUNT_DISABLED',
+        );
+      }
       // Update Google ID if they sign in with Google for first time on existing account
       if (!user.googleId) {
         await prisma.user.update({
@@ -318,7 +340,7 @@ export const authService = {
     });
 
     // Always return success — don't reveal if email exists
-    if (!user || user.authProvider !== 'LOCAL') {
+    if (!user || user.authProvider !== 'LOCAL' || user.role === 'ADMIN') {
       return { message: 'If this email is registered, a reset link has been sent.' };
     }
 
@@ -385,27 +407,9 @@ async deleteAccount(userId: string, password?: string) {
     }
   }
 
-  if (user.role === 'COMPANY') {
-    const company = await prisma.company.findUnique({ where: { userId } });
-    if (company) {
-      // Applications reference JobPosting, JobPosting references Company —
-      // must delete bottom-up before the User row can be removed.
-      const jobs = await prisma.jobPosting.findMany({
-        where: { companyId: company.id },
-        select: { id: true },
-      });
-      const jobIds = jobs.map(j => j.id);
+  if (user.role === 'ADMIN') throw new AppError('Administrator accounts cannot be deleted here.', 403, 'FORBIDDEN');
 
-      await prisma.$transaction([
-        prisma.application.deleteMany({ where: { jobId: { in: jobIds } } }),
-        prisma.jobPosting.deleteMany({ where: { companyId: company.id } }),
-      ]);
-    }
-  }
-
-  // Cascading deletes (Company/JobSeeker/CandidateResume/Notification rows
-  // tied directly to User) are handled by onDelete: Cascade in schema.prisma.
-  await prisma.user.delete({ where: { id: userId } });
+  await purgeUser(prisma, userId);
 
   logger.security('Account deleted', { userId });
   return { message: 'Account deleted successfully.' };

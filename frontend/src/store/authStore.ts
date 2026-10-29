@@ -4,8 +4,11 @@ import { secureStorage } from '@/lib/secureStorage';
 interface User {
   id: string;
   email: string;
-  role: 'SEEKER' | 'COMPANY';
-  profile: Record<string, unknown>;
+  role: 'SEEKER' | 'COMPANY' | 'ADMIN';
+  profile: Record<string, unknown> | null;
+  /** Admin accounts only */
+  adminLevel?: 'OWNER' | 'ADMIN';
+  mustChangePassword?: boolean;
 }
 
 interface AuthState {

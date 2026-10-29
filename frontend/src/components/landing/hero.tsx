@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { jobApi } from "@/lib/api";
+import type { HeroContent } from "@/lib/siteContent";
 
 function Counter({ value, suffix = "" }: { value: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -39,7 +40,7 @@ function Counter({ value, suffix = "" }: { value: number; suffix?: string }) {
   );
 }
 
-export default function HeroSection() {
+export default function HeroSection({ content }: { content: HeroContent }) {
   const [stats, setStats] = useState({
     activeJobs: 0,
     topCompanies: 0,
@@ -110,7 +111,7 @@ export default function HeroSection() {
                 className="mb-4 inline-flex items-center gap-2 rounded-full bg-transparent border border-white/30 tracking-widest px-3.5 py-1 text-[11px] sm:text-xs text-white shadow-sm"
               >
                 <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse shrink-0" />
-                <span className="truncate">SkillSync - AI POWERED JOB PORTAL</span>
+                <span className="truncate">{content.badge}</span>
               </motion.div>
 
               <motion.h1 
@@ -119,9 +120,9 @@ export default function HeroSection() {
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight"
               >
-                Your Career Edge, <br />
+                {content.titleLine1} <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-sky-200">
-                  Powered by Intelligence
+                  {content.titleLine2}
                 </span>
               </motion.h1>
 
@@ -131,9 +132,7 @@ export default function HeroSection() {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="mt-5 max-w-lg text-white/90 text-sm sm:text-base leading-relaxed"
               >
-                Experience a recruitment portal that does more than just list jobs.
-                SkillSync analyzes your potential, recommends paths for growth, and
-                streamlines hiring with AI-powered insights.
+                {content.description}
               </motion.p>
 
               <motion.div 
@@ -142,19 +141,19 @@ export default function HeroSection() {
                 transition={{ duration: 0.6, delay: 0.5 }}
                 className="mt-8 flex flex-col sm:flex-row gap-3.5 w-full sm:w-auto"
               >
-                <Link href="/jobs" className="w-full sm:w-auto">
+                <Link href={content.primaryButton.href} className="w-full sm:w-auto">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
                     <Button
                       variant="gradient"
                       size="md"
                       className="border-2 border-white cursor-pointer shadow-lg hover:shadow-cyan-500/35 transition-all w-full sm:w-auto"
                     >
-                      Find New Job
+                      {content.primaryButton.label}
                     </Button>
                   </motion.div>
                 </Link>
 
-                <Link href="/register?role=company" className="w-full sm:w-auto">
+                <Link href={content.secondaryButton.href} className="w-full sm:w-auto">
                   <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
                     <Button
                       variant="outline"
@@ -163,7 +162,7 @@ export default function HeroSection() {
                       hasBg={false}
                       className="text-white bg-transparent border-white cursor-pointer hover:bg-white/10 transition-all w-full sm:w-auto"
                     >
-                      Post New Job
+                      {content.secondaryButton.label}
                     </Button>
                   </motion.div>
                 </Link>
@@ -278,27 +277,13 @@ export default function HeroSection() {
               >
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-black font-semibold text-base">
-                    Career Paths
+                    {content.pathsTitle}
                   </h4>
-                  <span className="text-xs text-gray-400 font-medium">Explore Roles</span>
+                  <span className="text-xs text-gray-400 font-medium">{content.pathsSubtitle}</span>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    "Software Engineer",
-                    "AI/ML Engineer",
-                    "Full Stack Developer",
-                    "UI/UX Designer",
-                    "DevOps",
-                    "Digital Marketer",
-                    "Cloud Engineer",
-                    "Data Scientist",
-                    "QA Analyst",
-                    "Product Manager",
-                    "Data Engineer",
-                    "Cybersecurity Analyst",
-                    "Business Analyst",
-                  ].map((item, index) => (
+                  {content.paths.map((item, index) => (
                     <Link key={item} href={`/jobs?search=${encodeURIComponent(item)}`} aria-label={`Search ${item} jobs`} className="inline-block">
                     <motion.span
                       initial={{ opacity: 0, scale: 0.8 }}
