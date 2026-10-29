@@ -2,6 +2,18 @@
 
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* LinkEdge brand: primary #0063CE, secondary #0084DA */
+  --color-brand-50: #eff6fd;
+  --color-brand-100: #dbeafb;
+  --color-brand-200: #b8d6f6;
+  --color-brand-300: #85b8ee;
+  --color-brand-400: #3d8fe0;
+  --color-brand-500: #0084da;
+  --color-brand-600: #0063ce;
+  --color-brand-700: #0052ab;
+  --color-brand-800: #004288;
+  --color-brand-900: #00315f;
 }
 
 /* මුළු site එකේම font එක Inter කරන්න මේ ටික අනිවාර්යයෙන්ම දාන්න */
@@ -11,6 +23,8 @@
 
 body {
   font-family: var(--font-inter) !important;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
 }
 
 /* Headers වලටත් force කරමු */

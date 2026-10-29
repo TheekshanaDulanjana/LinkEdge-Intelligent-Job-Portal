@@ -47,7 +47,7 @@ export default function InterviewScheduleModal({
           <Field label="Time" required><input required type="time" value={time} onChange={e => setTime(e.target.value)} className={inputCls} /></Field>
         </div>
         <Field label="Venue or meeting link" required><input required value={venue} onChange={e => setVenue(e.target.value)} placeholder="Office address, Zoom or Meet link" className={inputCls} /></Field>
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg p-3 leading-relaxed">
+        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg p-3 leading-relaxed">
           The candidate gets an email invite with these details, and the interview appears on your calendar automatically.
         </p>
       </form>

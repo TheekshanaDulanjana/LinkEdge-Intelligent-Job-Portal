@@ -2,12 +2,18 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 
 export default function Footer() {
+  const pathname = usePathname();
   const currentYear = new Date().getFullYear();
+
+  // The account pages are kept clean: no footer on login, register and the other sign-in screens
+  const hideOn = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+  if (hideOn.some((p) => pathname?.startsWith(p))) return null;
 
   const footerLinks = {
     platform: [

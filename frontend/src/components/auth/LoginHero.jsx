@@ -39,6 +39,7 @@ export default function LoginHero() {
               alt="LinkEdge Logo" 
               width={180} 
               height={40}
+              style={{ width: 180, height: 'auto' }}
               className="mb-16 xl:mb-24" 
             />
           </Link>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,7 +26,15 @@ export default function LoginFormSection() {
   const { setAuth } = useAuthStore();
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState('');
   const [googleRole, setGoogleRole] = useState<'SEEKER' | 'COMPANY'>('SEEKER');
+
+  // Message shown after an automatic logout (read from the address, no Suspense needed)
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    if (reason === 'timeout') setNotice('You were logged out after 10 minutes of inactivity. Please sign in again.');
+    else if (reason === 'expired') setNotice('Your session has ended. Please sign in again.');
+  }, []);
 
   const {
     register,
@@ -63,6 +71,12 @@ export default function LoginFormSection() {
           <h2 className="text-2xl font-bold text-black">Welcome Back!</h2>
           <p className="text-black/60 mt-1 text-sm">Sign in to your account</p>
         </div>
+
+        {notice && !serverError && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+            {notice}
+          </div>
+        )}
 
         {serverError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-600">

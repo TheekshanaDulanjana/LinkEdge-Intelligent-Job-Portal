@@ -1,43 +1,32 @@
-import os
-import json
-import re
-from google.genai import Client
+from typing import List
+from pydantic import BaseModel
 from src.models.state import CVAnalysisState
-
-# Create a Gemini client instance
-client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+from src.tools.llm_json import generate_json
 
 
-def get_gemini_response(prompt: str) -> str:
-    """
-    Sends the prompt to Gemini and returns the generated text.
-    """
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        contents=prompt,
-        config={
-            "temperature": 0.1,
-            "max_output_tokens": 12000,
-        }
-    )
-    return response.text
+class _ParsedCV(BaseModel):
+    candidate_name: str
+    extracted_skills: List[str]
+    extracted_experience: str
+    extracted_education: str
 
 
-def clean_json_response(raw: str) -> str:
-    """
-    Gemini sometimes wraps JSON in markdown code blocks like ```json ... ```
-    This function strips that so we can parse the raw JSON.
-    """
-    raw = raw.strip()
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    return raw.strip()
+def _clean_skills(items) -> List[str]:
+    seen, out = set(), []
+    for it in items or []:
+        text = " ".join(str(it).split()).strip(" ,;.")
+        key = text.lower()
+        if text and len(text) <= 60 and key not in seen:
+            seen.add(key)
+            out.append(text)
+        if len(out) >= 150:
+            break
+    return out
 
 
 def parsing_agent(state: CVAnalysisState) -> CVAnalysisState:
     """
-    Agent 1 — Parsing Agent
+    Agent 1 - Parsing Agent
     Reads the raw CV text and extracts structured information.
 
     Input  : state["cv_text"]
@@ -48,60 +37,42 @@ def parsing_agent(state: CVAnalysisState) -> CVAnalysisState:
 
     prompt = f"""You are an expert CV/resume parser.
 
-Read the CV text carefully and extract structured information.
-Return ONLY a valid JSON object. No explanation, no markdown, no code blocks.
-Just the raw JSON starting with {{ and ending with }}.
+Read the CV text below carefully and extract structured information.
 
 CV TEXT:
 {state["cv_text"]}
 
-Return this exact JSON structure:
-{{
-    "candidate_name": "Full name of the person (empty string if not found)",
-    "extracted_skills": [
-        "List every technical skill, programming language, framework,",
-        "tool, certification, and soft skill mentioned in the CV"
-    ],
-    "extracted_experience": "A clear 2-3 sentence summary of their work experience and roles",
-    "extracted_education": "A clear 1-2 sentence summary of their educational background"
-}}
-
-Important rules:
-- extracted_skills must include ALL skills found, not just a few
-- Do not invent or assume skills not clearly mentioned
-- If a field cannot be found, use empty string or empty array
-- Keep the JSON valid — no trailing commas, proper quotes"""
+Rules:
+- candidate_name: the person's full name (empty string if not found).
+- extracted_skills: every technical skill, programming language, framework, tool, platform, certification and relevant soft skill that is clearly written in the CV. One skill per item, short name only (for example "React", "PostgreSQL", "Figma", "Team leadership"). No duplicates, no sentences.
+- Do not invent or assume skills that are not clearly mentioned.
+- extracted_experience: a clear 2 to 3 sentence summary of work experience, internships and main projects, with job titles and years when they are written.
+- extracted_education: a clear 1 to 2 sentence summary of education (degree, institution, year when written).
+- If something cannot be found use an empty string or an empty list."""
 
     try:
-        # Generate text using the new genai client
-        response_text = get_gemini_response(prompt)
-        raw = clean_json_response(response_text)
-        data = json.loads(raw)
+        data = generate_json(
+            prompt,
+            _ParsedCV,
+            temperature=0.0,
+            max_tokens=12000,
+            thinking_budget=512,
+            validate=lambda d: isinstance(d, dict) and "extracted_skills" in d,
+            label="cv-parsing",
+        )
 
-        print(f"   Found {len(data.get('extracted_skills', []))} skills")
+        skills = _clean_skills(data.get("extracted_skills", []))
+        print(f"   Found {len(skills)} skills")
         print(f"   Candidate: {data.get('candidate_name', 'Unknown')}")
 
         return {
             **state,
-            "candidate_name": data.get("candidate_name", ""),
-            "extracted_skills": data.get("extracted_skills", []),
-            "extracted_experience": data.get("extracted_experience", ""),
-            "extracted_education": data.get("extracted_education", ""),
+            "candidate_name": str(data.get("candidate_name", "")).strip(),
+            "extracted_skills": skills,
+            "extracted_experience": str(data.get("extracted_experience", "")).strip(),
+            "extracted_education": str(data.get("extracted_education", "")).strip(),
             "current_step": "parsing_complete",
             "error": None,
-        }
-
-    except json.JSONDecodeError as e:
-        print(f"   JSON parse error: {e}")
-        print(f"   Raw response: {response_text[:200]}")
-        return {
-            **state,
-            "candidate_name": "",
-            "extracted_skills": [],
-            "extracted_experience": "Could not parse experience",
-            "extracted_education": "Could not parse education",
-            "current_step": "parsing_failed",
-            "error": f"JSON parse error in parsing agent: {str(e)}",
         }
 
     except Exception as e:

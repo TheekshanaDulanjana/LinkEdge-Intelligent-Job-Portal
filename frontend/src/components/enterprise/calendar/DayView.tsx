@@ -28,7 +28,7 @@ export default function DayView({
   return (
     <div>
       <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/70">
-        <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">{date.toLocaleDateString('en-US', { weekday: 'long' })}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{date.toLocaleDateString('en-US', { weekday: 'long' })}</p>
         <p className="text-base font-semibold text-slate-900">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
       </div>
       <div>
@@ -37,7 +37,7 @@ export default function DayView({
           slotDate.setHours(hour, 0, 0, 0);
           return (
             <div key={hour} className="flex border-b border-slate-100">
-              <div className="w-16 shrink-0 text-[11px] text-slate-400 text-right pr-3 pt-2 tabular-nums">
+              <div className="w-16 shrink-0 text-xs text-slate-500 text-right pr-3 pt-2 tabular-nums">
                 {hour % 12 === 0 ? 12 : hour % 12}{hour < 12 ? 'am' : 'pm'}
               </div>
               <DroppableDay id={`slot-${slotDate.toISOString()}`} date={slotDate}
