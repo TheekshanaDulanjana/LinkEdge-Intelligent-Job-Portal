@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
 
-async function sendEmail(to: string, rawSubject: string, html: string) {
+async function sendEmail(to: string, rawSubject: string, html: string, replyTo?: string) {
   // Values arrive HTML-escaped for the body; the subject is plain text, so decode and strip line breaks.
   const subject = rawSubject.replace(/&amp;|&lt;|&gt;|&quot;|&#39;/g, (m) => ENTITIES[m]).replace(/[\r\n]+/g, ' ');
   try {
@@ -22,6 +22,7 @@ async function sendEmail(to: string, rawSubject: string, html: string) {
       to,
       subject,
       html,
+      ...(replyTo ? { replyTo } : {}),
     });
     console.log(`Email sent to ${to}: ${subject}`);
   } catch (err) {
@@ -31,6 +32,11 @@ async function sendEmail(to: string, rawSubject: string, html: string) {
 }
 
 export const emailService = {
+  async sendAdminNotice(to: string, p: { name: string; heading: string; message: string; reason: string; code?: string; ctaLabel?: string; ctaUrl?: string; footer?: string; discuss?: { email: string; subject: string } }) {
+    const { subject, html } = emailTemplates.adminNotice(p);
+    await sendEmail(to, subject, html, p.discuss?.email);
+  },
+
   async sendVerificationCode(to: string, name: string, code: string) {
     const { subject, html } = emailTemplates.verificationCode(name, code);
     await sendEmail(to, subject, html);

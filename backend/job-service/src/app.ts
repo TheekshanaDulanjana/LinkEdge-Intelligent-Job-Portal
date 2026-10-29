@@ -222,7 +222,7 @@ router.get(
           { location: { contains: search, mode: 'insensitive' } },
         ];
       }
-      if (typeof status === 'string' && ['ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT'].includes(status)) where.status = status;
+      if (typeof status === 'string' && ['ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT', 'HIDDEN'].includes(status)) where.status = status;
       if (typeof jobType === 'string' && ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'].includes(jobType)) where.jobType = jobType;
 
       const validSortFields = ['createdAt', 'title', 'deadline', 'status'];
@@ -237,7 +237,7 @@ router.get(
           select: {
             id: true, title: true, location: true, jobType: true,
             status: true, deadline: true, createdAt: true, salaryMin: true, salaryMax: true,
-            autoScreen: true, minMatchScore: true,
+            autoScreen: true, minMatchScore: true, moderationReason: true, moderatedAt: true,
             _count: { select: { applications: true } },
           },
         }),
@@ -260,6 +260,8 @@ router.get(
             applicationCount: j._count.applications,
             autoScreen: j.autoScreen,
             minMatchScore: j.minMatchScore,
+            moderationReason: j.status === 'HIDDEN' ? j.moderationReason : null,
+            moderatedAt: j.status === 'HIDDEN' ? j.moderatedAt : null,
           })),
           total,
           page,
@@ -342,7 +344,8 @@ router.get('/:id', validateParams('id'), async (req, res, next) => {
         }
       } catch { /* treated as anonymous */ }
     }
-    if (job.status === 'DRAFT' && !isOwner) {
+    // Drafts and jobs hidden by an admin are visible only to the owning company.
+    if ((job.status === 'DRAFT' || job.status === 'HIDDEN') && !isOwner) {
       res.status(404).json({ success: false, message: 'Job not found' });
       return;
     }
@@ -457,6 +460,15 @@ router.patch(
       });
       if (!company || job.companyId !== company.id) {
         res.status(403).json({ success: false, message: 'Not your job posting' });
+        return;
+      }
+
+      if (job.status === 'HIDDEN') {
+        res.status(403).json({
+          success: false,
+          code: 'JOB_HIDDEN',
+          message: 'This job was hidden by an administrator and cannot be changed until it is restored.',
+        });
         return;
       }
 

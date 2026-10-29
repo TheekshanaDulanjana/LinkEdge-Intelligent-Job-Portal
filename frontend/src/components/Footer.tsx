@@ -12,7 +12,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   // The account pages are kept clean: no footer on login, register and the other sign-in screens
-  const hideOn = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+  const hideOn = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password', '/admin'];
   if (hideOn.some((p) => pathname?.startsWith(p))) return null;
 
   const footerLinks = {

@@ -24,7 +24,7 @@ const TITLES: Record<string, string> = {
 
 type Notif = {
   id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string;
-  metadata?: { applicationId?: string; jobId?: string } | null;
+  metadata?: { applicationId?: string; jobId?: string; action?: string } | null;
 };
 
 export default function TopHeader({ userName, userAvatar }: Props) {
@@ -74,6 +74,10 @@ export default function TopHeader({ userName, userAvatar }: Props) {
     }
     setBellOpen(false);
     const jobId = n.metadata?.jobId;
+    if (n.type === 'SYSTEM') {
+      router.push(jobId && n.metadata?.action !== 'JOB_DELETED' ? `/company/jobs/${jobId}` : '/company/jobs');
+      return;
+    }
     router.push(jobId ? `/company/jobs/${jobId}/applicants` : '/company/candidates');
   }
   async function markAll() {

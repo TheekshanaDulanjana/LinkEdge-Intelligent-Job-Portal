@@ -541,8 +541,8 @@ export default function CompanyDashboardPage() {
                           </p>
                         </td>
                         <td className="px-3 py-3">
-                          <Pill tone={j.status === 'ACTIVE' ? 'green' : j.status === 'CLOSED' ? 'rose' : j.status === 'DRAFT' ? 'amber' : 'slate'}>
-                            {j.status.charAt(0) + j.status.slice(1).toLowerCase()}
+                          <Pill tone={j.status === 'ACTIVE' ? 'green' : j.status === 'CLOSED' ? 'rose' : j.status === 'DRAFT' ? 'amber' : j.status === 'HIDDEN' ? 'rose' : 'slate'}>
+                            {j.status === 'HIDDEN' ? 'Hidden by admin' : j.status.charAt(0) + j.status.slice(1).toLowerCase()}
                           </Pill>
                         </td>
                         <td className="px-3 py-3">

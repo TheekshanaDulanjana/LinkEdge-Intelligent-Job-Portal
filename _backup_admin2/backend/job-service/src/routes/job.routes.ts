@@ -1,0 +1,386 @@
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
+import { authenticate, requireCompany } from '../middleware/authenticate';
+
+const router = Router();
+const prisma  = new PrismaClient();
+
+const ATS_URL = process.env.ATS_SERVICE_URL || 'http://localhost:8003';
+
+// ─── GET /api/v1/jobs/portal-stats — Hero section stats (public) ─────────────
+// MUST be declared before /:id
+router.get('/portal-stats', async (_req, res, next) => {
+  try {
+    const [activeJobs, topCompanies] = await Promise.all([
+      prisma.jobPosting.count({ where: { status: 'ACTIVE' } }),
+      prisma.company.count(),
+    ]);
+
+    let candidates = 0;
+    try {
+      candidates = await prisma.user.count({ where: { role: 'SEEKER' } });
+    } catch (err: any) {
+      console.warn('[portal-stats] candidate count failed:', err?.message);
+    }
+
+    res.json({
+      success: true,
+      data: { activeJobs, topCompanies, candidates },
+    });
+  } catch (e) { next(e); }
+});
+
+// ─── GET /api/v1/jobs — Public job board, enriched with ATS scores ────────────
+router.get('/', async (req, res, next) => {
+  try {
+    const { page = 1, limit = 10, search, location, jobType, seekerId } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const where: any = { status: 'ACTIVE' };
+    if (search) {
+      where.OR = [
+        { title:       { contains: search as string, mode: 'insensitive' } },
+        { description: { contains: search as string, mode: 'insensitive' } },
+      ];
+    }
+    if (location) where.location = { contains: location as string, mode: 'insensitive' };
+    if (jobType)  where.jobType  = jobType;
+
+    const [jobs, total] = await Promise.all([
+      prisma.jobPosting.findMany({
+        where,
+        skip,
+        take:    Number(limit),
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.jobPosting.count({ where }),
+    ]);
+
+    const enriched = await Promise.all(
+      jobs.map(async (job) => {
+        const company = await prisma.company.findFirst({
+          where:  { id: job.companyId },
+          select: { id: true, companyName: true, logoUrl: true },
+        });
+        return { ...job, company };
+      })
+    );
+
+    let atsScores: Record<string, any> = {};
+    if (seekerId && typeof seekerId === 'string') {
+      try {
+        const atsRes = await axios.post(
+          `${ATS_URL}/api/v1/ats/batch-score`,
+          {
+            candidate_id: seekerId,
+            jobs: enriched.map((j) => ({
+              id:           j.id,
+              title:        j.title,
+              description:  j.description,
+              requirements: j.requirements,
+            })),
+          },
+          { timeout: 15000 }
+        );
+        if (atsRes.data?.has_resume) {
+          atsScores = atsRes.data.scores || {};
+        }
+      } catch (e: any) {
+        console.warn('ATS batch score failed (non-critical):', e.message);
+      }
+    }
+
+    const result = enriched.map((job) => ({
+      ...job,
+      atsScore:      atsScores[job.id]?.overall_score    ?? null,
+      atsColor:      atsScores[job.id]?.score_color      ?? null,
+      atsLabel:      atsScores[job.id]?.score_label      ?? null,
+      matchedSkills: atsScores[job.id]?.matched_skills ?? [],
+      missingSkills: atsScores[job.id]?.missing_skills ?? [],
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        jobs:       result,
+        total,
+        page:       Number(page),
+        totalPages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (e) { next(e); }
+});
+
+// ─── GET /api/v1/jobs/company/summary — KPI cards for Jobs page ───────────────
+router.get(
+  '/company/summary',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const company = await prisma.company.findFirst({ where: { userId: req.user.userId } });
+      if (!company) {
+        res.status(404).json({ success: false, message: 'Company profile not found' });
+        return;
+      }
+
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endToday    = new Date(startToday.getTime() + 24 * 60 * 60 * 1000);
+
+      const jobs = await prisma.jobPosting.findMany({
+        where: { companyId: company.id }, select: { id: true },
+      });
+      const jobIds = jobs.map(j => j.id);
+
+      const [
+        totalActiveJobs, newJobsThisWeek,
+        totalApplications, newAppsThisWeek,
+        interviewsToday, nextInterview,
+      ] = await Promise.all([
+        prisma.jobPosting.count({ where: { companyId: company.id, status: 'ACTIVE' } }),
+        prisma.jobPosting.count({ where: { companyId: company.id, createdAt: { gte: weekAgo } } }),
+        prisma.application.count({ where: { jobId: { in: jobIds } } }),
+        prisma.application.count({ where: { jobId: { in: jobIds }, createdAt: { gte: weekAgo } } }),
+        prisma.application.count({
+          where: { jobId: { in: jobIds }, status: 'INTERVIEW', interviewDate: { gte: startToday, lt: endToday } },
+        }),
+        prisma.application.findFirst({
+          where: { jobId: { in: jobIds }, status: 'INTERVIEW', interviewDate: { gte: now } },
+          orderBy: { interviewDate: 'asc' },
+          select: { interviewDate: true, interviewTime: true },
+        }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          totalActiveJobs,
+          newJobsThisWeek,
+          totalApplications,
+          newAppsThisWeek,
+          interviewsToday,
+          nextInterviewTime: nextInterview?.interviewTime ?? null,
+        },
+      });
+    } catch (e) { next(e); }
+  }
+);
+
+// ─── GET /api/v1/jobs/company/all — Full Jobs table (search/sort/filter/paginate) ──
+router.get(
+  '/company/all',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const company = await prisma.company.findFirst({
+        where: { userId: req.user.userId },
+      });
+      if (!company) {
+        res.status(404).json({ success: false, message: 'Company profile not found' });
+        return;
+      }
+
+      const {
+        page = '1', limit = '10', search, status, jobType,
+        sortBy = 'createdAt', sortOrder = 'desc',
+      } = req.query;
+
+      const where: any = { companyId: company.id };
+
+      if (search) {
+        where.OR = [
+          { title:    { contains: search as string, mode: 'insensitive' } },
+          { location: { contains: search as string, mode: 'insensitive' } },
+        ];
+      }
+      if (status && status !== 'ALL')  where.status  = status;
+      if (jobType && jobType !== 'ALL') where.jobType = jobType;
+
+      const validSortFields = ['createdAt', 'title', 'deadline', 'status'];
+      const orderField = validSortFields.includes(sortBy as string) ? sortBy as string : 'createdAt';
+
+      const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+      const [jobs, total] = await Promise.all([
+        prisma.jobPosting.findMany({
+          where,
+          skip,
+          take:    parseInt(limit as string),
+          orderBy: { [orderField]: sortOrder === 'asc' ? 'asc' : 'desc' },
+          select: {
+            id: true, title: true, location: true, jobType: true,
+            status: true, deadline: true, createdAt: true, salaryMin: true, salaryMax: true,
+            _count: { select: { applications: true } },
+          },
+        }),
+        prisma.jobPosting.count({ where }),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          jobs: jobs.map(j => ({
+            id: j.id,
+            title: j.title,
+            location: j.location,
+            jobType: j.jobType,
+            status: j.status,
+            deadline: j.deadline,
+            createdAt: j.createdAt,
+            salaryMin: j.salaryMin,
+            salaryMax: j.salaryMax,
+            applicationCount: j._count.applications,
+          })),
+          total,
+          page: parseInt(page as string),
+          totalPages: Math.ceil(total / parseInt(limit as string)),
+        },
+      });
+    } catch (e) { next(e); }
+  }
+);
+
+// ─── GET /api/v1/jobs/:id — Single job detail ────────────────────────────────
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { id }       = req.params;
+    const { seekerId } = req.query;
+
+    const job = await prisma.jobPosting.findUnique({ where: { id } });
+    // Jobs hidden by an admin are not public.
+    if (!job || job.status === 'HIDDEN') {
+      res.status(404).json({ success: false, message: 'Job not found' });
+      return;
+    }
+
+    const company = await prisma.company.findFirst({
+      where: { id: job.companyId },
+    });
+
+    let atsData: any = null;
+    if (seekerId && typeof seekerId === 'string') {
+      try {
+        const atsRes = await axios.post(
+          `${ATS_URL}/api/v1/ats/score`,
+          {
+            candidate_id:     seekerId,
+            job_id:           job.id,
+            job_title:        job.title,
+            job_description:  job.description,
+            job_requirements: job.requirements,
+          },
+          { timeout: 20000 }
+        );
+        atsData = atsRes.data;
+      } catch (e: any) {
+        console.warn('Single job ATS score failed (non-critical):', e.message);
+      }
+    }
+
+    res.json({ success: true, data: { ...job, company, atsData } });
+  } catch (e) { next(e); }
+});
+
+// ─── POST /api/v1/jobs — Create job posting ──────────────────────────────────
+router.post('/', async (req, res, next) => {
+  try {
+    const {
+      companyId, title, description, requirements,
+      location, jobType, salaryMin, salaryMax, deadline,
+    } = req.body;
+
+    const newJob = await prisma.jobPosting.create({
+      data: {
+        companyId,
+        title,
+        description,
+        requirements,
+        location,
+        jobType,
+        salaryMin: salaryMin ? Number(salaryMin) : null,
+        salaryMax: salaryMax ? Number(salaryMax) : null,
+        deadline:  new Date(deadline),
+      },
+    });
+
+    res.status(201).json({ success: true, data: newJob });
+  } catch (e) { next(e); }
+});
+
+// ─── PATCH /api/v1/jobs/:id/status — Toggle Active / Inactive ────────────────
+router.patch(
+  '/:id/status',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const { status } = req.body;
+      if (!['ACTIVE', 'INACTIVE', 'CLOSED'].includes(status)) {
+        res.status(400).json({ success: false, message: 'Invalid status value' });
+        return;
+      }
+
+      const job = await prisma.jobPosting.findUnique({ where: { id: req.params.id } });
+      if (!job) {
+        res.status(404).json({ success: false, message: 'Job not found' });
+        return;
+      }
+
+      const company = await prisma.company.findFirst({
+        where: { userId: req.user.userId },
+      });
+      if (!company || job.companyId !== company.id) {
+        res.status(403).json({ success: false, message: 'Not your job posting' });
+        return;
+      }
+
+      if (job.status === 'HIDDEN') {
+        res.status(403).json({
+          success: false,
+          code: 'JOB_HIDDEN',
+          message: 'This job was hidden by an administrator and cannot be changed until it is restored.',
+        });
+        return;
+      }
+
+      const updated = await prisma.jobPosting.update({
+        where: { id: req.params.id },
+        data:  { status },
+      });
+      res.json({ success: true, data: updated });
+    } catch (e) { next(e); }
+  }
+);
+
+// ─── DELETE /api/v1/jobs/:id — Delete job posting ────────────────────────────
+router.delete(
+  '/:id',
+  authenticate,
+  requireCompany,
+  async (req: any, res, next) => {
+    try {
+      const job = await prisma.jobPosting.findUnique({ where: { id: req.params.id } });
+      if (!job) {
+        res.status(404).json({ success: false, message: 'Job not found' });
+        return;
+      }
+
+      const company = await prisma.company.findFirst({
+        where: { userId: req.user.userId },
+      });
+      if (!company || job.companyId !== company.id) {
+        res.status(403).json({ success: false, message: 'Not your job posting' });
+        return;
+      }
+
+      await prisma.jobPosting.delete({ where: { id: req.params.id } });
+      res.json({ success: true, message: 'Job deleted successfully' });
+    } catch (e) { next(e); }
+  }
+);
+
+export default router;

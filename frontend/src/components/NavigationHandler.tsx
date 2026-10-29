@@ -23,7 +23,7 @@ export default function NavigationHandler() {
     }
   }, [pathname, router]);
 
-  if (isCompanyRoute) return null;
+  if (isCompanyRoute || pathname.startsWith('/admin')) return null;
 
   return <Header />;
 }

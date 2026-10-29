@@ -28,6 +28,20 @@ model User {
   sentNotifications     Notification[]   @relation("NotificationSender")
   receivedNotifications Notification[]   @relation("NotificationReceiver")
   resume                CandidateResume?
+  // Admin back-office: account status, forced password change, login lockout
+  status                AccountStatus    @default(ACTIVE)
+  statusReason          String?
+  statusChangedAt       DateTime?
+  mustChangePassword    Boolean          @default(false)
+  passwordChangedAt     DateTime?
+  failedLoginCount      Int              @default(0)
+  lockedUntil           DateTime?
+  adminLevel            String?          // OWNER | ADMIN (only for role ADMIN)
+  lastLoginAt           DateTime?
+  pendingEmail          String?          // admin e-mail change waiting for the code sent to the new address
+  pendingEmailAttempts  Int              @default(0)
+
+  @@index([role, status])
 }
 
 model JobSeeker {
@@ -91,6 +105,11 @@ model JobPosting {
   status           JobStatus         @default(ACTIVE)
   autoScreen       Boolean           @default(true)
   minMatchScore    Int               @default(35)
+  // Admin moderation (set when an admin hides a job; cleared when it is restored)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  statusBeforeHide JobStatus?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   applications     Application[]
@@ -230,6 +249,7 @@ model Notification {
 enum Role {
   SEEKER
   COMPANY
+  ADMIN
 }
 
 enum AuthProvider {
@@ -255,6 +275,7 @@ enum JobStatus {
   INACTIVE
   CLOSED
   DRAFT
+  HIDDEN
 }
 
 enum ApplicationStatus {
@@ -272,4 +293,37 @@ enum NotificationType {
   APPLICATION_REJECTED
   STATUS_UPDATE
   SYSTEM
+}
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ─── Admin back-office ──────────────────────────────────────────
+
+// Landing-page / marketing content. One row per content block, value is validated JSON.
+model SiteContent {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// Append-only record of every admin action (who, what, on whom, why).
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String?
+  actorEmail  String
+  action      String
+  targetType  String?
+  targetId    String?
+  targetLabel String?
+  reason      String?
+  metadata    Json?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
 }

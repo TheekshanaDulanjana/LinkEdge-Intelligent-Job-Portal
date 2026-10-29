@@ -49,6 +49,10 @@ function createApiInstance(baseURL: string): AxiosInstance {
 
         if (typeof window !== 'undefined') {
           const path = window.location.pathname;
+          if (path.startsWith('/admin') && path !== '/admin/login') {
+            window.location.href = '/admin/login?reason=expired';
+            return Promise.reject({ name: 'ApiError', message: 'Your session has ended.', statusCode: 401 });
+          }
           const needsLogin =
             path.startsWith('/seeker') ||
             path.startsWith('/settings') ||
@@ -81,6 +85,11 @@ function createApiInstance(baseURL: string): AxiosInstance {
 // Auth service
 export const authApi = createApiInstance(
   process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1'
+);
+
+// Admin back-office (same service as auth, /admin routes)
+export const adminApi = createApiInstance(
+  `${process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1'}/admin`
 );
 
 // Job service

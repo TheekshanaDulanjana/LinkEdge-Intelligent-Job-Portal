@@ -86,6 +86,11 @@ model JobPosting {
   status           JobStatus         @default(ACTIVE)
   autoScreen       Boolean           @default(true)
   minMatchScore    Int               @default(35)
+  // Admin moderation (set when an admin hides a job; cleared when it is restored)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  statusBeforeHide JobStatus?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   applications     Application[]
@@ -227,6 +232,7 @@ model Notification {
 enum Role {
   SEEKER
   COMPANY
+  ADMIN
 }
 
 enum AuthProvider {
@@ -252,6 +258,7 @@ enum JobStatus {
   INACTIVE
   CLOSED
   DRAFT
+  HIDDEN
 }
 
 enum ApplicationStatus {

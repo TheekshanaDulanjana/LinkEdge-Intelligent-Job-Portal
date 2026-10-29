@@ -3,15 +3,10 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import type { CareerPathsContent } from "@/lib/siteContent";
 
-const JOBS = [
-  "Software Engineer", "Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile App Developer",
-  "QA Engineer", "DevOps Engineer", "Cybersecurity Analyst", "UI/UX Designer", "Product Designer",
-  "Graphic Designer", "Motion Graphics Artist", "Data Scientist", "AI/Machine Learning Engineer", "Data Analyst",
-  "Project Manager", "Business Analyst", "Digital Marketer", "Cloud Engineer", "Database Administrator", "Technical Writer",
-];
-
-export default function CareerPath() {
+export default function CareerPath({ content }: { content: CareerPathsContent }) {
+  const JOBS = content.paths;
   return (
     <section className="relative w-full py-20 px-4 sm:px-6 lg:px-8 text-center font-sans overflow-hidden bg-white">
       
@@ -30,13 +25,13 @@ export default function CareerPath() {
           className="space-y-3"
         >
           <span className="inline-block text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3 py-1 rounded-full border border-sky-100 shadow-sm">
-            Explore Opportunities
+            {content.tag}
           </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
-            Choose Your Career Path
+            {content.title}
           </h2>
           <p className="text-slate-600 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Explore thousands of job openings across 20+ specialized industries and find the perfect match for your expertise.
+            {content.description}
           </p>
         </motion.div>
 

@@ -5,7 +5,8 @@ export interface JobRow {
   title: string;
   location: string;
   jobType: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT';
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED' | 'DRAFT' | 'HIDDEN';
+  moderationReason?: string | null;
   deadline: string;
   createdAt: string;
   salaryMin: number | null;
