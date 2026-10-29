@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LogOut } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   open: boolean;
@@ -37,36 +38,46 @@ export default function LogoutConfirmModal({ open, onConfirm, onCancel }: Props)
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-4 font-sans"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         >
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onCancel} />
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={onCancel} />
           <motion.div
             role="alertdialog" aria-modal="true" aria-labelledby="logout-title" aria-describedby="logout-desc"
             initial={{ opacity: 0, scale: 0.95, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 12 }} transition={{ duration: 0.18 }}
-            className="relative bg-white rounded-[28px] border border-sky-100 shadow-2xl w-full max-w-sm p-7 text-center"
+            className="relative bg-white/95 backdrop-blur-2xl rounded-[16px] border border-sky-100 shadow-2xl w-full max-w-sm p-8 text-center space-y-4"
           >
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
-              <LogOut className="w-6 h-6" />
+            <div className="w-16 h-16 mx-auto rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-xs">
+              <LogOut className="w-7 h-7" />
             </div>
-            <h2 id="logout-title" className="text-lg font-bold text-slate-900 tracking-tight">Log out?</h2>
-            <p id="logout-desc" className="text-sm text-slate-500 font-medium mt-1.5 mb-6">
-              Are you sure you want to log out of your account?
-            </p>
-            <div className="flex gap-3">
-              <button
-                ref={cancelRef} onClick={onCancel}
-                className="flex-1 h-11 rounded-full border border-sky-200 text-[#0025B8] hover:bg-sky-50 font-semibold text-sm transition-colors cursor-pointer"
+            
+            <div className="space-y-1">
+              <h2 id="logout-title" className="text-xl font-extrabold text-slate-900 tracking-tight">Log out?</h2>
+              <p id="logout-desc" className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
+                Are you sure you want to log out of your account?
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                ref={cancelRef} 
+                onClick={onCancel}
+                variant="outline"
+                className="flex-1 rounded-full h-11 border-sky-200 text-[#0025B8] hover:bg-sky-50 font-bold text-xs cursor-pointer shadow-xs"
               >
                 Stay signed in
-              </button>
-              <button
-                onClick={onConfirm}
-                className="flex-1 h-11 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer"
-              >
-                Log out
-              </button>
+              </Button>
+              
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
+                <Button
+                  onClick={onConfirm}
+                  variant="gradient"
+                  className="w-full rounded-full h-11 bg-rose-600 shadow-2xl hover:bg-rose-700 text-white font-bold text-xs  cursor-pointer border-0"
+                >
+                  Log out
+                </Button>
+              </motion.div>
             </div>
           </motion.div>
         </motion.div>

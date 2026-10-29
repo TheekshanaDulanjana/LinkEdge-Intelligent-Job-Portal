@@ -116,9 +116,12 @@ function InterviewPage() {
     };
   }, []);
 
+  // Keep the session open while the interview is running (no mouse or keyboard
+  // input is needed while the candidate is speaking)
   useEffect(() => {
-    if (!isAuthenticated) { router.push('/login'); }
-  }, [isAuthenticated, router]);
+    document.body.dataset.keepSession = 'true';
+    return () => { delete document.body.dataset.keepSession; };
+  }, []);
 
   useEffect(() => {
     async function load() {

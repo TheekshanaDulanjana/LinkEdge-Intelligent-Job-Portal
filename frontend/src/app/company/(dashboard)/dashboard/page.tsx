@@ -38,9 +38,9 @@ const PERIODS = [
 
 const STATUS_META: Record<string, { label: string; color: string; tone: 'slate' | 'blue' | 'violet' | 'sky' | 'rose' }> = {
   PENDING:     { label: 'Pending',     color: '#94a3b8', tone: 'slate' },
-  REVIEWING:   { label: 'Reviewing',   color: '#0025B8', tone: 'blue' },
+  REVIEWING:   { label: 'Reviewing',   color: '#0063CE', tone: 'blue' },
   SHORTLISTED: { label: 'Shortlisted', color: '#7c3aed', tone: 'violet' },
-  INTERVIEW:   { label: 'Interview',   color: '#0F9DE4', tone: 'sky' },
+  INTERVIEW:   { label: 'Interview',   color: '#0084DA', tone: 'sky' },
   REJECTED:    { label: 'Rejected',    color: '#e11d48', tone: 'rose' },
 };
 
@@ -272,12 +272,12 @@ export default function CompanyDashboardPage() {
       {/* ===== Toolbar ===== */}
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{greeting} · Recruitment operations</p>
-          <h1 className="text-[22px] font-semibold text-slate-900 leading-tight mt-0.5">Command centre</h1>
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{greeting} · Recruitment operations</p>
+          <h1 className="text-2xl font-semibold text-slate-900 leading-tight mt-0.5">Command centre</h1>
+          <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
             <span className={cx('inline-block w-1.5 h-1.5 rounded-full', autoRefresh ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
             {updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Loading live data'}
-            <button onClick={() => setAutoRefresh(v => !v)} className="text-[#0025B8] font-semibold hover:underline cursor-pointer">
+            <button onClick={() => setAutoRefresh(v => !v)} className="text-[#0063CE] font-semibold hover:underline cursor-pointer">
               {autoRefresh ? 'Auto-refresh on' : 'Auto-refresh off'}
             </button>
           </p>
@@ -288,7 +288,7 @@ export default function CompanyDashboardPage() {
             {PERIODS.map(p => (
               <button key={p.value} onClick={() => setPeriod(p.value)}
                 className={cx('px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer',
-                  period === p.value ? 'bg-[#0025B8] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+                  period === p.value ? 'bg-[#0063CE] text-white shadow-sm' : 'text-slate-600 hover:text-slate-800')}>
                 {p.label}
               </button>
             ))}
@@ -302,7 +302,7 @@ export default function CompanyDashboardPage() {
             <Download className="w-3.5 h-3.5" /> Export report
           </button>
           <Link href="/company/post-job"
-            className="h-9 px-4 inline-flex items-center gap-2 text-xs font-semibold rounded-lg bg-[#0025B8] text-white hover:bg-[#001f9c] shadow-sm">
+            className="h-9 px-4 inline-flex items-center gap-2 text-xs font-semibold rounded-lg bg-[#0063CE] text-white hover:bg-[#0052AB] shadow-sm">
             <Plus className="w-3.5 h-3.5" /> Post job
           </Link>
         </div>
@@ -316,7 +316,7 @@ export default function CompanyDashboardPage() {
         <KpiTile label="Applications" icon={<FileText className="w-3.5 h-3.5" />} loading={loading}
           value={fmtNum(stats.data?.kpis.totalApplications ?? jobsSummary.data?.totalApplications)}
           delta={jobsSummary.data ? { value: jobsSummary.data.newAppsThisWeek, label: 'new this week' } : null}
-          spark={sparkApps} sparkColor="#0025B8" href="/company/candidates" />
+          spark={sparkApps} sparkColor="#0063CE" href="/company/candidates" />
         <KpiTile label="Interviews today" icon={<CalendarCheck className="w-3.5 h-3.5" />} loading={loading}
           value={fmtNum(stats.data?.kpis.interviewsToday ?? candSummary.data?.interviewsToday)}
           hint={jobsSummary.data?.nextInterviewTime ? `Next ${new Date(jobsSummary.data.nextInterviewTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Nothing scheduled next'} href="/company/calendar" />
@@ -345,12 +345,12 @@ export default function CompanyDashboardPage() {
                       a.count === 0 ? 'bg-slate-50 text-slate-300'
                         : a.tone === 'rose' ? 'bg-rose-50 text-rose-600'
                         : a.tone === 'amber' ? 'bg-amber-50 text-amber-700'
-                        : a.tone === 'sky' ? 'bg-sky-50 text-sky-700' : 'bg-blue-50 text-blue-700')}>
+                        : a.tone === 'sky' ? 'bg-brand-50 text-brand-700' : 'bg-brand-50 text-brand-700')}>
                       {a.count}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className={cx('text-[13px] font-medium truncate', a.count === 0 ? 'text-slate-400' : 'text-slate-800')}>{a.label}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{a.count === 0 ? 'All clear' : a.hint}</p>
+                      <p className={cx('text-[13px] font-medium truncate', a.count === 0 ? 'text-slate-500' : 'text-slate-800')}>{a.label}</p>
+                      <p className="text-xs text-slate-500 truncate">{a.count === 0 ? 'All clear' : a.hint}</p>
                     </div>
                     <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 shrink-0" />
                   </Link>
@@ -382,8 +382,8 @@ export default function CompanyDashboardPage() {
                   <AreaChart data={trendData} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
                     <defs>
                       <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0025B8" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="#0025B8" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#0063CE" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="#0063CE" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="#f1f5f9" vertical={false} />
@@ -391,7 +391,7 @@ export default function CompanyDashboardPage() {
                     <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,.08)' }}
                       formatter={(v) => [`${v}`, 'Applications']} />
-                    <Area type="monotone" dataKey="count" stroke="#0025B8" strokeWidth={2} fill="url(#trendFill)" activeDot={{ r: 4 }} />
+                    <Area type="monotone" dataKey="count" stroke="#0063CE" strokeWidth={2} fill="url(#trendFill)" activeDot={{ r: 4 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -411,17 +411,17 @@ export default function CompanyDashboardPage() {
                 <div key={r.stage}>
                   <div className="flex items-baseline justify-between text-xs mb-1">
                     <span className="font-semibold text-slate-700">{r.stage}</span>
-                    <span className="tabular-nums text-slate-500">
+                    <span className="tabular-nums text-slate-600">
                       <b className="text-slate-900 font-semibold">{fmtNum(r.value)}</b>
-                      {i > 0 && <span className="ml-2 text-[11px]">{fmtNum(r.stepConv, 0)}% of previous</span>}
+                      {i > 0 && <span className="ml-2 text-xs">{fmtNum(r.stepConv, 0)}% of previous</span>}
                     </span>
                   </div>
                   <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] transition-all duration-700"
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#0063CE] to-[#0084DA] transition-all duration-700"
                       style={{ width: `${Math.max(r.pctOfTop, r.value > 0 ? 2 : 0)}%` }} />
                   </div>
                   {i > 0 && r.drop > 0 && (
-                    <p className="text-[10.5px] text-slate-400 mt-1">{fmtNum(r.drop)} dropped before this stage</p>
+                    <p className="text-xs text-slate-500 mt-1">{fmtNum(r.drop)} dropped before this stage</p>
                   )}
                 </div>
               ))}
@@ -446,7 +446,7 @@ export default function CompanyDashboardPage() {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-xl font-semibold text-slate-900 tabular-nums">{fmtNum(distTotal)}</span>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Total</span>
+                  <span className="text-xs text-slate-500 uppercase tracking-wide">Total</span>
                 </div>
               </div>
               <ul className="w-full space-y-1.5">
@@ -456,9 +456,9 @@ export default function CompanyDashboardPage() {
                       <span className="w-2 h-2 rounded-full" style={{ background: STATUS_META[s.status]?.color ?? '#cbd5e1' }} />
                       {STATUS_META[s.status]?.label ?? s.status}
                     </span>
-                    <span className="tabular-nums text-slate-500">
+                    <span className="tabular-nums text-slate-600">
                       <b className="text-slate-900 font-semibold">{fmtNum(s.count)}</b>
-                      <span className="ml-1.5 text-[11px]">{distTotal ? Math.round((s.count / distTotal) * 100) : 0}%</span>
+                      <span className="ml-1.5 text-xs">{distTotal ? Math.round((s.count / distTotal) * 100) : 0}%</span>
                     </span>
                   </li>
                 ))}
@@ -479,12 +479,12 @@ export default function CompanyDashboardPage() {
                   <li key={j.title + j.status} className="px-5 py-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[13px] font-medium text-slate-800 truncate">{j.title}</p>
-                      <span className="text-[11px] tabular-nums text-slate-400 shrink-0">{j.hired} hired · {fmtNum(conv, 0)}%</span>
+                      <span className="text-xs tabular-nums text-slate-500 shrink-0">{j.hired} hired · {fmtNum(conv, 0)}%</span>
                     </div>
                     <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                      <div className="h-full rounded-full bg-[#0025B8]" style={{ width: `${(j.applications / max) * 100}%` }} />
+                      <div className="h-full rounded-full bg-[#0063CE]" style={{ width: `${(j.applications / max) * 100}%` }} />
                     </div>
-                    <p className="text-[10.5px] text-slate-400 mt-1">{fmtNum(j.applications)} applications</p>
+                    <p className="text-xs text-slate-500 mt-1">{fmtNum(j.applications)} applications</p>
                   </li>
                 );
               })}
@@ -496,23 +496,23 @@ export default function CompanyDashboardPage() {
       {/* ===== Row: jobs table + schedule ===== */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         <Panel className="xl:col-span-8" title="Job postings" subtitle={`${jobs.data.length} postings · live from the job service`} icon={<Briefcase className="w-3.5 h-3.5" />}
-          actions={<Link href="/company/jobs" className="text-[11px] font-semibold text-[#0025B8] hover:underline inline-flex items-center gap-1">Manage all <ArrowUpRight className="w-3 h-3" /></Link>}
+          actions={<Link href="/company/jobs" className="text-xs font-semibold text-[#0063CE] hover:underline inline-flex items-center gap-1">Manage all <ArrowUpRight className="w-3 h-3" /></Link>}
           noPad>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-slate-100">
             <div className="flex gap-1 flex-wrap">
               {JOB_TABS.map(t => (
                 <button key={t} onClick={() => setJobTab(t)}
-                  className={cx('px-2.5 py-1 text-[11px] font-semibold rounded-md cursor-pointer transition-colors',
-                    jobTab === t ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100')}>
+                  className={cx('px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer transition-colors',
+                    jobTab === t ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100')}>
                   {t === 'ALL' ? 'All' : t.charAt(0) + t.slice(1).toLowerCase()}
                   <span className="ml-1 opacity-60">{t === 'ALL' ? jobs.data.length : jobs.data.filter(j => j.status === t).length}</span>
                 </button>
               ))}
             </div>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input value={jobSearch} onChange={e => setJobSearch(e.target.value)} placeholder="Filter by title or location"
-                className="h-8 w-full sm:w-56 pl-8 pr-3 text-xs rounded-md border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0F9DE4]/25 focus:border-[#0F9DE4]" />
+                className="h-8 w-full sm:w-56 pl-8 pr-3 text-xs rounded-md border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#0084DA]/25 focus:border-[#0084DA]" />
             </div>
           </div>
           {loading ? <div className="p-5"><PanelSkeleton rows={6} /></div> : jobs.error ? <ErrorNote onRetry={() => load(true)} /> : jobsView.length === 0 ? (
@@ -521,7 +521,7 @@ export default function CompanyDashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[10.5px] uppercase tracking-wide text-slate-400 bg-slate-50/70">
+                  <tr className="text-left text-xs uppercase tracking-wide text-slate-500 bg-slate-50/70">
                     <th className="font-semibold px-5 py-2.5">Position</th>
                     <th className="font-semibold px-3 py-2.5">Status</th>
                     <th className="font-semibold px-3 py-2.5 w-44">Applicants</th>
@@ -536,7 +536,7 @@ export default function CompanyDashboardPage() {
                       <tr key={j.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-5 py-3">
                           <p className="font-semibold text-slate-800 text-[13px]">{j.title}</p>
-                          <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                             <MapPin className="w-3 h-3" />{j.location || 'Location not set'}<span>·</span>{String(j.jobType ?? '').replace('_', ' ')}
                           </p>
                         </td>
@@ -548,7 +548,7 @@ export default function CompanyDashboardPage() {
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
                             <div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                              <div className="h-full bg-gradient-to-r from-[#0025B8] to-[#0F9DE4]" style={{ width: `${(j.applicationCount / maxApps) * 100}%` }} />
+                              <div className="h-full bg-gradient-to-r from-[#0063CE] to-[#0084DA]" style={{ width: `${(j.applicationCount / maxApps) * 100}%` }} />
                             </div>
                             <span className="tabular-nums font-semibold text-slate-700 w-7 text-right">{j.applicationCount}</span>
                           </div>
@@ -557,10 +557,10 @@ export default function CompanyDashboardPage() {
                           {dl === null ? <span className="text-slate-300">–</span> : dl < 0 ? <Pill tone="slate">Ended</Pill>
                             : dl <= 3 ? <Pill tone="rose"><Clock className="w-3 h-3" />{dl}d left</Pill>
                             : dl <= 7 ? <Pill tone="amber"><Clock className="w-3 h-3" />{dl}d left</Pill>
-                            : <span className="text-slate-500">{new Date(j.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>}
+                            : <span className="text-slate-600">{new Date(j.deadline).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>}
                         </td>
                         <td className="px-5 py-3 text-right">
-                          <Link href={`/company/jobs/${j.id}/applicants`} className="text-[11px] font-semibold text-[#0025B8] hover:underline whitespace-nowrap">
+                          <Link href={`/company/jobs/${j.id}/applicants`} className="text-xs font-semibold text-[#0063CE] hover:underline whitespace-nowrap">
                             Review applicants
                           </Link>
                         </td>
@@ -574,7 +574,7 @@ export default function CompanyDashboardPage() {
         </Panel>
 
         <Panel className="xl:col-span-4" title="Upcoming schedule" subtitle="Next 7 days" icon={<CalendarDays className="w-3.5 h-3.5" />}
-          actions={<Link href="/company/calendar" className="text-[11px] font-semibold text-[#0025B8] hover:underline">Open calendar</Link>} noPad>
+          actions={<Link href="/company/calendar" className="text-xs font-semibold text-[#0063CE] hover:underline">Open calendar</Link>} noPad>
           {loading ? <div className="p-5"><PanelSkeleton rows={5} /></div> : events.error ? <ErrorNote onRetry={() => load(true)} /> : eventsByDay.length === 0 ? (
             <EmptyNote text="No interviews or events in the next 7 days." icon={<CalendarDays className="w-6 h-6" />} />
           ) : (
@@ -583,14 +583,14 @@ export default function CompanyDashboardPage() {
                 const isToday = day === new Date().toDateString();
                 return (
                   <div key={day}>
-                    <p className={cx('sticky top-0 px-5 py-1.5 text-[10.5px] font-semibold uppercase tracking-wide border-y border-slate-100',
-                      isToday ? 'bg-[#0025B8]/5 text-[#0025B8]' : 'bg-slate-50 text-slate-400')}>
+                    <p className={cx('sticky top-0 px-5 py-1.5 text-xs font-semibold uppercase tracking-wide border-y border-slate-100',
+                      isToday ? 'bg-[#0063CE]/5 text-[#0063CE]' : 'bg-slate-50 text-slate-500')}>
                       {isToday ? 'Today' : new Date(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
                     </p>
                     <ul className="divide-y divide-slate-100">
                       {list.map(e => (
                         <li key={e.id} className="px-5 py-3 flex gap-3">
-                          <div className="w-14 shrink-0 text-[11px] tabular-nums text-slate-500 leading-tight">
+                          <div className="w-14 shrink-0 text-xs tabular-nums text-slate-600 leading-tight">
                             <p className="font-semibold text-slate-800">{new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             <p>{new Date(e.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                           </div>
@@ -598,7 +598,7 @@ export default function CompanyDashboardPage() {
                             <p className="text-[13px] font-medium text-slate-800 truncate">{e.title}</p>
                             <div className="mt-1 flex items-center gap-2 flex-wrap">
                               <Pill tone={EVENT_META[e.eventType]?.tone ?? 'slate'}>{EVENT_META[e.eventType]?.label ?? e.eventType}</Pill>
-                              {e.location && <span className="text-[11px] text-slate-400 truncate inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{e.location}</span>}
+                              {e.location && <span className="text-xs text-slate-500 truncate inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{e.location}</span>}
                             </div>
                           </div>
                         </li>
@@ -615,14 +615,14 @@ export default function CompanyDashboardPage() {
       {/* ===== Row: top candidates + activity + insights ===== */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         <Panel className="xl:col-span-8" title="Top candidates by score" subtitle="Best AI or ATS match among current applicants" icon={<Users className="w-3.5 h-3.5" />}
-          actions={<Link href="/company/candidates" className="text-[11px] font-semibold text-[#0025B8] hover:underline inline-flex items-center gap-1">All candidates <ArrowUpRight className="w-3 h-3" /></Link>} noPad>
+          actions={<Link href="/company/candidates" className="text-xs font-semibold text-[#0063CE] hover:underline inline-flex items-center gap-1">All candidates <ArrowUpRight className="w-3 h-3" /></Link>} noPad>
           {loading ? <div className="p-5"><PanelSkeleton rows={6} /></div> : candidates.error ? <ErrorNote onRetry={() => load(true)} /> : topCandidates.length === 0 ? (
             <EmptyNote text="Candidates appear here when people apply to your jobs." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-left text-[10.5px] uppercase tracking-wide text-slate-400 bg-slate-50/70">
+                  <tr className="text-left text-xs uppercase tracking-wide text-slate-500 bg-slate-50/70">
                     <th className="font-semibold px-5 py-2.5">Candidate</th>
                     <th className="font-semibold px-3 py-2.5">Applied for</th>
                     <th className="font-semibold px-3 py-2.5 text-center">AI</th>
@@ -638,7 +638,7 @@ export default function CompanyDashboardPage() {
                       <tr key={c.applicationId} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
-                            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0063CE] to-[#0084DA] text-white text-xs font-bold flex items-center justify-center shrink-0">
                               {(name ?? '?').charAt(0).toUpperCase()}
                             </span>
                             <span className="font-semibold text-slate-800 text-[13px]">{name ?? 'Loading name…'}</span>
@@ -648,7 +648,7 @@ export default function CompanyDashboardPage() {
                         <td className="px-3 py-3"><div className="flex justify-center"><ScoreRing value={c.aiScore} /></div></td>
                         <td className="px-3 py-3"><div className="flex justify-center"><ScoreRing value={c.atsScore} /></div></td>
                         <td className="px-3 py-3"><Pill tone={STATUS_META[c.status]?.tone ?? 'slate'}>{STATUS_META[c.status]?.label ?? c.status}</Pill></td>
-                        <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{relTime(c.appliedDate)}</td>
+                        <td className="px-5 py-3 text-slate-600 whitespace-nowrap">{relTime(c.appliedDate)}</td>
                       </tr>
                     );
                   })}
@@ -680,9 +680,9 @@ export default function CompanyDashboardPage() {
                 {activity.data.slice(0, 12).map((a, i, arr) => (
                   <li key={a.id} className="relative pl-5 pb-4 last:pb-0">
                     {i < arr.length - 1 && <span className="absolute left-[3px] top-3 bottom-0 w-px bg-slate-200" />}
-                    <span className="absolute left-0 top-1.5 w-[7px] h-[7px] rounded-full bg-[#0F9DE4] ring-4 ring-sky-50" />
+                    <span className="absolute left-0 top-1.5 w-[7px] h-[7px] rounded-full bg-[#0084DA] ring-4 ring-brand-50" />
                     <p className="text-xs text-slate-700 leading-snug">{a.message}</p>
-                    <p className="text-[10.5px] text-slate-400 mt-0.5">{relTime(a.timestamp)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{relTime(a.timestamp)}</p>
                   </li>
                 ))}
               </ol>
@@ -711,8 +711,8 @@ function scoreOf(c: CandidateRow) {
 function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
-      <p className="text-[10.5px] uppercase tracking-wide font-semibold text-slate-400">{label}</p>
-      <p className="text-lg font-semibold text-slate-900 tabular-nums leading-tight">{value}{sub && <span className="text-[11px] font-medium text-slate-400 ml-1.5">{sub}</span>}</p>
+      <p className="text-xs uppercase tracking-wide font-semibold text-slate-500">{label}</p>
+      <p className="text-lg font-semibold text-slate-900 tabular-nums leading-tight">{value}{sub && <span className="text-xs font-medium text-slate-500 ml-1.5">{sub}</span>}</p>
     </div>
   );
 }
@@ -720,9 +720,9 @@ function MiniStat({ label, value, sub }: { label: string; value: string; sub?: s
 function InsightRow({ tone, label, title, value }: { tone: 'green' | 'amber'; label: string; title: string; value: string }) {
   return (
     <div className={cx('rounded-lg border px-3.5 py-3', tone === 'green' ? 'bg-emerald-50/60 border-emerald-100' : 'bg-amber-50/60 border-amber-100')}>
-      <p className={cx('text-[10.5px] font-semibold uppercase tracking-wide', tone === 'green' ? 'text-emerald-700' : 'text-amber-700')}>{label}</p>
+      <p className={cx('text-xs font-semibold uppercase tracking-wide', tone === 'green' ? 'text-emerald-700' : 'text-amber-700')}>{label}</p>
       <p className="text-[13px] font-semibold text-slate-800 mt-0.5 truncate">{title}</p>
-      <p className="text-[11px] text-slate-500">{value}</p>
+      <p className="text-xs text-slate-600">{value}</p>
     </div>
   );
 }

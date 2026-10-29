@@ -1,33 +1,39 @@
-import os
-import json
-import re
-from google.genai import Client
+from typing import List
+from pydantic import BaseModel
 from src.models.state import CVAnalysisState
+from src.tools.llm_json import generate_json
 
-# Create the new Gemini client
-client = Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-def clean_json_response(raw: str) -> str:
-    raw = raw.strip()
-    raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*", "", raw)
-    raw = re.sub(r"\s*```$", "", raw)
-    return raw.strip()
+class _Match(BaseModel):
+    job_id: str
+    match_score: int
+    match_reasons: List[str]
+
+
+class _Recommendations(BaseModel):
+    recommended_jobs: List[_Match]
+    recommendation_summary: str
+
+
+def _as_text(value, limit: int) -> str:
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(v) for v in value)
+    return str(value or "").strip()[:limit]
+
 
 def recommendation_agent(state: CVAnalysisState) -> CVAnalysisState:
     """
     Agent 3: Recommendation Agent
-    Compares the candidate's profile against all live job listings
-    and returns the best matching jobs with scores and reasons.
+    Compares the candidate's profile against the live job listings and returns the best
+    matches. The model only chooses the job id, score and reasons: title and location are
+    copied from the real listing, and ids that do not exist are dropped.
 
-    Input  : extracted_skills, extracted_experience, desired_role,
-             job_listings (from job-service)
+    Input  : extracted_skills, extracted_experience, desired_role, job_listings
     Output : recommended_jobs, recommendation_summary
     """
     print(">> [Agent 3] Recommendation agent started")
     print(f"   Available jobs to match: {len(state.get('job_listings', []))}")
 
-    # No jobs available, return early gracefully
     if not state.get("job_listings"):
         return {
             **state,
@@ -40,23 +46,21 @@ def recommendation_agent(state: CVAnalysisState) -> CVAnalysisState:
         }
 
     skills_text = (
-        ", ".join(state["extracted_skills"])
-        if state["extracted_skills"]
-        else "No skills extracted"
+        ", ".join(state["extracted_skills"]) if state["extracted_skills"] else "No skills extracted"
     )
 
-    # Format jobs for the prompt, cap at 15 to avoid token limit
+    # Cap at 15 listings to stay inside the token limit
     jobs_for_prompt = state["job_listings"][:15]
+    by_id = {str(j.get("id", "")): j for j in jobs_for_prompt if j.get("id")}
     jobs_text = ""
     for i, job in enumerate(jobs_for_prompt):
-        requirements = job.get("requirements", "")[:400]
         jobs_text += f"""
 Job {i + 1}:
   ID       : {job.get("id", "")}
   Title    : {job.get("title", "")}
   Location : {job.get("location", "")}
   Type     : {job.get("jobType", "")}
-  Requirements: {requirements}
+  Requirements: {_as_text(job.get("requirements", ""), 500)}
 ---"""
 
     prompt = f"""You are an expert job matching specialist.
@@ -72,66 +76,54 @@ CANDIDATE PROFILE:
 AVAILABLE JOB LISTINGS:
 {jobs_text}
 
-Analyze every job and select the best matches for this candidate.
-Return ONLY a valid JSON object. No markdown, no code blocks, no explanation.
-Start with {{ and end with }}.
-
-{{
-    "recommended_jobs": [
-        {{
-            "job_id": "copy the exact ID value from the job listing above",
-            "title": "job title exactly as listed",
-            "location": "job location exactly as listed",
-            "match_score": 85,
-            "match_reasons": [
-                "Specific reason mentioning actual skill that matches",
-                "Another specific reason why this role fits the candidate"
-            ]
-        }}
-    ],
-    "recommendation_summary": "2-3 sentences summarising the match results and giving the candidate actionable advice"
-}}
-
 Rules:
-- Include 3 to 5 jobs maximum, ordered by match_score descending
-- match_score is an integer 0-100 based on genuine skill alignment
-- Only include jobs where match_score is at least 30
-- match_reasons must reference specific skills from the candidate's profile
-- Use the EXACT job_id string from the listing, do not modify it
-- If fewer than 3 jobs score above 30, include the top 2 with honest reasoning"""
+- Return 1 to 5 jobs, ordered by match_score from highest to lowest.
+- match_score is an integer from 0 to 100 that reflects real overlap between the candidate's skills and the job requirements, and fit with the desired role. Do not inflate it.
+- Only include jobs with match_score of at least 30. If no job reaches 30, return the single best job with an honest low score.
+- match_reasons: 2 to 3 short reasons, each naming a specific skill or experience of the candidate that fits this job. Mention an important gap when there is one.
+- job_id must be copied exactly from the ID line of the listing.
+- recommendation_summary: 2 to 3 sentences that sum up the results and give one actionable next step."""
 
     try:
-        # Generate text using the new genai client
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-            contents=prompt,
-            config={
-                "temperature": 0.2,
-                "max_output_tokens": 3000,
-            }
+        data = generate_json(
+            prompt,
+            _Recommendations,
+            temperature=0.1,
+            max_tokens=8192,
+            thinking_budget=1024,
+            validate=lambda d: isinstance(d, dict) and "recommended_jobs" in d,
+            label="recommendation",
         )
-        
-        raw = clean_json_response(response.text)
-        data = json.loads(raw)
 
-        jobs = data.get("recommended_jobs", [])
+        jobs, used = [], set()
+        for m in data.get("recommended_jobs", []):
+            jid = str(m.get("job_id", "")).strip()
+            job = by_id.get(jid)
+            if not job or jid in used:
+                continue  # unknown or repeated id
+            used.add(jid)
+            try:
+                score = int(round(float(m.get("match_score", 0))))
+            except (TypeError, ValueError):
+                score = 0
+            reasons = [str(r).strip() for r in m.get("match_reasons", []) if str(r).strip()][:3]
+            jobs.append({
+                "job_id": jid,
+                "title": str(job.get("title", "")),
+                "location": str(job.get("location", "")),
+                "match_score": max(0, min(100, score)),
+                "match_reasons": reasons,
+            })
+        jobs.sort(key=lambda j: j["match_score"], reverse=True)
+        jobs = jobs[:5]
+
         print(f"   Recommended {len(jobs)} jobs")
 
         return {
             **state,
             "recommended_jobs": jobs,
-            "recommendation_summary": data.get("recommendation_summary", ""),
+            "recommendation_summary": str(data.get("recommendation_summary", "")).strip(),
             "current_step": "recommendation_complete",
-        }
-
-    except json.JSONDecodeError as e:
-        print(f"   JSON parse error: {e}")
-        return {
-            **state,
-            "recommended_jobs": [],
-            "recommendation_summary": "Could not generate recommendations due to a formatting issue.",
-            "current_step": "recommendation_failed",
-            "error": f"Recommendation JSON error: {str(e)}",
         }
 
     except Exception as e:
@@ -139,7 +131,7 @@ Rules:
         return {
             **state,
             "recommended_jobs": [],
-            "recommendation_summary": "Could not generate job recommendations.",
+            "recommendation_summary": "Job recommendations are temporarily unavailable. Please try the analysis again in a moment.",
             "current_step": "recommendation_failed",
             "error": f"Recommendation failed: {str(e)}",
         }

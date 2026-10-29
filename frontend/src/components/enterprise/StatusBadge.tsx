@@ -11,7 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-md border
       ${STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {STATUS_LABELS[status] ?? status}

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -88,7 +87,6 @@ function formatSize(bytes: number): string {
 
 function SmartApplyContent() {
   const { isAuthenticated } = useAuthStore();
-  const router = useRouter();
 
   const [step, setStep] = useState<Step>('upload');
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -159,10 +157,8 @@ function SmartApplyContent() {
     fetchSavedResume();
   }, [isAuthenticated]);
 
-  if (!isAuthenticated) {
-    router.push('/login');
-    return null;
-  }
+  // The AuthGuard around this page sends a signed-out user to the login page
+  if (!isAuthenticated) return null;
 
   async function handleAnalyze() {
     if (!desiredRole.trim()) {
@@ -517,7 +513,7 @@ function SmartApplyContent() {
             </div>
 
             <span className="inline-block text-[10px] font-extrabold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 mb-3 shadow-sm">
-              NEURAL AI SCANNING
+              AI SCANNING
             </span>
 
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-2">

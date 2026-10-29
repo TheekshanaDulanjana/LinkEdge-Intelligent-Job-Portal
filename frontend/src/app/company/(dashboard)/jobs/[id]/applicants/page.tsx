@@ -128,7 +128,7 @@ export default function JobApplicantsPage() {
   return (
     <div className="space-y-5 pb-10 text-slate-800">
       <PageHead
-        breadcrumb={<Link href={`/company/jobs/${jobId}`} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 hover:text-[#0025B8] mb-1"><ArrowLeft className="w-3 h-3" /> Back to job</Link>}
+        breadcrumb={<Link href={`/company/jobs/${jobId}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0063CE] mb-1"><ArrowLeft className="w-3 h-3" /> Back to job</Link>}
         eyebrow="Applicants"
         title={jobTitle || 'Applicants'}
         description="Rank applicants against this job, shortlist the best matches and schedule interviews."
@@ -183,9 +183,9 @@ export default function JobApplicantsPage() {
                     {view.map((a, i) => (
                       <React.Fragment key={a.id}>
                         <tr className="hover:bg-slate-50/70 transition-colors">
-                          <td className={cx(tdCls, 'text-slate-400 tabular-nums')}>
+                          <td className={cx(tdCls, 'text-slate-500 tabular-nums')}>
                             {sort === 'score' && ranked && a.aiScore !== null && i < 3
-                              ? <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center justify-center">{i + 1}</span>
+                              ? <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-800 text-xs font-bold flex items-center justify-center">{i + 1}</span>
                               : i + 1}
                           </td>
                           <td className={tdCls}>
@@ -193,10 +193,10 @@ export default function JobApplicantsPage() {
                               <Avatar name={people[a.seekerId]?.name} src={people[a.seekerId]?.img} size={32} />
                               <div className="min-w-0">
                                 <p className="text-[13px] font-semibold text-slate-900 truncate">{nameOf(a)}
-                                  {a.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">System rejected</span>}
-                                  {a.companyOverride && !a.autoRejected && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Override</span>}
+                                  {a.autoRejected && <span className="ml-2 align-middle text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">System rejected</span>}
+                                  {a.companyOverride && !a.autoRejected && <span className="ml-2 align-middle text-xs font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-200">Override</span>}
                                 </p>
-                                <a href={a.cvUrl} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#0025B8] hover:underline">Open CV ↗</a>
+                                <a href={a.cvUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-[#0063CE] hover:underline">Open CV ↗</a>
                               </div>
                             </div>
                           </td>
@@ -205,23 +205,23 @@ export default function JobApplicantsPage() {
                               <ScoreRing value={a.aiScore} />
                               {a.atsBreakdown && (
                                 <button onClick={() => setExpanded(expanded === a.id ? null : a.id)} className={iconBtn} aria-label="Show AI insight">
-                                  {expanded === a.id ? <ChevronDown className="w-4 h-4 text-[#0F9DE4]" /> : <ChevronRight className="w-4 h-4" />}
+                                  {expanded === a.id ? <ChevronDown className="w-4 h-4 text-[#0084DA]" /> : <ChevronRight className="w-4 h-4" />}
                                 </button>
                               )}
                             </div>
                           </td>
                           <td className={tdCls}><div className="flex justify-center"><ScoreRing value={a.atsScore} /></div></td>
                           <td className={tdCls}><StagePill status={a.status} /></td>
-                          <td className={cx(tdCls, 'text-slate-500 whitespace-nowrap')}>{relTime(a.createdAt)}</td>
+                          <td className={cx(tdCls, 'text-slate-600 whitespace-nowrap')}>{relTime(a.createdAt)}</td>
                           <td className={tdCls}>
                             {a.status === 'REJECTED' && !a.autoRejected ? (
-                              <p className="text-right text-[11px] text-slate-400 max-w-[180px] ml-auto truncate" title={a.rejectionReason ?? ''}>{a.rejectionReason}</p>
+                              <p className="text-right text-xs text-slate-500 max-w-[180px] ml-auto truncate" title={a.rejectionReason ?? ''}>{a.rejectionReason}</p>
                             ) : (
                               <div className="flex items-center justify-end gap-0.5">
                                 {a.status !== 'SHORTLISTED' && a.status !== 'INTERVIEW' && (
                                   <button onClick={() => handleShortlist(a)} title={a.autoRejected ? 'Shortlist anyway' : 'Shortlist'} className={cx(iconBtn, 'hover:!bg-violet-50 hover:!text-violet-700')}><CheckCircle2 className="w-4 h-4" /></button>
                                 )}
-                                <button onClick={() => setScheduleTarget(a)} title={a.autoRejected ? 'Interview anyway' : 'Schedule interview'} className={cx(iconBtn, 'hover:!bg-sky-50 hover:!text-sky-700')}><CalendarClock className="w-4 h-4" /></button>
+                                <button onClick={() => setScheduleTarget(a)} title={a.autoRejected ? 'Interview anyway' : 'Schedule interview'} className={cx(iconBtn, 'hover:!bg-brand-50 hover:!text-brand-700')}><CalendarClock className="w-4 h-4" /></button>
                                 {!a.autoRejected && <button onClick={() => setRejectTarget(a)} title="Reject" className={cx(iconBtn, 'hover:!bg-rose-50 hover:!text-rose-600')}><XCircle className="w-4 h-4" /></button>}
                               </div>
                             )}
@@ -242,11 +242,11 @@ export default function JobApplicantsPage() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-4xl">
                                 <div className="bg-white rounded-lg border border-slate-200 p-4">
                                   <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1.5 mb-2"><ThumbsUp className="w-3.5 h-3.5" /> Strengths</p>
-                                  <ul className="space-y-1">{(a.atsBreakdown.strengths ?? []).length === 0 ? <li className="text-xs text-slate-400">Not specified</li> : (a.atsBreakdown.strengths ?? []).map((s, k) => <li key={k} className="text-xs text-slate-600 flex gap-2"><span className="text-emerald-500">•</span>{s}</li>)}</ul>
+                                  <ul className="space-y-1">{(a.atsBreakdown.strengths ?? []).length === 0 ? <li className="text-xs text-slate-500">Not specified</li> : (a.atsBreakdown.strengths ?? []).map((s, k) => <li key={k} className="text-xs text-slate-600 flex gap-2"><span className="text-emerald-500">•</span>{s}</li>)}</ul>
                                 </div>
                                 <div className="bg-white rounded-lg border border-slate-200 p-4">
                                   <p className="text-xs font-semibold text-rose-600 flex items-center gap-1.5 mb-2"><ThumbsDown className="w-3.5 h-3.5" /> Gaps</p>
-                                  <ul className="space-y-1">{(a.atsBreakdown.weaknesses ?? []).length === 0 ? <li className="text-xs text-slate-400">Not specified</li> : (a.atsBreakdown.weaknesses ?? []).map((w, k) => <li key={k} className="text-xs text-slate-600 flex gap-2"><span className="text-rose-400">•</span>{w}</li>)}</ul>
+                                  <ul className="space-y-1">{(a.atsBreakdown.weaknesses ?? []).length === 0 ? <li className="text-xs text-slate-500">Not specified</li> : (a.atsBreakdown.weaknesses ?? []).map((w, k) => <li key={k} className="text-xs text-slate-600 flex gap-2"><span className="text-rose-400">•</span>{w}</li>)}</ul>
                                 </div>
                               </div>
                               {a.atsBreakdown.recommendation && (
@@ -271,7 +271,7 @@ export default function JobApplicantsPage() {
               <ul className="space-y-3">
                 {bands.map(b => (
                   <li key={b.label}>
-                    <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-slate-600">{b.label}%</span><span className="tabular-nums text-slate-500"><b className="text-slate-900">{b.n}</b></span></div>
+                    <div className="flex justify-between text-xs mb-1"><span className="font-semibold text-slate-600">{b.label}%</span><span className="tabular-nums text-slate-600"><b className="text-slate-900">{b.n}</b></span></div>
                     <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(b.n / scored.length) * 100}%`, background: b.color }} /></div>
                   </li>
                 ))}
@@ -279,7 +279,7 @@ export default function JobApplicantsPage() {
             )}
           </Panel>
           <Panel title="How ranking works" icon={<Sparkles className="w-3.5 h-3.5" />}>
-            <p className="text-xs text-slate-500 leading-relaxed">Smart Rank compares each CV with this job’s description and requirements. The same CV and job always give the same score. Treat it as a first filter, then review profiles yourself.</p>
+            <p className="text-xs text-slate-600 leading-relaxed">Smart Rank compares each CV with this job’s description and requirements. The same CV and job always give the same score. Treat it as a first filter, then review profiles yourself.</p>
           </Panel>
         </div>
       </div>

@@ -24,9 +24,9 @@ const PERIODS = [
 ];
 const STATUS_META: Record<string, { label: string; color: string }> = {
   PENDING: { label: 'Pending', color: '#94a3b8' },
-  REVIEWING: { label: 'Reviewing', color: '#0025B8' },
+  REVIEWING: { label: 'Reviewing', color: '#0063CE' },
   SHORTLISTED: { label: 'Shortlisted', color: '#7c3aed' },
-  INTERVIEW: { label: 'Interview', color: '#0F9DE4' },
+  INTERVIEW: { label: 'Interview', color: '#0084DA' },
   REJECTED: { label: 'Rejected', color: '#e11d48' },
 };
 const tip = { fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(15,23,42,.08)' };
@@ -127,14 +127,14 @@ export default function AnalyticsPage() {
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={trendData} margin={{ top: 6, right: 8, left: -18, bottom: 0 }}>
-                  <defs><linearGradient id="av" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0F9DE4" stopOpacity={0.25} /><stop offset="100%" stopColor="#0F9DE4" stopOpacity={0} /></linearGradient></defs>
+                  <defs><linearGradient id="av" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0084DA" stopOpacity={0.25} /><stop offset="100%" stopColor="#0084DA" stopOpacity={0} /></linearGradient></defs>
                   <CartesianGrid stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} minTickGap={28}
                     tickFormatter={d => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={tip} labelFormatter={d => new Date(String(d)).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} />
-                  <Area type="monotone" dataKey="count" name="Applications" stroke="#0F9DE4" strokeWidth={1.5} fill="url(#av)" />
-                  <Line type="monotone" dataKey="avg" name="7-day average" stroke="#0025B8" strokeWidth={2.2} dot={false} />
+                  <Area type="monotone" dataKey="count" name="Applications" stroke="#0084DA" strokeWidth={1.5} fill="url(#av)" />
+                  <Line type="monotone" dataKey="avg" name="7-day average" stroke="#0063CE" strokeWidth={2.2} dot={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -153,13 +153,13 @@ export default function AnalyticsPage() {
                     <Tooltip contentStyle={tip} formatter={(v, n) => [`${v}`, STATUS_META[String(n)]?.label ?? String(n)]} />
                   </PieChart>
                 </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><span className="text-2xl font-semibold text-slate-900 tabular-nums">{fmtNum(distTotal)}</span><span className="text-[10px] uppercase tracking-wide text-slate-400">Total</span></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"><span className="text-2xl font-semibold text-slate-900 tabular-nums">{fmtNum(distTotal)}</span><span className="text-xs uppercase tracking-wide text-slate-500">Total</span></div>
               </div>
               <ul className="w-full space-y-1.5">
                 {dist.data.map(d => (
                   <li key={d.status} className="flex items-center justify-between text-xs">
                     <span className="flex items-center gap-2 text-slate-600"><span className="w-2 h-2 rounded-full" style={{ background: STATUS_META[d.status]?.color ?? '#cbd5e1' }} />{STATUS_META[d.status]?.label ?? d.status}</span>
-                    <span className="tabular-nums text-slate-500"><b className="text-slate-900">{fmtNum(d.count)}</b><span className="ml-1.5 text-[11px]">{Math.round((d.count / distTotal) * 100)}%</span></span>
+                    <span className="tabular-nums text-slate-600"><b className="text-slate-900">{fmtNum(d.count)}</b><span className="ml-1.5 text-xs">{Math.round((d.count / distTotal) * 100)}%</span></span>
                   </li>
                 ))}
               </ul>
@@ -176,9 +176,9 @@ export default function AnalyticsPage() {
                 <div key={r.stage}>
                   <div className="flex items-baseline justify-between text-xs mb-1">
                     <span className="font-semibold text-slate-700">{r.stage}</span>
-                    <span className="tabular-nums text-slate-500"><b className="text-slate-900">{fmtNum(r.value)}</b>{i > 0 && <span className="ml-2 text-[11px]">{fmtNum(r.step, 0)}% of previous · {fmtNum(r.ofTop, 0)}% of top</span>}</span>
+                    <span className="tabular-nums text-slate-600"><b className="text-slate-900">{fmtNum(r.value)}</b>{i > 0 && <span className="ml-2 text-xs">{fmtNum(r.step, 0)}% of previous · {fmtNum(r.ofTop, 0)}% of top</span>}</span>
                   </div>
-                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#0025B8] to-[#0F9DE4] transition-all duration-700" style={{ width: `${Math.max(r.ofTop, r.value > 0 ? 2 : 0)}%` }} /></div>
+                  <div className="h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#0063CE] to-[#0084DA] transition-all duration-700" style={{ width: `${Math.max(r.ofTop, r.value > 0 ? 2 : 0)}%` }} /></div>
                 </div>
               ))}
             </div>
@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
                   <Tooltip contentStyle={tip} cursor={{ fill: '#f8fafc' }} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="applications" name="Applications" fill="#bae6fd" radius={[0, 4, 4, 0]} barSize={10} />
-                  <Bar dataKey="hired" name="Hired" fill="#0025B8" radius={[0, 4, 4, 0]} barSize={10} />
+                  <Bar dataKey="hired" name="Hired" fill="#0063CE" radius={[0, 4, 4, 0]} barSize={10} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -219,7 +219,7 @@ export default function AnalyticsPage() {
                         <td className={tdCls}><JobStatusPill status={j.status} /></td>
                         <td className={cx(tdCls, 'text-right tabular-nums')}>{fmtNum(j.applications)}</td>
                         <td className={cx(tdCls, 'text-right tabular-nums')}>{fmtNum(j.hired)}</td>
-                        <td className={tdCls}><div className="flex items-center gap-2"><div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${Math.min(rate, 100)}%` }} /></div><span className="tabular-nums text-slate-500 w-10 text-right">{fmtNum(rate, 0)}%</span></div></td>
+                        <td className={tdCls}><div className="flex items-center gap-2"><div className="h-1.5 flex-1 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-emerald-500" style={{ width: `${Math.min(rate, 100)}%` }} /></div><span className="tabular-nums text-slate-600 w-10 text-right">{fmtNum(rate, 0)}%</span></div></td>
                       </tr>
                     );
                   })}
@@ -232,9 +232,9 @@ export default function AnalyticsPage() {
         <Panel className="xl:col-span-4" title="Insights" subtitle="Computed from your postings" icon={<Lightbulb className="w-3.5 h-3.5" />}>
           {loading ? <PanelSkeleton rows={4} /> : insights.error ? <ErrorNote onRetry={load} /> : !insights.data?.topJob ? <EmptyNote text="Insights appear once jobs receive applications." /> : (
             <div className="space-y-3">
-              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3.5 py-3"><p className="text-[10.5px] font-semibold uppercase tracking-wide text-emerald-700">Most applied job</p><p className="text-[13px] font-semibold text-slate-800 mt-0.5">{insights.data.topJob.title}</p><p className="text-[11px] text-slate-500">{fmtNum(insights.data.topJob.applications)} applications</p></div>
+              <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 px-3.5 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Most applied job</p><p className="text-[13px] font-semibold text-slate-800 mt-0.5">{insights.data.topJob.title}</p><p className="text-xs text-slate-600">{fmtNum(insights.data.topJob.applications)} applications</p></div>
               {insights.data.lowestJob && insights.data.lowestJob.title !== insights.data.topJob.title && (
-                <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3.5 py-3"><p className="text-[10.5px] font-semibold uppercase tracking-wide text-amber-700">Needs attention</p><p className="text-[13px] font-semibold text-slate-800 mt-0.5">{insights.data.lowestJob.title}</p><p className="text-[11px] text-slate-500">Only {fmtNum(insights.data.lowestJob.applications)} applications. Review the title, skills and salary range.</p></div>
+                <div className="rounded-lg border border-amber-100 bg-amber-50/60 px-3.5 py-3"><p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Needs attention</p><p className="text-[13px] font-semibold text-slate-800 mt-0.5">{insights.data.lowestJob.title}</p><p className="text-xs text-slate-600">Only {fmtNum(insights.data.lowestJob.applications)} applications. Review the title, skills and salary range.</p></div>
               )}
             </div>
           )}

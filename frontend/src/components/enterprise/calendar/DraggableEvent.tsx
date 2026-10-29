@@ -31,7 +31,7 @@ export default function DraggableEvent({
       {...attributes}
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       className={`cursor-grab active:cursor-grabbing rounded-md border border-l-[3px] truncate transition-shadow hover:shadow-sm ${s.chip} ${s.bar}
-        ${compact ? 'text-[10.5px] px-1.5 py-0.5' : 'text-xs px-2 py-1.5'}`}
+        ${compact ? 'text-xs px-1.5 py-0.5' : 'text-xs px-2 py-1.5'}`}
       title={event.title}
     >
       {compact

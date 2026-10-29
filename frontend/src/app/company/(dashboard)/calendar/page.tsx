@@ -161,10 +161,10 @@ export default function CalendarPage() {
               <Segmented size="sm" value={view} onChange={setView} options={[{ value: 'month', label: 'Month' }, { value: 'week', label: 'Week' }, { value: 'day', label: 'Day' }]} />
             </>}>
             <div className="flex items-center gap-4 px-5 py-2.5 border-b border-slate-100 flex-wrap">
-              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-400">Show</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Show</span>
               {Object.entries(EVENT_STYLE).map(([k, s]) => (
                 <label key={k} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none">
-                  <input type="checkbox" checked={!hidden[k]} onChange={() => setHidden(h => ({ ...h, [k]: !h[k] }))} className="accent-[#0025B8]" />
+                  <input type="checkbox" checked={!hidden[k]} onChange={() => setHidden(h => ({ ...h, [k]: !h[k] }))} className="accent-[#0063CE]" />
                   <span className={cx('w-2 h-2 rounded-full', s.dot)} />{s.label}
                 </label>
               ))}
@@ -174,7 +174,7 @@ export default function CalendarPage() {
               : view === 'month' ? (
                 <div>
                   <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/70">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 py-2">{d}</div>)}
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} className="text-center text-xs font-semibold uppercase tracking-wide text-slate-500 py-2">{d}</div>)}
                   </div>
                   <div className="grid grid-cols-7">
                     {monthGrid.map((day, i) => {
@@ -185,13 +185,13 @@ export default function CalendarPage() {
                         <DroppableDay key={i} id={`slot-${day.toISOString()}`} date={day}
                           className={cx('min-h-[112px] p-1.5 border-b border-l border-slate-100 text-left transition-colors', !inMonth && 'bg-slate-50/60', i % 7 === 0 && 'border-l-0')}>
                           <button onClick={() => { setSelectedDate(day); setShowModal(true); }}
-                            className={cx('text-[11px] inline-flex items-center justify-center w-6 h-6 rounded-full font-semibold cursor-pointer transition-colors',
-                              isToday ? 'bg-[#0025B8] text-white' : inMonth ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-300 hover:bg-slate-100')}>
+                            className={cx('text-xs inline-flex items-center justify-center w-6 h-6 rounded-full font-semibold cursor-pointer transition-colors',
+                              isToday ? 'bg-[#0063CE] text-white' : inMonth ? 'text-slate-700 hover:bg-slate-100' : 'text-slate-300 hover:bg-slate-100')}>
                             {day.getDate()}
                           </button>
                           <div className="mt-1 space-y-0.5">
                             {list.slice(0, 3).map(ev => <DraggableEvent key={ev.id} event={ev} onClick={() => setDetail(ev)} />)}
-                            {list.length > 3 && <button onClick={() => { setCursor(day); setView('day'); }} className="text-[10px] font-semibold text-[#0025B8] px-1 hover:underline cursor-pointer">+{list.length - 3} more</button>}
+                            {list.length > 3 && <button onClick={() => { setCursor(day); setView('day'); }} className="text-xs font-semibold text-[#0063CE] px-1 hover:underline cursor-pointer">+{list.length - 3} more</button>}
                           </div>
                         </DroppableDay>
                       );
@@ -215,8 +215,8 @@ export default function CalendarPage() {
                       <li key={ev.id}>
                         <button onClick={() => setDetail(ev)} className={cx('w-full text-left px-5 py-3 border-l-[3px] hover:bg-slate-50 transition-colors cursor-pointer', s.bar)}>
                           <p className="text-[13px] font-semibold text-slate-900 truncate">{ev.title}</p>
-                          <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5"><Clock className="w-3 h-3" />{new Date(ev.startTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                          {ev.location && <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3" />{ev.location}</p>}
+                          <p className="text-xs text-slate-600 mt-0.5 flex items-center gap-1.5"><Clock className="w-3 h-3" />{new Date(ev.startTime).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                          {ev.location && <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 truncate"><MapPin className="w-3 h-3" />{ev.location}</p>}
                         </button>
                       </li>
                     );
@@ -238,10 +238,10 @@ export default function CalendarPage() {
         {detail && (
           <div className="space-y-3 text-[13px]">
             <div className="flex items-center gap-2"><Pill tone={detail.eventType === 'DEADLINE' ? 'rose' : detail.eventType === 'REMINDER' ? 'green' : detail.eventType === 'INTERVIEW' ? 'sky' : 'blue'}>{styleFor(detail).label}</Pill>{detail.isSystemGenerated && <Pill tone="slate">Auto-created</Pill>}</div>
-            <p className="flex items-center gap-2 text-slate-700"><Clock className="w-4 h-4 text-slate-400" />{new Date(detail.startTime).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, {timeOf(detail.startTime)} – {timeOf(detail.endTime)}</p>
-            {detail.location && <p className="flex items-center gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-400" />{detail.location}</p>}
-            {detail.description && <p className="text-slate-500 leading-relaxed bg-slate-50 border border-slate-100 rounded-lg p-3">{detail.description}</p>}
-            {detail.applicationId && <p className="text-xs text-slate-400">Linked to an application. Drag it on the calendar to change the interview time.</p>}
+            <p className="flex items-center gap-2 text-slate-700"><Clock className="w-4 h-4 text-slate-500" />{new Date(detail.startTime).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, {timeOf(detail.startTime)} – {timeOf(detail.endTime)}</p>
+            {detail.location && <p className="flex items-center gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-500" />{detail.location}</p>}
+            {detail.description && <p className="text-slate-600 leading-relaxed bg-slate-50 border border-slate-100 rounded-lg p-3">{detail.description}</p>}
+            {detail.applicationId && <p className="text-xs text-slate-500">Linked to an application. Drag it on the calendar to change the interview time.</p>}
           </div>
         )}
       </Modal>

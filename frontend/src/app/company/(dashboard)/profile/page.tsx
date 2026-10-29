@@ -136,8 +136,8 @@ function CompanyProfileContent() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         <div className="xl:col-span-8 space-y-4">
-          <section className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="relative h-44 bg-gradient-to-br from-[#0025B8] to-[#0F9DE4]">
+          <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="relative h-44 bg-gradient-to-br from-[#0063CE] to-[#0084DA]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {coverPreview && <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent" />
@@ -152,13 +152,13 @@ function CompanyProfileContent() {
             </div>
             <div className="px-6 pb-5 -mt-10 flex items-end gap-4">
               <div className="relative shrink-0">
-                <div className="w-20 h-20 rounded-xl overflow-hidden border-4 border-white bg-white shadow-md">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden border-4 border-white bg-white shadow-md">
                   {logoPreview
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[#0025B8] font-semibold text-2xl">{profile.companyName?.[0]?.toUpperCase() || 'C'}</div>}
+                    : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-[#0063CE] font-semibold text-2xl">{profile.companyName?.[0]?.toUpperCase() || 'C'}</div>}
                 </div>
-                <label htmlFor="logo-img" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-lg bg-[#0025B8] text-white flex items-center justify-center cursor-pointer border-2 border-white hover:bg-[#001f9c] transition-colors" title="Change logo">
+                <label htmlFor="logo-img" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-lg bg-[#0063CE] text-white flex items-center justify-center cursor-pointer border-2 border-white hover:bg-[#0052AB] transition-colors" title="Change logo">
                   <ImageIcon className="w-3.5 h-3.5" />
                   <input id="logo-img" type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, 'logo')} />
                 </label>
@@ -169,7 +169,7 @@ function CompanyProfileContent() {
               </div>
               <div className="pb-1 min-w-0">
                 <h2 className="text-lg font-semibold text-slate-900 truncate">{profile.companyName || 'Your company'}</h2>
-                <p className="text-xs text-slate-500">{[profile.industry, profile.location].filter(Boolean).join(' · ') || 'Add your industry and location'}</p>
+                <p className="text-xs text-slate-600">{[profile.industry, profile.location].filter(Boolean).join(' · ') || 'Add your industry and location'}</p>
               </div>
             </div>
           </section>
@@ -186,20 +186,20 @@ function CompanyProfileContent() {
                 </select>
               </Field>
               <Field label="Website" error={websiteError}>
-                <div className="relative"><Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="url" maxLength={200} value={profile.website} onChange={set('website')} placeholder="https://company.com" className={cx(inputCls, 'pl-9', websiteError && '!border-rose-300')} /></div>
+                <div className="relative"><Globe className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="url" maxLength={200} value={profile.website} onChange={set('website')} placeholder="https://company.com" className={cx(inputCls, 'pl-9', websiteError && '!border-rose-300')} /></div>
               </Field>
               <Field label="Phone">
-                <div className="relative"><Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: stripPhone(e.target.value) }))} placeholder="+94 11 000 0000" className={cx(inputCls, 'pl-9')} /></div>
+                <div className="relative"><Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" /><input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: stripPhone(e.target.value) }))} placeholder="+94 11 000 0000" className={cx(inputCls, 'pl-9')} /></div>
               </Field>
               <Field label="Location" className="sm:col-span-2">
-                <div className="relative"><MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" /><input maxLength={100} value={profile.location} onChange={e => setProfile(p => ({ ...p, location: stripPlace(e.target.value) }))} placeholder="Colombo, Sri Lanka" className={cx(inputCls, 'pl-9')} /></div>
+                <div className="relative"><MapPin className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" /><input maxLength={100} value={profile.location} onChange={e => setProfile(p => ({ ...p, location: stripPlace(e.target.value) }))} placeholder="Colombo, Sri Lanka" className={cx(inputCls, 'pl-9')} /></div>
               </Field>
             </div>
           </Panel>
 
           <Panel title="About your company" subtitle="Mission, culture and what makes it a good place to work" icon={<Eye className="w-3.5 h-3.5" />}>
             <textarea rows={7} maxLength={ABOUT_MAX} value={profile.aboutUs} onChange={set('aboutUs')} placeholder="Tell candidates who you are, what you build and how your team works." className={textareaCls} />
-            <p className={cx('text-[11px] text-right mt-1.5 tabular-nums', profile.aboutUs.length > ABOUT_MAX * 0.9 ? 'text-amber-600' : 'text-slate-400')}>{profile.aboutUs.length} / {ABOUT_MAX}</p>
+            <p className={cx('text-xs text-right mt-1.5 tabular-nums', profile.aboutUs.length > ABOUT_MAX * 0.9 ? 'text-amber-600' : 'text-slate-500')}>{profile.aboutUs.length} / {ABOUT_MAX}</p>
           </Panel>
         </div>
 
@@ -213,7 +213,7 @@ function CompanyProfileContent() {
               {checklist.map(c => (
                 <li key={c.label} className="flex items-center gap-2.5 text-xs">
                   <span className={cx('w-4 h-4 rounded-full flex items-center justify-center shrink-0', c.done ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-300')}><CheckCircle2 className="w-3 h-3" /></span>
-                  <span className={c.done ? 'text-slate-600' : 'text-slate-400'}>{c.label}</span>
+                  <span className={c.done ? 'text-slate-600' : 'text-slate-500'}>{c.label}</span>
                 </li>
               ))}
             </ul>
@@ -224,13 +224,13 @@ function CompanyProfileContent() {
               {logoPreview
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={logoPreview} alt="" className="w-10 h-10 rounded-lg object-cover" />
-                : <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] text-white font-semibold flex items-center justify-center">{profile.companyName?.[0]?.toUpperCase() || 'C'}</span>}
-              <div className="min-w-0"><p className="text-[13px] font-semibold text-slate-900 truncate">{profile.companyName || 'Company name'}</p><p className="text-[11px] text-slate-400 truncate">{profile.location || 'Location'} · {profile.industry || 'Industry'}</p></div>
+                : <span className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#0063CE] to-[#0084DA] text-white font-semibold flex items-center justify-center">{profile.companyName?.[0]?.toUpperCase() || 'C'}</span>}
+              <div className="min-w-0"><p className="text-[13px] font-semibold text-slate-900 truncate">{profile.companyName || 'Company name'}</p><p className="text-xs text-slate-500 truncate">{profile.location || 'Location'} · {profile.industry || 'Industry'}</p></div>
             </div>
           </Panel>
 
           <Panel title="Danger zone" icon={<ShieldAlert className="w-3.5 h-3.5" />}>
-            <p className="text-xs text-slate-500 leading-relaxed mb-3">Deleting your account removes your company, jobs and applications permanently.</p>
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">Deleting your account removes your company, jobs and applications permanently.</p>
             <Link href="/settings/delete-account" className={cx(btnSecondary, 'text-rose-600 border-rose-200 hover:!bg-rose-50 hover:!text-rose-700')}><AlertTriangle className="w-3.5 h-3.5" /> Delete account</Link>
           </Panel>
         </div>
@@ -240,7 +240,7 @@ function CompanyProfileContent() {
       <div className={cx('fixed bottom-0 left-0 right-0 z-40 transition-transform duration-200 pointer-events-none', dirty ? 'translate-y-0' : 'translate-y-full')}>
         <div className="lg:pl-[248px]">
           <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 pb-4 pointer-events-auto">
-            <div className="flex items-center justify-between gap-3 bg-slate-900 text-white rounded-xl px-5 py-3 shadow-2xl">
+            <div className="flex items-center justify-between gap-3 bg-slate-900 text-white rounded-2xl px-5 py-3 shadow-2xl">
               <p className="text-xs font-medium">You have unsaved changes</p>
               <div className="flex items-center gap-2">
                 <button onClick={discard} disabled={saving} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"><Undo2 className="w-3.5 h-3.5" /> Discard</button>

@@ -232,6 +232,17 @@ export const authService = {
     return { ...tokens, user: { id: user.id, email: user.email, role: user.role, profile } };
   },
 
+  // ── Session renewal ───────────────────────────────────────────
+  // Gives a fresh 15-minute access token to a user whose current token is still valid.
+  async refreshSession(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AppError('Account not found.', 401, 'UNAUTHORIZED');
+    const { accessToken } = generateTokens({
+      userId: user.id, email: user.email, role: user.role,
+    });
+    return { accessToken };
+  },
+
   // ── Google OAuth ──────────────────────────────────────────────
 
   async googleAuth(idToken: string, role: 'SEEKER' | 'COMPANY') {
