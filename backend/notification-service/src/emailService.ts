@@ -62,6 +62,14 @@ export const emailService = {
     await sendEmail(to, subject, html);
   },
 
+  async sendJobMatch(
+    to: string,
+    p: { seekerName: string; jobTitle: string; companyName: string; location: string; score: number; matchedSkills: string[]; jobUrl: string; settingsUrl: string }
+  ) {
+    const { subject, html } = emailTemplates.jobMatch(p);
+    await sendEmail(to, subject, html);
+  },
+
   async sendShortlisted(
     to: string,
     seekerName: string,

@@ -5,7 +5,11 @@ import axios from 'axios';
  * AI services. The key is only added for those two hosts, never for anything else.
  */
 const targets = () =>
-  [process.env.ATS_SERVICE_URL || 'http://localhost:8003', process.env.AI_SERVICE_URL || 'http://localhost:8001'];
+  [
+    process.env.ATS_SERVICE_URL || 'http://localhost:8003',
+    process.env.AI_SERVICE_URL || 'http://localhost:8001',
+    process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3004',
+  ];
 
 axios.interceptors.request.use((config) => {
   const url = String(config.url || '');
