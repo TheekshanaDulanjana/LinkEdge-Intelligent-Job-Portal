@@ -1,3 +1,4 @@
+from src.security.paths import safe_upload_path
 import os
 import json
 import uuid
@@ -551,7 +552,7 @@ class ExtractTextRequest(BaseModel):
 @router.post("/extract-text")
 async def extract_text(request: ExtractTextRequest):
     """Readable text of a stored CV file (PDF / DOCX / TXT). Empty text means unreadable (e.g. scanned)."""
-    path = Path(request.file_path)
+    path = safe_upload_path(request.file_path)
     if path.suffix.lower() not in ALLOWED_EXTRACT_SUFFIXES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
     if not path.is_file():

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter } from 'next/navigation';
-import { applicationApi } from '@/lib/api';
+import { applicationApi, INTERVIEW_SERVICE_URL, authHeader } from '@/lib/api';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import AuthGuard from '@/components/AuthGuard';
@@ -47,7 +47,8 @@ function SeekerDashboardContent() {
           if (app.status === 'INTERVIEW') {
             try {
               const r = await fetch(
-                `http://localhost:8002/api/v1/interview/can-practice/${app.id}`
+                `${INTERVIEW_SERVICE_URL}/interview/can-practice/${app.id}`,
+                { headers: authHeader() }
               );
               checks[app.id] = await r.json();
             } catch { checks[app.id] = { can_practice: false, reason: 'Service unavailable' }; }

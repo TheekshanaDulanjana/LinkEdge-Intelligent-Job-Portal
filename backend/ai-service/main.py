@@ -28,7 +28,8 @@ app = FastAPI(
 # ── Trusted hosts ─────────────────────────────────────────────────
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"],
+    allowed_hosts=["localhost", "127.0.0.1", "*.yourdomain.com"]
+    + [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()],
 )
 
 # ── CORS ──────────────────────────────────────────────────────────

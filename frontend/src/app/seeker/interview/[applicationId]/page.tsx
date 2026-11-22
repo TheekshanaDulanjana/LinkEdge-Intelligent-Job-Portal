@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { applicationApi } from '@/lib/api';
+import { applicationApi, INTERVIEW_SERVICE_URL, JOB_SERVICE_URL, authHeader } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
@@ -132,10 +132,9 @@ function InterviewPage() {
         );
         if (!app) return;
 
-        const token = localStorage.getItem('accessToken');
         const jobRes = await fetch(
-          `http://localhost:3002/api/v1/jobs/${app.job.id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          `${JOB_SERVICE_URL}/jobs/${app.job.id}`,
+          { headers: authHeader() }
         );
         const jobData = await jobRes.json();
         setJobInfo({
@@ -176,14 +175,13 @@ function InterviewPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('accessToken');
       const res = await fetch(
-        'http://localhost:8002/api/v1/interview/start',
+        `${INTERVIEW_SERVICE_URL}/interview/start`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            ...authHeader(),
           },
           body: JSON.stringify({
             application_id: applicationId,
@@ -260,14 +258,13 @@ function InterviewPage() {
     setStage('submitting');
 
     try {
-      const token = localStorage.getItem('accessToken');
       const res = await fetch(
-        'http://localhost:8002/api/v1/interview/submit',
+        `${INTERVIEW_SERVICE_URL}/interview/submit`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            ...authHeader(),
           },
           body: JSON.stringify({
             session_id: sessionId,

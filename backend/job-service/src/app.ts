@@ -1,3 +1,4 @@
+import './lib/internalAuth';
 import express from 'express';
 import cors from 'cors';
 import { Router } from 'express';
@@ -222,7 +223,7 @@ router.get(
           { location: { contains: search, mode: 'insensitive' } },
         ];
       }
-      if (typeof status === 'string' && ['ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT'].includes(status)) where.status = status;
+      if (typeof status === 'string' && ['ACTIVE', 'INACTIVE', 'CLOSED', 'DRAFT', 'HIDDEN'].includes(status)) where.status = status;
       if (typeof jobType === 'string' && ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'REMOTE'].includes(jobType)) where.jobType = jobType;
 
       const validSortFields = ['createdAt', 'title', 'deadline', 'status'];
@@ -237,7 +238,7 @@ router.get(
           select: {
             id: true, title: true, location: true, jobType: true,
             status: true, deadline: true, createdAt: true, salaryMin: true, salaryMax: true,
-            autoScreen: true, minMatchScore: true,
+            autoScreen: true, minMatchScore: true, moderationReason: true, moderatedAt: true,
             _count: { select: { applications: true } },
           },
         }),
@@ -260,6 +261,8 @@ router.get(
             applicationCount: j._count.applications,
             autoScreen: j.autoScreen,
             minMatchScore: j.minMatchScore,
+            moderationReason: j.status === 'HIDDEN' ? j.moderationReason : null,
+            moderatedAt: j.status === 'HIDDEN' ? j.moderatedAt : null,
           })),
           total,
           page,
@@ -342,7 +345,8 @@ router.get('/:id', validateParams('id'), async (req, res, next) => {
         }
       } catch { /* treated as anonymous */ }
     }
-    if (job.status === 'DRAFT' && !isOwner) {
+    // Drafts and jobs hidden by an admin are visible only to the owning company.
+    if ((job.status === 'DRAFT' || job.status === 'HIDDEN') && !isOwner) {
       res.status(404).json({ success: false, message: 'Job not found' });
       return;
     }
@@ -460,6 +464,15 @@ router.patch(
         return;
       }
 
+      if (job.status === 'HIDDEN') {
+        res.status(403).json({
+          success: false,
+          code: 'JOB_HIDDEN',
+          message: 'This job was hidden by an administrator and cannot be changed until it is restored.',
+        });
+        return;
+      }
+
       // Re-opening a job whose deadline already passed would accept nothing; make that explicit.
       if (status === 'ACTIVE' && job.deadline.getTime() < Date.now()) {
         res.status(400).json({ success: false, message: 'The deadline has passed. Post a new job or extend the deadline first.' });
@@ -570,7 +583,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 3002;
 
-app.listen(PORT, () => {
+app.listen(PORT, (err?: Error) => {
+  if (err) {
+    console.error(`Job service could not start on port ${PORT}: ${err.message}. Is another copy already running? Stop it and try again.`);
+    process.exit(1);
+  }
   console.log(`Job Service is running on port ${PORT}`);
 });
 

@@ -27,7 +27,7 @@ export const PUBLIC_BASE_URL = (
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-export type ImageFolder = 'profiles' | 'logos' | 'covers';
+export type ImageFolder = 'profiles' | 'logos' | 'covers' | 'site';
 
 /** Identify the real image type from the first bytes, ignoring the file name and client MIME. */
 export function sniffImage(buf: Buffer): { ext: 'jpg' | 'png' | 'webp'; mime: string } | null {

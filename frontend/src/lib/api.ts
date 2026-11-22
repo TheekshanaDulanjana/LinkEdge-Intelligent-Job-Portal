@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { secureStorage } from './secureStorage';
+import { serviceUrl } from './serviceUrl';
 
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
@@ -49,6 +50,10 @@ function createApiInstance(baseURL: string): AxiosInstance {
 
         if (typeof window !== 'undefined') {
           const path = window.location.pathname;
+          if (path.startsWith('/admin') && path !== '/admin/login') {
+            window.location.href = '/admin/login?reason=expired';
+            return Promise.reject({ name: 'ApiError', message: 'Your session has ended.', statusCode: 401 });
+          }
           const needsLogin =
             path.startsWith('/seeker') ||
             path.startsWith('/settings') ||
@@ -80,22 +85,38 @@ function createApiInstance(baseURL: string): AxiosInstance {
 
 // Auth service
 export const authApi = createApiInstance(
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1'
+  serviceUrl(process.env.NEXT_PUBLIC_AUTH_SERVICE_URL, 3001)
+);
+
+// Admin back-office (same service as auth, /admin routes)
+export const adminApi = createApiInstance(
+  `${serviceUrl(process.env.NEXT_PUBLIC_AUTH_SERVICE_URL, 3001)}/admin`
 );
 
 // Job service
-export const jobApi = createApiInstance(
-  process.env.NEXT_PUBLIC_JOB_SERVICE_URL || 'http://localhost:3002/api/v1'
-);
+export const JOB_SERVICE_URL = serviceUrl(process.env.NEXT_PUBLIC_JOB_SERVICE_URL, 3002);
+export const jobApi = createApiInstance(JOB_SERVICE_URL);
 
 // Application service
 export const applicationApi = createApiInstance(
-  process.env.NEXT_PUBLIC_APPLICATION_SERVICE_URL || 'http://localhost:3003/api/v1'
+  serviceUrl(process.env.NEXT_PUBLIC_APPLICATION_SERVICE_URL, 3003)
 );
 
 // ATS service
 export const atsApi = createApiInstance(
-  process.env.NEXT_PUBLIC_ATS_SERVICE_URL || 'http://localhost:8003/api/v1'
+  serviceUrl(process.env.NEXT_PUBLIC_ATS_SERVICE_URL, 8003)
 );
+
+// Direct (non-axios) endpoints used with fetch()
+export const AI_SERVICE_URL =
+  serviceUrl(process.env.NEXT_PUBLIC_AI_SERVICE_URL, 8001);
+export const INTERVIEW_SERVICE_URL =
+  serviceUrl(process.env.NEXT_PUBLIC_INTERVIEW_SERVICE_URL, 8002);
+
+/** Authorization header for fetch() calls, using the same stored session as the axios clients. */
+export function authHeader(): Record<string, string> {
+  const token = secureStorage.getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export default authApi;

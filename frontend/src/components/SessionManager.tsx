@@ -1,5 +1,6 @@
 'use client';
 
+import { serviceUrl } from '@/lib/serviceUrl';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -9,6 +10,7 @@ import { secureStorage } from '@/lib/secureStorage';
 /** Inactivity limits: companies are logged out after 10 minutes, job seekers after 15. */
 export const COMPANY_IDLE_LIMIT_MS = 10 * 60 * 1000;
 export const SEEKER_IDLE_LIMIT_MS = 15 * 60 * 1000;
+export const ADMIN_IDLE_LIMIT_MS = 10 * 60 * 1000;
 
 // The access token lives for 15 minutes. While the session is still valid (the user has
 // not passed the idle limit) it is renewed in the background every few minutes, so the
@@ -17,8 +19,7 @@ const RENEW_AFTER_MS = 4 * 60 * 1000;
 const CHECK_EVERY_MS = 15 * 1000;
 const ACTIVITY_THROTTLE_MS = 2000;
 
-const AUTH_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1';
+const authUrl = () => serviceUrl(process.env.NEXT_PUBLIC_AUTH_SERVICE_URL, 3001);
 
 /**
  * Watches for user activity. After the idle limit (10 min company, 15 min seeker) with no mouse, keyboard, scroll or
@@ -33,7 +34,8 @@ export default function SessionManager() {
   const logout = useAuthStore((s) => s.logout);
   const setToken = useAuthStore((s) => s.setToken);
   const role = useAuthStore((s) => s.user?.role);
-  const idleLimit = role === 'COMPANY' ? COMPANY_IDLE_LIMIT_MS : SEEKER_IDLE_LIMIT_MS;
+  const idleLimit =
+    role === 'ADMIN' ? ADMIN_IDLE_LIMIT_MS : role === 'COMPANY' ? COMPANY_IDLE_LIMIT_MS : SEEKER_IDLE_LIMIT_MS;
 
   // Restore the saved session as soon as the app opens
   useEffect(() => {
@@ -46,9 +48,10 @@ export default function SessionManager() {
     let renewing = false;
     let lastWrite = 0;
 
+    const loginPath = role === 'ADMIN' ? '/admin/login' : '/login';
     const endSession = () => {
       logout();
-      router.replace('/login?reason=timeout');
+      router.replace(`${loginPath}?reason=timeout`);
     };
 
     const renewToken = async () => {
@@ -59,7 +62,7 @@ export default function SessionManager() {
       try {
         // A plain axios call, so a failure here never triggers the global 401 handler
         const res = await axios.post(
-          `${AUTH_URL}/auth/refresh-token`,
+          `${authUrl()}/auth/refresh-token`,
           {},
           { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
         );
@@ -106,7 +109,7 @@ export default function SessionManager() {
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'jp_at' && !e.newValue) {
         logout();
-        router.replace('/login');
+        router.replace(loginPath);
       }
     };
 
@@ -128,7 +131,7 @@ export default function SessionManager() {
       window.removeEventListener('storage', onStorage);
       window.clearInterval(timer);
     };
-  }, [isAuthenticated, idleLimit, logout, router, setToken]);
+  }, [isAuthenticated, idleLimit, role, logout, router, setToken]);
 
   return null;
 }

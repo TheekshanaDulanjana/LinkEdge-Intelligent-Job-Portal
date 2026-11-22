@@ -251,7 +251,8 @@ router.get('/:id', async (req, res, next) => {
     const { seekerId } = req.query;
 
     const job = await prisma.jobPosting.findUnique({ where: { id } });
-    if (!job) {
+    // Jobs hidden by an admin are not public.
+    if (!job || job.status === 'HIDDEN') {
       res.status(404).json({ success: false, message: 'Job not found' });
       return;
     }
@@ -334,6 +335,15 @@ router.patch(
       });
       if (!company || job.companyId !== company.id) {
         res.status(403).json({ success: false, message: 'Not your job posting' });
+        return;
+      }
+
+      if (job.status === 'HIDDEN') {
+        res.status(403).json({
+          success: false,
+          code: 'JOB_HIDDEN',
+          message: 'This job was hidden by an administrator and cannot be changed until it is restored.',
+        });
         return;
       }
 

@@ -1,4 +1,28 @@
 export const emailTemplates = {
+  // Generic notice sent by the platform administrators (account / job moderation, credentials).
+  // Every value arrives HTML-escaped from the caller.
+  adminNotice: (p: { name: string; heading: string; message: string; reason: string; code?: string; ctaLabel?: string; ctaUrl?: string; footer?: string; discuss?: { email: string; subject: string } }) => ({
+    subject: `${p.heading} - SkillSync`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
+        <h1 style="color:#1e293b;font-size:22px;margin-bottom:8px;">${p.heading}</h1>
+        <p style="color:#64748b;font-size:16px;">Hi ${p.name},</p>
+        <p style="color:#475569;font-size:15px;line-height:1.6;white-space:pre-line;">${p.message}</p>
+        ${p.code ? `<div style="background:#ffffff;border:2px solid #e2e8f0;border-radius:12px;padding:20px;text-align:center;margin:20px 0;"><p style="font-size:36px;font-weight:700;letter-spacing:10px;color:#0063CE;margin:0;">${p.code}</p></div>` : ''}
+        ${p.reason ? `<div style="background:#ffffff;border:1px solid #e2e8f0;border-left:4px solid #0063CE;border-radius:8px;padding:16px 20px;margin:20px 0;">
+          <p style="margin:0 0 6px 0;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Reason</p>
+          <p style="margin:0;color:#1e293b;font-size:15px;line-height:1.6;white-space:pre-line;">${p.reason}</p>
+        </div>` : ''}
+        ${p.ctaUrl && p.ctaLabel ? `<div style="text-align:center;margin:28px 0;"><a href="${p.ctaUrl}" style="background:#0063CE;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">${p.ctaLabel}</a></div>` : ''}
+        ${p.discuss ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:18px 20px;margin:24px 0;">
+          <p style="margin:0 0 6px 0;color:#1e3a8a;font-size:15px;font-weight:700;">Want to talk this through?</p>
+          <p style="margin:0 0 14px 0;color:#334155;font-size:14px;line-height:1.6;">Simply reply to this email and our admin team will discuss it with you. If you have already fixed the issue, tell us and we will review the post again.</p>
+          <a href="mailto:${p.discuss.email}?subject=${encodeURIComponent(p.discuss.subject)}" style="display:inline-block;background:#ffffff;color:#0063CE;border:1px solid #0063CE;padding:9px 20px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Reply to the admin team</a>
+        </div>` : ''}
+        <p style="color:#94a3b8;font-size:13px;">${p.footer || 'If you think this was a mistake, please reply to this email or contact the SkillSync support team.'}</p>
+      </div>
+    `,
+  }),
   verificationCode: (name: string, code: string) => ({
     subject: 'Verify your email - Intelligent Job Portal',
     html: `

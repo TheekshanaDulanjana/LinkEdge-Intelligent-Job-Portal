@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { Request, Response, NextFunction } from 'express';
 
 const handler = (_req: Request, res: Response) => {
@@ -15,7 +15,7 @@ export const applyLimiter = rateLimit({
   ...base,
   windowMs: 60 * 60 * 1000,
   limit: 30,
-  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => (req as any).user?.userId || ipKeyGenerator(req.ip ?? 'unknown'),
 });
 
 /** Company actions that send email or run scoring. */
@@ -23,7 +23,7 @@ export const heavyActionLimiter = rateLimit({
   ...base,
   windowMs: 15 * 60 * 1000,
   limit: 60,
-  keyGenerator: (req: Request) => (req as any).user?.userId || req.ip || 'unknown',
+  keyGenerator: (req: Request) => (req as any).user?.userId || ipKeyGenerator(req.ip ?? 'unknown'),
 });
 
 /** Last middleware: turns upload / parse errors into clean JSON instead of a stack trace. */

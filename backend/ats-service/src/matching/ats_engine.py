@@ -10,44 +10,55 @@ Weights:
     Keyword TF-IDF    10 %
 """
 
+import re
+
 from src.models.schemas import ParsedResume, JobRequirements, ATSResult, ScoreBreakdown
 from src.matching.keyword_scorer import keyword_scorer
 
 
 # ── Education level hierarchy ──────────────────────────────────────────────────
-_EDUCATION_LEVELS: dict[str, int] = {
-    "phd": 5, "doctorate": 5, "doctoral": 5,
-    "master's": 4, "masters": 4, "msc": 4, "mba": 4,
-    "bachelor's": 3, "bachelors": 3, "bsc": 3,
-    "diploma": 2, "hnd": 2, "associate's": 2,
-    "high school": 1, "secondary": 1,
-}
+# Matched with word-boundary patterns so "Bachelor of Science", "B.Sc", "BEng",
+# "MSc", "HND" and "Postgraduate Diploma" are all understood. The highest level
+# found in the text wins. A plain "degree" counts as a bachelor's degree.
+_EDUCATION_PATTERNS: list[tuple[int, re.Pattern]] = [
+    (5, re.compile(r"\b(ph\.?\s?d|doctorate|doctoral|d\.?phil)\b", re.I)),
+    (4, re.compile(r"\b(master'?s?|m\.?\s?sc|m\.?\s?eng|m\.?\s?tech|m\.?\s?phil|mba|postgraduate|post-graduate|pgd)\b", re.I)),
+    (3, re.compile(r"\b(bachelor'?s?|b\.?\s?sc|b\.?\s?eng|b\.?\s?tech|b\.?\s?com|bba|bit|undergraduate|degree|honou?rs|hons)\b", re.I)),
+    (2, re.compile(r"\b(diploma|hnd|higher national|associate'?s?|advanced certificate)\b", re.I)),
+    (1, re.compile(r"\b(high school|secondary|a/l|o/l|advanced level|ordinary level|g\.?c\.?e)\b", re.I)),
+]
 
 _FIELD_GROUPS: dict[str, str] = {
     "computer science": "cs", "information technology": "cs",
     "software engineering": "cs", "information systems": "cs",
-    "computing": "cs",
+    "computing": "cs", "software": "cs", "computer": "cs",
+    "cyber security": "cs", "cybersecurity": "cs", "networking": "cs",
+    "electrical": "eng", "electronic": "eng", "mechanical": "eng", "civil": "eng",
     "electrical engineering": "eng", "electronic engineering": "eng",
-    "mechanical engineering": "eng",
+    "mechanical engineering": "eng", "civil engineering": "eng",
     "data science": "data", "statistics": "data", "mathematics": "data",
+    "analytics": "data",
     "business administration": "business", "management": "business",
-    "finance": "business",
+    "finance": "business", "accounting": "business", "marketing": "business",
 }
 
 
 def _edu_level(text: str) -> int:
-    t = text.lower()
-    for kw, lvl in sorted(_EDUCATION_LEVELS.items(), key=lambda x: -x[1]):
-        if kw in t:
-            return lvl
-    return 0
+    best = 0
+    for lvl, pat in _EDUCATION_PATTERNS:
+        if lvl > best and pat.search(text or ""):
+            best = lvl
+    return best
 
 
 def _edu_field(text: str) -> str:
-    t = text.lower()
-    for field, group in _FIELD_GROUPS.items():
+    t = (text or "").lower()
+    # longest phrase first so "software engineering" wins over "software"
+    for field in sorted(_FIELD_GROUPS, key=len, reverse=True):
         if field in t:
-            return group
+            return _FIELD_GROUPS[field]
+    if re.search(r"\b(it|ict|bit)\b", t):
+        return "cs"
     return "other"
 
 

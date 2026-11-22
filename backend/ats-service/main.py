@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -8,6 +8,7 @@ load_dotenv()
 from src.routers.resume_router   import router as resume_router
 from src.routers.matching_router import router as matching_router
 from src.routers.job_router      import router as job_router
+from src.security.auth import require_service
 
 app = FastAPI(
     title="ATS Service",
@@ -25,13 +26,15 @@ app.add_middleware(
         for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Service-Key", "X-Request-Id"],
 )
 
-app.include_router(resume_router,   prefix="/api/v1/ats", tags=["Resume"])
-app.include_router(matching_router, prefix="/api/v1/ats", tags=["Matching"])
-app.include_router(job_router,      prefix="/api/v1/ats", tags=["Jobs"])
+# Every ATS route is internal: only the other back-end services may call it.
+_internal = [Depends(require_service)]
+app.include_router(resume_router,   prefix="/api/v1/ats", tags=["Resume"], dependencies=_internal)
+app.include_router(matching_router, prefix="/api/v1/ats", tags=["Matching"], dependencies=_internal)
+app.include_router(job_router,      prefix="/api/v1/ats", tags=["Jobs"], dependencies=_internal)
 
 
 @app.on_event("startup")

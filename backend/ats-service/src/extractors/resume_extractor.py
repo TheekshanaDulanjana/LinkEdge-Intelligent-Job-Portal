@@ -183,7 +183,9 @@ def _normalize_text(text: str) -> str:
 
 
 def _build_ngrams(text: str, max_n: int = 4) -> set[str]:
-    words = text.split()
+    # Strip sentence punctuation stuck to a word ("python." / "react,") but keep
+    # the dots and symbols that belong to skill names (node.js, c++, c#, .net).
+    words = [w for w in (x.rstrip(".-/").lstrip("-/") for x in text.split()) if w]
     result: set[str] = set()
     for n in range(1, max_n + 1):
         for i in range(len(words) - n + 1):

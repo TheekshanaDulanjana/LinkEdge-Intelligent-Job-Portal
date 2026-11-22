@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  requiredRole?: 'SEEKER' | 'COMPANY';
+  requiredRole?: 'SEEKER' | 'COMPANY' | 'ADMIN';
 }
 
 export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
@@ -24,14 +24,14 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     if (!isHydrated) return;
 
     if (!isAuthenticated) {
-      router.replace('/login');
+      router.replace(requiredRole === 'ADMIN' ? '/admin/login' : '/login');
       return;
     }
 
     if (requiredRole && user?.role !== requiredRole) {
       // Wrong role: send to their correct dashboard
       router.replace(
-        user?.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
+        user?.role === 'ADMIN' ? '/admin' : user?.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
       );
     }
   }, [isHydrated, isAuthenticated, user, requiredRole, router]);
