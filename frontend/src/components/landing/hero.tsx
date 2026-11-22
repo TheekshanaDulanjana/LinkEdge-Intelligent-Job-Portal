@@ -111,7 +111,7 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                 className="mb-4 inline-flex items-center gap-2 rounded-full bg-transparent border border-white/30 tracking-widest px-3.5 py-1 text-[11px] sm:text-xs text-white shadow-sm"
               >
                 <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse shrink-0" />
-                <span className="truncate">{content.badge}</span>
+                <span className="truncate uppercase">{content.badge}</span>
               </motion.div>
 
               <motion.h1 
