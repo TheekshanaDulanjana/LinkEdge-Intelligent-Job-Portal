@@ -32,6 +32,7 @@ const GROUPS = [
   ] },
 ];
 const STORE_KEY = 'ls-admin-sidebar-collapsed';
+const SEEN_KEY = 'ls-admin-bell-seen';
 
 interface Attention { unverifiedOld: number; expiring: number; zeroApps: number; hiddenJobs: number; lockedAdmins: number; failedLogins24: number; pendingApplications: number }
 
@@ -46,6 +47,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [bell, setBell] = useState(false);
   const [menu, setMenu] = useState(false);
   const [att, setAtt] = useState<Attention | null>(null);
+  const [seen, setSeen] = useState<Record<string, number>>({});
   const [term, setTerm] = useState('');
   const bellRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => { try { setCollapsed(localStorage.getItem(STORE_KEY) === '1'); } catch { /* storage unavailable */ } }, []);
   useEffect(() => { if (forced && pathname !== '/admin/account') router.replace('/admin/account'); }, [forced, pathname, router]);
   useEffect(() => { setMobile(false); setBell(false); setMenu(false); }, [pathname]);
+  useEffect(() => { try { setSeen(JSON.parse(localStorage.getItem(SEEN_KEY) || '{}')); } catch { /* storage unavailable */ } }, []);
   useEffect(() => {
     if (forced) return;
     const load = () => adminGet<{ attention: Attention }>('/analytics/summary', { days: 7 }).then((d) => setAtt(d.attention)).catch(() => undefined);
@@ -89,7 +92,15 @@ function Shell({ children }: { children: React.ReactNode }) {
     { n: att.zeroApps, text: 'Active jobs with no applicants', href: '/admin/jobs?status=ACTIVE', tone: 'slate' },
     { n: att.unverifiedOld, text: 'Accounts unverified for 3+ days', href: '/admin/users', tone: 'amber' },
   ].filter((a) => a.n > 0) : [];
-  const urgent = alerts.filter((a) => a.tone === 'rose').reduce((s, a) => s + a.n, 0);
+  // The badge counts only what is new or has grown since the bell was last opened; opening it marks everything as seen.
+  const unseen = alerts.filter((a) => a.n > (seen[a.text] ?? 0));
+  const urgent = unseen.filter((a) => a.tone === 'rose').length;
+  function markSeen() {
+    const next: Record<string, number> = {};
+    alerts.forEach((a) => { next[a.text] = a.n; });
+    setSeen(next);
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+  }
 
   const content = (compact: boolean) => (
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
@@ -159,10 +170,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           </form>
           <div className="flex-1" />
           <div ref={bellRef} className="relative">
-            <button onClick={() => { setBell((v) => !v); setMenu(false); }} aria-label="Needs attention" disabled={forced}
+            <button onClick={() => { if (!bell) markSeen(); setBell((v) => !v); setMenu(false); }} aria-label="Needs attention" disabled={forced}
               className="relative w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 cursor-pointer">
               <Bell className="w-4 h-4" />
-              {alerts.length > 0 && <span className={cn('absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center', urgent ? 'bg-rose-600' : 'bg-[#0063CE]')}>{alerts.length}</span>}
+              {unseen.length > 0 && <span className={cn('absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center', urgent ? 'bg-rose-600' : 'bg-[#0063CE]')}>{unseen.length}</span>}
             </button>
             {bell && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">

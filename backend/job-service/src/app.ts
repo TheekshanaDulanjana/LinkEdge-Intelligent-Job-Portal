@@ -1,3 +1,4 @@
+import './lib/internalAuth';
 import express from 'express';
 import cors from 'cors';
 import { Router } from 'express';
@@ -582,7 +583,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 const PORT = process.env.PORT || 3002;
 
-app.listen(PORT, () => {
+app.listen(PORT, (err?: Error) => {
+  if (err) {
+    console.error(`Job service could not start on port ${PORT}: ${err.message}. Is another copy already running? Stop it and try again.`);
+    process.exit(1);
+  }
   console.log(`Job Service is running on port ${PORT}`);
 });
 

@@ -1,7 +1,8 @@
 import os
 import re
 import google.generativeai as genai
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from src.security.auth import Caller, require_service
 from pydantic import BaseModel, Field
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -43,7 +44,7 @@ def get_model():
 
 
 @router.post("/generate-rejection-message", response_model=RejectionResponse)
-async def generate_rejection_message(req: RejectionRequest):
+async def generate_rejection_message(req: RejectionRequest, _: Caller = Depends(require_service)):
     """
     Company selects a rejection reason TITLE from a dropdown.
     This agent compares the candidate's actual CV against the job posting

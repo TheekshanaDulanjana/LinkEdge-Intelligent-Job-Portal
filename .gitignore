@@ -36,3 +36,9 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
+# Live demo (deploy/): generated copies of secrets, tunnel logs
+deploy/env/
+deploy/tunnel.*
+deploy/LIVE_URL.txt
+deploy/secrets.env
+deploy/secrets-email.env

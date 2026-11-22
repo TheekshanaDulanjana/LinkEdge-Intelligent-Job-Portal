@@ -1,0 +1,153 @@
+# Live (demo) stack: every service in Docker, ONE public entry (Caddy :8080) that Cloudflare Tunnel exposes.
+# Does not touch the normal local setup (docker-compose.yml in the project root + npm run dev / uvicorn).
+# Start with deploy\start-live.ps1 (it creates deploy\env\*.env from your real .env files first).
+name: linkedge-live
+
+x-node: &node-build
+  dockerfile: ../../deploy/Dockerfile.node
+  additional_contexts:
+    shared: ../backend/shared
+
+x-hosts: &hosts
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # Also join the project's Docker network so services reach Postgres (container jobportal_postgres) directly.
+  networks: [default, pg]
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    <<: *restart
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - frontend
+      - auth-service
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../deploy/Dockerfile.frontend
+    <<: *restart
+    environment:
+      # Server-side page rendering reads the site content straight from the auth service (inside Docker).
+      AUTH_SERVICE_INTERNAL_URL: http://auth-service:3001/api/v1
+
+  auth-service:
+    build:
+      context: ../backend/auth-service
+      args: { APP_DIR: auth }
+      <<: *node-build
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/auth-service.env
+        format: raw
+      - path: ./secrets.env
+        format: raw
+        required: false
+    environment:
+      PORT: "3001"
+      JOB_SERVICE_URL: http://job-service:3002
+      APPLICATION_SERVICE_URL: http://application-service:3003
+      NOTIFICATION_SERVICE_URL: http://notification-service:3004
+      AI_SERVICE_URL: http://ai-service:8001
+      INTERVIEW_SERVICE_URL: http://interview-service:8002
+      ATS_SERVICE_URL: http://ats-service:8003
+      RATE_LIMIT_MAX: "5000"
+      AUTH_RATE_LIMIT_MAX: "300"
+    volumes:
+      - ../backend/auth-service/uploads:/app/auth/uploads
+
+  job-service:
+    build:
+      context: ../backend/job-service
+      args: { APP_DIR: job }
+      <<: *node-build
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/job-service.env
+        format: raw
+    environment:
+      PORT: "3002"
+      RATE_LIMIT_MAX: "5000"
+
+  application-service:
+    build:
+      context: ../backend/application-service
+      args: { APP_DIR: application }
+      <<: *node-build
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/application-service.env
+        format: raw
+    environment:
+      PORT: "3003"
+      RATE_LIMIT_MAX: "5000"
+    volumes:
+      - ../backend/application-service/uploads:/app/application/uploads
+
+  notification-service:
+    build:
+      context: ../backend/notification-service
+      args: { APP_DIR: notification }
+      <<: *node-build
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/notification-service.env
+        format: raw
+      - path: ./secrets-email.env
+        format: raw
+        required: false
+    environment:
+      PORT: "3004"
+
+  ai-service:
+    build:
+      context: ../backend/ai-service
+      dockerfile: ../../deploy/Dockerfile.python
+      args: { PORT: "8001" }
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/ai-service.env
+        format: raw
+    environment:
+      PORT: "8001"
+      ALLOWED_HOSTS: ai-service,localhost
+
+  interview-service:
+    build:
+      context: ../backend/interview-service
+      dockerfile: ../../deploy/Dockerfile.python
+      args: { PORT: "8002" }
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/interview-service.env
+        format: raw
+    environment:
+      PORT: "8002"
+
+  ats-service:
+    build:
+      context: ../backend/ats-service
+      dockerfile: ../../deploy/Dockerfile.ats
+    <<: [*restart, *hosts]
+    env_file:
+      - path: ./env/ats-service.env
+        format: raw
+    environment:
+      PORT: "8003"
+      # Same absolute paths as in the auth and application containers, so file paths they send work here.
+      ATS_ALLOWED_DIRS: /app/auth/uploads,/app/application/uploads
+    volumes:
+      - ../backend/auth-service/uploads:/app/auth/uploads
+      - ../backend/application-service/uploads:/app/application/uploads
+
+networks:
+  pg:
+    name: linkedge_jobportal_network
+    external: true

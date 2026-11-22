@@ -1,5 +1,6 @@
 'use client';
 
+import { AI_SERVICE_URL, authHeader } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
@@ -209,12 +210,9 @@ function SmartApplyContent() {
       formData.append('desired_role', desiredRole);
       formData.append('additional_inputs', additionalInputs || '');
 
-      const token = localStorage.getItem('accessToken');
-      const response = await fetch('http://localhost:8001/api/v1/ai/analyze', {
+      const response = await fetch(`${AI_SERVICE_URL}/ai/analyze`, {
         method: 'POST',
-        headers: { 
-          Authorization: `Bearer ${token}`
-        },
+        headers: authHeader(),
         body: formData,
       });
 

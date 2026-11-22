@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from src.database.db import get_db
+from src.security.auth import Caller, require_user
 from src.database.models import InterviewSession, InterviewQuestion
 from src.services_context import load_context
 from src.agents.workflow import question_workflow, evaluation_workflow
@@ -16,7 +17,11 @@ router = APIRouter()
 
 
 @router.get("/can-practice/{application_id}")
-def check_practice_eligibility(application_id: str, db: Session = Depends(get_db)):
+def check_practice_eligibility(
+    application_id: str,
+    db: Session = Depends(get_db),
+    caller: Caller = Depends(require_user),
+):
     """
     Server-clock controlled check.
     Returns whether the practice feature is still available.
@@ -30,14 +35,16 @@ def check_practice_eligibility(application_id: str, db: Session = Depends(get_db
             "practiceExpiresAt",
             "interviewDate",
             "interviewTime",
-            "interviewVenue"
+            "interviewVenue",
+            "seekerId"
         FROM "Application"
         WHERE id = :app_id
         """),
         {"app_id": application_id}
     ).fetchone()
 
-    if not result:
+    # Only the seeker who owns the application may ask (404 hides other people's ids).
+    if not result or result[5] != caller.user_id:
         raise HTTPException(status_code=404, detail="Application not found")
 
     status = result[0]
@@ -76,16 +83,23 @@ def check_practice_eligibility(application_id: str, db: Session = Depends(get_db
 
 
 @router.post("/start", response_model=StartSessionResponse)
-def start_interview(request: StartSessionRequest, db: Session = Depends(get_db)):
+def start_interview(
+    request: StartSessionRequest,
+    db: Session = Depends(get_db),
+    caller: Caller = Depends(require_user),
+):
     """
     Creates a new interview session and generates questions.
     Call this when the seeker clicks 'Start Practice Interview'.
     """
-    ctx = load_context(db, request.application_id, request.seeker_id)
+    # The identity comes from the token, never from the request body.
+    if request.seeker_id != caller.user_id:
+        raise HTTPException(status_code=403, detail="This application does not belong to you")
+    ctx = load_context(db, request.application_id, caller.user_id)
     if not ctx or not ctx.get("job_title"):
         raise HTTPException(status_code=404, detail="Application or job not found")
     # Ownership: the application must belong to the seeker making the request.
-    if ctx["owner_id"] != request.seeker_id:
+    if ctx["owner_id"] != caller.user_id:
         raise HTTPException(status_code=403, detail="This application does not belong to you")
     if ctx["status"] != "INTERVIEW":
         raise HTTPException(status_code=403, detail="Practice is only available for shortlisted candidates")
@@ -128,7 +142,7 @@ def start_interview(request: StartSessionRequest, db: Session = Depends(get_db))
     # Save the session to the database
     session = InterviewSession(
         application_id=request.application_id,
-        seeker_id=request.seeker_id,
+        seeker_id=caller.user_id,
         job_id=ctx["job_id"],
         job_title=ctx["job_title"],
         level=ctx["level"],
@@ -160,7 +174,11 @@ def start_interview(request: StartSessionRequest, db: Session = Depends(get_db))
 
 
 @router.post("/submit", response_model=SubmitAnswersResponse)
-def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db)):
+def submit_answers(
+    request: SubmitAnswersRequest,
+    db: Session = Depends(get_db),
+    caller: Caller = Depends(require_user),
+):
     """
     Receives the seeker's answers, evaluates them with Gemini,
     and saves the results to the database.
@@ -170,7 +188,7 @@ def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db))
         InterviewSession.id == request.session_id
     ).first()
 
-    if not session:
+    if not session or session.seeker_id != caller.user_id:
         raise HTTPException(status_code=404, detail="Interview session not found")
 
     if session.status == "COMPLETED":
@@ -277,13 +295,17 @@ def submit_answers(request: SubmitAnswersRequest, db: Session = Depends(get_db))
 
 
 @router.get("/session/{session_id}", response_model=SubmitAnswersResponse)
-def get_session_results(session_id: str, db: Session = Depends(get_db)):
+def get_session_results(
+    session_id: str,
+    db: Session = Depends(get_db),
+    caller: Caller = Depends(require_user),
+):
     """Returns saved results for a completed session."""
     session = db.query(InterviewSession).filter(
         InterviewSession.id == session_id
     ).first()
 
-    if not session:
+    if not session or session.seeker_id != caller.user_id:
         raise HTTPException(status_code=404, detail="Session not found")
 
     questions = (
@@ -322,8 +344,14 @@ def get_session_results(session_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/my-sessions/{seeker_id}", response_model=list)
-def get_my_sessions(seeker_id: str, db: Session = Depends(get_db)):
+def get_my_sessions(
+    seeker_id: str,
+    db: Session = Depends(get_db),
+    caller: Caller = Depends(require_user),
+):
     """Returns all interview sessions for a seeker."""
+    if seeker_id != caller.user_id:
+        raise HTTPException(status_code=403, detail="You can only view your own sessions")
     sessions = (
         db.query(InterviewSession)
         .filter(InterviewSession.seeker_id == seeker_id)

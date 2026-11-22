@@ -16,6 +16,7 @@ This helper
 import json
 import os
 import re
+import random
 import time
 from typing import Any, Callable, Optional
 
@@ -156,6 +157,8 @@ def generate_json(
     `validate(data)` may return False to force a retry (for example when a key is missing).
     """
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # When the main model is overloaded (503/429) the next try uses a lighter model instead of waiting on the same one.
+    fallback = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite")
     last_err: Optional[Exception] = None
     use_schema = schema is not None
     budget = thinking_budget
@@ -180,7 +183,9 @@ def generate_json(
                 budget = None
             elif ("schema" in msg or "response_schema" in msg or "invalid_argument" in msg) and use_schema:
                 use_schema = False
+            if _is_retryable(e) and fallback and fallback != model and attempt >= 1:
+                model = fallback
             if attempt < retries:
-                time.sleep(2 * attempt if _is_retryable(e) else 0.5)
+                time.sleep((1.5 * attempt + random.random()) if _is_retryable(e) else 0.5)
 
     raise RuntimeError(f"{label}: model did not return usable JSON ({last_err})")

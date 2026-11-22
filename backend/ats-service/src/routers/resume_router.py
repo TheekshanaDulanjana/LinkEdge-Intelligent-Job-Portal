@@ -1,3 +1,4 @@
+from src.security.paths import safe_upload_path
 import os
 import json
 import uuid
@@ -120,7 +121,7 @@ async def parse_resume(
     No external API calls.
     """
     try:
-        raw_text     = document_parser.parse(request.file_path)
+        raw_text     = document_parser.parse(str(safe_upload_path(request.file_path)))
         cleaned_text = skill_normalizer.clean_text(raw_text)
         parsed       = extract_resume_data(cleaned_text)
 
@@ -143,11 +144,13 @@ async def parse_resume(
                 f"{parsed.experience_years}y experience detected."
             ),
         }
+    except HTTPException:
+        raise
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         _update_resume_db(request.resume_id, error=str(exc))
-        raise HTTPException(status_code=500, detail=f"Parse failed: {exc}")
+        raise HTTPException(status_code=500, detail="Parse failed")
 
 
 @router.get("/resume/{candidate_id}/skills")

@@ -55,11 +55,11 @@ export default function BenefitsPage({ content }: { content: BenefitPageContent 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-24 overflow-x-clip">
         {content.sections.map((sec, idx) => {
           const imageFirst = idx % 2 === 1;
           return (
-            <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center [&>*]:min-w-0">
               <div className={`relative h-80 sm:h-96 rounded-[32px] overflow-hidden shadow-2xl border-4 border-white ${imageFirst ? 'order-2 lg:order-1' : 'order-2'}`}>
                 <Image src="/test.png" alt={sec.title} fill className="object-cover" priority={idx === 0} />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 to-transparent" />
@@ -70,7 +70,7 @@ export default function BenefitsPage({ content }: { content: BenefitPageContent 
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className={`space-y-6 ${imageFirst ? 'order-1 lg:order-2' : 'order-1'}`}
+                className={`min-w-0 space-y-6 ${imageFirst ? 'order-1 lg:order-2' : 'order-1'}`}
               >
                 <span className="text-xs font-bold tracking-wider text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
                   {sec.tag}
