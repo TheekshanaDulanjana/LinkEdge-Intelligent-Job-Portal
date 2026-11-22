@@ -108,6 +108,24 @@ app.post('/send/rejection', handler(async (b) => {
   );
 }));
 
+app.post('/send/job-match', handler(async (b) => {
+  const score = Number(b.score);
+  if (!Number.isFinite(score) || score < 0 || score > 100) throw new BadInput('score must be between 0 and 100');
+  const skills: string[] = Array.isArray(b.matchedSkills)
+    ? b.matchedSkills.slice(0, 8).map((s: unknown) => text(s, 'matchedSkills', 60))
+    : [];
+  await emailService.sendJobMatch(emailAddress(b.to), {
+    seekerName: text(b.seekerName, 'seekerName', 80),
+    jobTitle: text(b.jobTitle, 'jobTitle', 100),
+    companyName: text(b.companyName, 'companyName', 100),
+    location: text(b.location, 'location', 100),
+    score: Math.round(score),
+    matchedSkills: skills,
+    jobUrl: httpUrl(b.jobUrl, 'jobUrl'),
+    settingsUrl: httpUrl(b.settingsUrl, 'settingsUrl'),
+  });
+}));
+
 app.post('/send/application-received', handler(async (b) => {
   await emailService.sendApplicationReceived(emailAddress(b.to), text(b.companyName, 'companyName', 100), text(b.seekerName, 'seekerName', 80), text(b.jobTitle, 'jobTitle', 100));
 }));

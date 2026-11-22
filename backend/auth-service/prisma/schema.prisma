@@ -59,6 +59,8 @@ model JobSeeker {
   githubUrl           String?
   behanceUrl          String?
   workStyle           String?
+  // Seeker's choice on the profile page: e-mail me when a newly posted job matches my CV
+  emailJobAlerts      Boolean    @default(true)
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 }
@@ -198,6 +200,22 @@ model ATSScore {
   @@index([jobId])
   @@index([resumeId])
   @@map("ats_scores")
+}
+
+// ─── Job match alerts ───────────────────────────────────────────
+// One row per (job, seeker) e-mail that was sent when a new job matched the seeker's CV.
+// The unique key makes the alert idempotent: re-publishing or re-activating a job never e-mails twice.
+// Owned by job-service; declared here so every service sees the same database schema.
+
+model JobMatchAlert {
+  id        String   @id @default(uuid())
+  jobId     String
+  userId    String
+  score     Float
+  sentAt    DateTime @default(now())
+
+  @@unique([jobId, userId])
+  @@index([userId, sentAt])
 }
 
 // ─── Calendar ───────────────────────────────────────────────────

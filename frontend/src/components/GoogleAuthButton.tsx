@@ -42,7 +42,7 @@ export default function GoogleAuthButton({
       // Step 4 — store session and redirect
       setAuth(user, accessToken);
       router.push(
-        user.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
+        user.role === 'SEEKER' ? '/seeker/profile' : '/company/dashboard'
       );
     } catch (err: any) {
       const code: string = err?.code || '';

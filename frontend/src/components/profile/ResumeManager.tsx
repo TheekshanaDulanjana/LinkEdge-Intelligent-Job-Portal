@@ -55,6 +55,8 @@ export default function ResumeManager() {
   const [isDragOver,        setIsDragOver]        = useState(false);
   const [error,             setError]             = useState('');
   const [success,           setSuccess]           = useState('');
+  const [showAnalysis,      setShowAnalysis]      = useState(false);   // parsing / result modal
+  const [showDetails,       setShowDetails]       = useState(false);   // collapsible extracted-details panel
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +82,19 @@ export default function ResumeManager() {
   // On mount: load resume profile data
   useEffect(() => { fetchResume(); }, [fetchResume]);
 
+  // While the CV is still being parsed, check again every 3 s (max ~3 min) so the status
+  // flips to "done" by itself, without a page refresh.
+  const isParsing = !!resume && !resume.isParsed && !resume.parseError;
+  useEffect(() => {
+    if (!isParsing) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (tries > 60) { clearInterval(timer); return; }
+      fetchResume();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [isParsing, fetchResume]);
   // ── Validate and start upload ─────────────────────────────────────────────
   const handleFile = (file: File) => {
     setError('');
@@ -112,6 +127,7 @@ export default function ResumeManager() {
         },
       });
       await fetchResume();
+      setShowAnalysis(true);
       flash('ok', 'Resume uploaded successfully. Skills are being extracted.');
     } catch (e: any) {
       flash('err', e?.message ?? 'Upload failed. Please try again.');
@@ -351,8 +367,32 @@ export default function ResumeManager() {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2.5 mt-5 pt-4 border-t border-slate-100">
+            {/* Extracted details (collapsible) */}
+            {resume.isParsed && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowDetails((v) => !v)}
+                  aria-expanded={showDetails}
+                  className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg px-3.5 py-2.5 transition-colors"
+                >
+                  <span>Extracted details</span>
+                  <svg className={`w-4 h-4 text-slate-500 transition-transform ${showDetails ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showDetails && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+                    <div className="rounded-lg border border-slate-100 p-3"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Skills found</p><p className="text-base font-bold text-slate-900 mt-0.5">{resume.skillCount}</p></div>
+                    <div className="rounded-lg border border-slate-100 p-3"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Experience</p><p className="text-base font-bold text-slate-900 mt-0.5">{resume.experienceYears ? `${resume.experienceYears} yrs` : '—'}</p></div>
+                    <div className="rounded-lg border border-slate-100 p-3 col-span-2 sm:col-span-1"><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Job title</p><p className="text-sm font-bold text-slate-900 mt-0.5 truncate">{resume.jobTitle || '—'}</p></div>
+                    <p className="col-span-2 sm:col-span-3 text-[11px] text-slate-400">Last updated {formatDate(resume.lastUpdated)}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}            <div className="flex items-center gap-2.5 mt-5 pt-4 border-t border-slate-100">
               <button
                 type="button"
                 onClick={handleOpenPreview}
@@ -391,9 +431,52 @@ export default function ResumeManager() {
           </div>
         </div>
 
-        {/* CV Preview Modal */}
-        {showPreview && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 sm:p-6">
+        {/* CV analysis modal: shows progress, then the parsed details */}
+        {showAnalysis && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-100">
+              {!resume.isParsed && !resume.parseError ? (
+                <div className="text-center py-4">
+                  <div className="w-12 h-12 mx-auto mb-4 border-4 border-[#0084FF] border-t-transparent rounded-full animate-spin" />
+                  <h3 className="font-semibold text-slate-900">Analysing your CV...</h3>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">We are extracting your skills and experience. This usually takes a few seconds. You can close this and keep using the page.</p>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-start gap-3.5 mb-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${resume.parseError ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                      <svg className={`w-5 h-5 ${resume.parseError ? 'text-amber-600' : 'text-emerald-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{resume.parseError ? 'CV processed with warnings' : 'CV processed'}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[16rem]" title={resume.originalName}>{resume.originalName}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="rounded-lg border border-slate-100 p-3 text-center"><p className="text-lg font-bold text-slate-900">{resume.skillCount}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Skills</p></div>
+                    <div className="rounded-lg border border-slate-100 p-3 text-center"><p className="text-lg font-bold text-slate-900">{resume.experienceYears ? `${resume.experienceYears}y` : '—'}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Experience</p></div>
+                    <div className="rounded-lg border border-slate-100 p-3 text-center"><p className="text-sm font-bold text-slate-900 truncate">{resume.jobTitle || '—'}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Title</p></div>
+                  </div>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {resume.parseError ? 'Some data may be limited. You can still apply to jobs.' : 'Your CV is ready for ATS matching.'} You can see these details any time under "Extracted details".
+                  </p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => { setShowAnalysis(false); setShowDetails(true); }}
+                className="w-full mt-5 px-4 py-2.5 text-xs font-semibold rounded-lg bg-[#0084FF] text-white hover:bg-[#0070DD] transition-colors"
+              >
+                {!resume.isParsed && !resume.parseError ? 'Close and continue in background' : 'Close'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CV Preview Modal */}        {showPreview && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 sm:p-6">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col border border-slate-100 overflow-hidden">
               {/* Modal Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -483,7 +566,7 @@ export default function ResumeManager() {
 
         {/* Delete confirmation modal */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 border border-slate-100">
               <div className="flex items-start gap-3.5 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0">

@@ -64,7 +64,7 @@ export default function OverviewClient({ content }: { content: OverviewContent }
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-tight"
+            className="text-3xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-tight"
           >
             {content.hero.title}
           </motion.h1>
@@ -91,10 +91,10 @@ export default function OverviewClient({ content }: { content: OverviewContent }
             transition={{ duration: 0.6 }}
             className="lg:col-span-5 space-y-6"
           >
-            <span className="text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
+            <span className="text-xs font-semibold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
               {content.about.tag}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
               {content.about.title}
             </h2>
             <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-medium">
@@ -115,7 +115,7 @@ export default function OverviewClient({ content }: { content: OverviewContent }
                 <div className="w-10 h-10 rounded-2xl bg-sky-50 flex items-center justify-center text-[#0F9DE4]">
                   {React.createElement([Compass, Award, Users2, TrendingUp][i % 4], { className: "w-5 h-5" })}
                 </div>
-                <p className="text-3xl font-black text-slate-900 tracking-tight">{item.stat}</p>
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">{item.stat}</p>
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">{item.label}</p>
               </motion.div>
             ))}
@@ -124,10 +124,10 @@ export default function OverviewClient({ content }: { content: OverviewContent }
 
         {/* SECTION 3: TRUSTED ECOSYSTEM PARTNERS */}
         <div className="text-center space-y-8 bg-slate-50/80 border border-slate-100 rounded-[36px] p-8 sm:p-12 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{content.partners.label}</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">{content.partners.label}</p>
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 opacity-80">
             {content.partners.names.map((brand, i) => (
-              <div key={i} className="flex items-center gap-2.5 font-bold text-slate-700 text-base sm:text-lg tracking-tight">
+              <div key={i} className="flex items-center gap-2.5 font-semibold text-slate-700 text-base sm:text-lg tracking-tight">
                 <div className="w-3 h-3 rounded-full bg-[#0F9DE4]" />
                 <span>{brand}</span>
               </div>
@@ -138,10 +138,10 @@ export default function OverviewClient({ content }: { content: OverviewContent }
         {/* SECTION 4: CORE CAPABILITIES CATALOG */}
         <div className="space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
+            <span className="text-xs font-semibold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
               {content.capabilities.tag}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
               {content.capabilities.title}
             </h2>
             <p className="text-slate-600 text-sm sm:text-base font-medium">
@@ -191,7 +191,7 @@ export default function OverviewClient({ content }: { content: OverviewContent }
               <span className="text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
                 {content.workflow.tag}
               </span>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
                 {content.workflow.title}
               </h2>
               <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-medium">
@@ -268,7 +268,7 @@ export default function OverviewClient({ content }: { content: OverviewContent }
             <span className="text-xs font-bold tracking-widest text-[#0F9DE4] uppercase bg-sky-50 px-3.5 py-1 rounded-full border border-sky-100 shadow-xs">
               {content.impact.tag}
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
               {content.impact.title}
             </h2>
 
@@ -351,7 +351,7 @@ export default function OverviewClient({ content }: { content: OverviewContent }
           <div className="w-12 h-12 rounded-full bg-sky-50 text-[#0025B8] flex items-center justify-center mx-auto shadow-sm">
             <Terminal className="w-6 h-6" />
           </div>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h3 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             &ldquo;Building the intelligent bridge where exceptional careers and elite companies meet.&rdquo;
           </h3>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">— The SkillSync Engineering & Product Team</p>

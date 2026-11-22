@@ -146,7 +146,7 @@ export default function Header() {
   }
 
   const dashboardPath = user?.role === 'SEEKER'
-    ? '/seeker/dashboard' : '/company/dashboard';
+    ? '/seeker/profile' : '/company/dashboard';
 
   // A signed-in company never lands on the public home page.
   const homePath = user?.role === 'COMPANY' ? '/company/dashboard' : '/';
@@ -276,7 +276,13 @@ export default function Header() {
                           ) : (
                             notifications.map((n) => (
                               <div key={n.id}
-                                onClick={() => markRead(n.id)}
+                                onClick={() => {
+                                  markRead(n.id).catch(() => {});
+                                  if (user?.role === 'SEEKER') {
+                                    setShowNotifications(false);
+                                    router.push('/seeker/profile#applications');
+                                  }
+                                }}
                                 className={`px-4 py-3 cursor-pointer transition-colors ${!n.isRead ? 'bg-sky-50/70 hover:bg-sky-100/50' : 'hover:bg-gray-50'}`}
                               >
                                 <p className="text-sm font-semibold text-gray-800">{n.title}</p>
@@ -319,7 +325,9 @@ export default function Header() {
                           <p className="text-xs text-gray-400 font-medium">Signed in as</p>
                           <p className="text-sm font-bold text-gray-800 truncate">{user?.email}</p>
                         </div>
-                        <Link href={dashboardPath} onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors">Dashboard</Link>
+                        {user?.role !== 'SEEKER' && (
+                          <Link href={dashboardPath} onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors">Dashboard</Link>
+                        )}
                         <Link href={profilePath} onClick={() => setShowUserMenu(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-sky-50 hover:text-[#0F9DE4] transition-colors">Profile Settings</Link>
                         <div className="border-t border-gray-100 my-1" />
                         <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
