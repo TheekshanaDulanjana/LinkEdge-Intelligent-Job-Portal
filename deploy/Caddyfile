@@ -1,0 +1,54 @@
+{
+	auto_https off
+	admin off
+}
+
+# Backends think the request comes from the normal local site, so CORS / trusted-host checks stay as they are.
+(backend) {
+	header_up Origin http://localhost:3000
+	header_up Host localhost
+	header_up -X-Forwarded-For
+	header_up -X-Forwarded-Proto
+	header_up -X-Forwarded-Host
+}
+
+:8080 {
+	encode gzip
+
+	# The browser calls  <tunnel-url>/p/<port>/api/v1/...  (see frontend/src/lib/serviceUrl.ts)
+	handle_path /p/3001/* {
+		reverse_proxy auth-service:3001 {
+			import backend
+		}
+	}
+	handle_path /p/3002/* {
+		reverse_proxy job-service:3002 {
+			import backend
+		}
+	}
+	handle_path /p/3003/* {
+		reverse_proxy application-service:3003 {
+			import backend
+		}
+	}
+	handle_path /p/3004/* {
+		reverse_proxy notification-service:3004 {
+			import backend
+		}
+	}
+	handle_path /p/8001/* {
+		reverse_proxy ai-service:8001 {
+			import backend
+		}
+	}
+	handle_path /p/8002/* {
+		reverse_proxy interview-service:8002 {
+			import backend
+		}
+	}
+	# 8003 (ATS) is internal only on purpose: it accepts the service key only.
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

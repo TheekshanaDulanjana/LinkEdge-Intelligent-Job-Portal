@@ -2,7 +2,8 @@ import os
 import shutil
 import time
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request, Depends
+from src.security.auth import Caller, require_user
 from fastapi.responses import JSONResponse
 from src.models.schemas import AnalysisResponse
 from src.agents.workflow import cv_analysis_workflow
@@ -28,6 +29,7 @@ async def analyze_cv(
     cv_file: UploadFile = File(...),
     desired_role: str = Form(...),
     additional_inputs: str = Form(""),
+    caller: Caller = Depends(require_user),
 ):
     start_time = time.time()
     request_id = request.headers.get("x-request-id", "unknown")

@@ -1,0 +1,21 @@
+# Node/Express/Prisma services (auth, job, application, notification).
+# Build context = the service folder. APP_DIR decides the folder inside the image, so file paths
+# stay the same in every container that shares an uploads folder (needed by the ATS service).
+FROM node:20-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ARG APP_DIR
+WORKDIR /app/${APP_DIR}
+COPY package*.json ./
+RUN npm ci
+COPY . .
+# Shared helpers (rate limiter, logger...) live in backend/shared and are imported as ../../shared/...
+COPY --from=shared package*.json /app/shared/
+RUN cd /app/shared && npm ci --omit=dev
+COPY --from=shared config /app/shared/config
+COPY --from=shared logger /app/shared/logger
+COPY --from=shared middleware /app/shared/middleware
+COPY --from=shared security /app/shared/security
+RUN if [ -f prisma/schema.prisma ]; then npx prisma generate; fi
+ENV NODE_ENV=production
+CMD ["npx", "ts-node", "--transpile-only", "src/app.ts"]

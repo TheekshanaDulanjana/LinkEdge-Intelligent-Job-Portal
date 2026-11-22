@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from src.security.auth import Caller, require_service
 from pydantic import BaseModel, Field
 from typing import List
 from src.agents.ranking_agent import ranking_workflow
@@ -36,7 +37,7 @@ class RankingResponse(BaseModel):
 
 
 @router.post("/rank-candidates", response_model=RankingResponse)
-async def rank_candidates(request: RankingRequest):
+async def rank_candidates(request: RankingRequest, _: Caller = Depends(require_service)):
     """
     Receives all applications for a job and returns them
     ranked by AI score from highest to lowest.

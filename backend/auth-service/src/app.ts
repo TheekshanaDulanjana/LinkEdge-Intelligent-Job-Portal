@@ -1,3 +1,4 @@
+import './lib/internalAuth';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -107,7 +108,11 @@ app.use((req, res) => {
 app.use(globalErrorHandler('auth-service'));
 
 const PORT = parseInt(env.PORT);
-app.listen(PORT, () => {
+app.listen(PORT, (err?: Error) => {
+  if (err) {
+    console.error(`Auth service could not start on port ${PORT}: ${err.message}. Is another copy already running? Stop it and try again.`);
+    process.exit(1);
+  }
   // Old rows stored relative paths (/uploads/...). Make them full URLs once.
   absolutizeStoredUrls(new PrismaClient()).catch(() => undefined);
   // Make sure the editable site content exists and that there is an owner admin to sign in with.

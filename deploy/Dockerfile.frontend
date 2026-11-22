@@ -1,0 +1,13 @@
+# Next.js frontend. Build context = frontend/. The Firebase NEXT_PUBLIC_* values come from
+# frontend/.env.local (copied in at build time). Service URLs are NOT baked in: the browser works
+# them out from the page address (see src/lib/serviceUrl.ts), so one build works on any tunnel URL.
+FROM node:20-bookworm-slim
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npx", "next", "start", "-p", "3000"]

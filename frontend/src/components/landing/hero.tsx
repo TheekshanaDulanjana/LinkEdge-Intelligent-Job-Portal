@@ -250,7 +250,7 @@ export default function HeroSection({ content }: { content: HeroContent }) {
                     </div>
                   </div>
 
-                  <span className="relative z-10 text-xs font-semibold text-gray-800 tracking-wide">AI Voice & Video Practice</span>
+                  <span className="relative z-10 text-xs font-semibold text-gray-800 tracking-wide">AI Voice Practice</span>
                   <span className="relative z-10 text-[10px] text-gray-400 mb-3">Simulate real-time questions & feedback</span>
 
                   <div className="relative z-10 flex items-center gap-1 h-3">

@@ -29,7 +29,8 @@ function generateTokens(payload: { userId: string; email: string; role: string }
 }
 
 function generateCode(length = 6): string {
-  return Math.floor(Math.random() * Math.pow(10, length))
+  // crypto.randomInt: unpredictable, unlike Math.random
+  return crypto.randomInt(0, Math.pow(10, length))
     .toString()
     .padStart(length, '0');
 }

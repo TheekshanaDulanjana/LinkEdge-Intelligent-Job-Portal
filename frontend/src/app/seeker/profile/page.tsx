@@ -1,5 +1,6 @@
 'use client';
 
+import { INTERVIEW_SERVICE_URL, authHeader } from '@/lib/api';
 import { assetUrl } from '@/lib/assetUrl';
 import { z } from 'zod';
 import { personName, optionalPhone, optionalPlace, optionalText, optionalUrl, stripName, stripPhone, stripPlace } from '@/lib/validation';
@@ -134,7 +135,7 @@ function CombinedProfileContent() {
         for (const app of apps) {
           if (app.status === 'INTERVIEW') {
             try {
-              const r = await fetch(`http://localhost:8002/api/v1/interview/can-practice/${app.id}`);
+              const r = await fetch(`${INTERVIEW_SERVICE_URL}/interview/can-practice/${app.id}`, { headers: authHeader() });
               checks[app.id] = await r.json();
             } catch {
               checks[app.id] = { can_practice: false, reason: 'Service unavailable' };

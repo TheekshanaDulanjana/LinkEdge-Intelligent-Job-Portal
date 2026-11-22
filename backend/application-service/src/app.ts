@@ -1,3 +1,4 @@
+import './lib/internalAuth';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -59,7 +60,11 @@ app.use((_req, res) => {
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, (err?: Error) => {
+  if (err) {
+    console.error(`Application service could not start on port ${PORT}: ${err.message}. Is another copy already running? Stop it and try again.`);
+    process.exit(1);
+  }
   console.log(`Application service running on http://localhost:${PORT}`);
 });
 

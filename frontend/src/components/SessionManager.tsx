@@ -1,5 +1,6 @@
 'use client';
 
+import { serviceUrl } from '@/lib/serviceUrl';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -18,8 +19,7 @@ const RENEW_AFTER_MS = 4 * 60 * 1000;
 const CHECK_EVERY_MS = 15 * 1000;
 const ACTIVITY_THROTTLE_MS = 2000;
 
-const AUTH_URL =
-  process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || 'http://localhost:3001/api/v1';
+const authUrl = () => serviceUrl(process.env.NEXT_PUBLIC_AUTH_SERVICE_URL, 3001);
 
 /**
  * Watches for user activity. After the idle limit (10 min company, 15 min seeker) with no mouse, keyboard, scroll or
@@ -62,7 +62,7 @@ export default function SessionManager() {
       try {
         // A plain axios call, so a failure here never triggers the global 401 handler
         const res = await axios.post(
-          `${AUTH_URL}/auth/refresh-token`,
+          `${authUrl()}/auth/refresh-token`,
           {},
           { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
         );

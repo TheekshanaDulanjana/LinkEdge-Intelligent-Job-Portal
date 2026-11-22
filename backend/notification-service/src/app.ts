@@ -143,6 +143,10 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ success: false, message: 'Server error' });
 });
 
-app.listen(PORT, () =>
-  console.log(`Notification service running on port ${PORT}`)
-);
+app.listen(PORT, (err?: Error) => {
+  if (err) {
+    console.error(`Notification service could not start on port ${PORT}: ${err.message}. Is another copy already running? Stop it and try again.`);
+    process.exit(1);
+  }
+  console.log(`Notification service running on port ${PORT}`);
+});

@@ -367,11 +367,13 @@ router.get('/engagement', wrap(async (req, res) => {
 // ─── system health and admin security ───────────────────────────────────────
 
 const SERVICES: Array<{ name: string; url: string }> = [
-  { name: 'Auth service', url: `http://localhost:${process.env.PORT || 3001}/health` },
-  { name: 'Job service', url: `${process.env.JOB_SERVICE_URL || 'http://localhost:3002'}/health` },
-  { name: 'Application service', url: `${process.env.APPLICATION_SERVICE_URL || 'http://localhost:3003'}/health` },
-  { name: 'Notification service', url: `${process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3004'}/health` },
-  { name: 'AI service', url: `${process.env.AI_SERVICE_URL || 'http://localhost:8000'}/health` },
+  { name: 'Auth service', url: `http://127.0.0.1:${process.env.PORT || 3001}/health` },
+  { name: 'Job service', url: `${process.env.JOB_SERVICE_URL || 'http://127.0.0.1:3002'}/health` },
+  { name: 'Application service', url: `${process.env.APPLICATION_SERVICE_URL || 'http://127.0.0.1:3003'}/health` },
+  { name: 'Notification service', url: `${process.env.NOTIFICATION_SERVICE_URL || 'http://127.0.0.1:3004'}/health` },
+  { name: 'AI service', url: `${process.env.AI_SERVICE_URL || 'http://127.0.0.1:8001'}/health` },
+  { name: 'Interview service', url: `${process.env.INTERVIEW_SERVICE_URL || 'http://127.0.0.1:8002'}/health` },
+  { name: 'ATS service', url: `${process.env.ATS_SERVICE_URL || 'http://127.0.0.1:8003'}/health` },
 ];
 
 async function ping(s: { name: string; url: string }) {
