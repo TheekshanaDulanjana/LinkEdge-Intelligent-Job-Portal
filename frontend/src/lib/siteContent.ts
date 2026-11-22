@@ -54,7 +54,7 @@ const BASE =
 /** Server-side: current content from the database, per block falling back to the built-in default. */
 export async function getSiteContent(): Promise<SiteContent> {
   try {
-    const res = await fetch(`${BASE}/content`, { cache: 'no-store', signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${BASE}/content`, { next: { revalidate: 30 }, signal: AbortSignal.timeout(3000) });
     if (!res.ok) throw new Error(String(res.status));
     const json = await res.json();
     const data = json?.data ?? {};
