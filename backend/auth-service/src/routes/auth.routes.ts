@@ -69,6 +69,8 @@ const seekerProfileSchema = z.object({
   githubUrl: z.union([z.literal(''), V.optionalUrl('GitHub link')]).optional(),
   behanceUrl: z.union([z.literal(''), V.optionalUrl('Behance link')]).optional(),
   workStyle: z.enum(['REMOTE', 'HYBRID', 'ON_SITE'], { message: 'Invalid work style' }).optional(),
+  // Sent as the text "true" / "false" because the profile form is multipart.
+  emailJobAlerts: z.union([z.boolean(), z.enum(['true', 'false'])], { message: 'Invalid e-mail alert setting' }).optional(),
 });
 
 const companyProfileSchema = z.object({
@@ -209,9 +211,11 @@ router.patch(
     try {
       const {
         fullName, phone, location, interestArea, workStatus, professionalSummary,
-        websiteUrl, githubUrl, behanceUrl, workStyle,
+        websiteUrl, githubUrl, behanceUrl, workStyle, emailJobAlerts,
       } = req.body;
       const updateData: Record<string, any> = {};
+
+      if (emailJobAlerts !== undefined) updateData.emailJobAlerts = emailJobAlerts === true || emailJobAlerts === 'true';
 
       if (fullName) updateData.fullName = fullName;
       if (phone !== undefined) updateData.phone = phone || null;

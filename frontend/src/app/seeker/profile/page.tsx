@@ -21,7 +21,6 @@ import {
   Globe,
   Globe2,
   Grid,
-  Lock,
   Pencil,
   Trash2,
   Plus,
@@ -31,7 +30,8 @@ import {
   AlertCircle,
   Video,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  ChevronDown
 } from 'lucide-react';
 
 interface Application {
@@ -58,6 +58,7 @@ interface SeekerProfile {
   githubUrl?: string;
   behanceUrl?: string;
   workStyle?: 'REMOTE' | 'HYBRID' | 'ON_SITE';
+  emailJobAlerts?: boolean;
 }
 
 const INTEREST_OPTIONS = [
@@ -85,6 +86,7 @@ function CombinedProfileContent() {
     githubUrl: '',
     behanceUrl: '',
     workStyle: 'REMOTE',
+    emailJobAlerts: true,
   });
 
   const [applications, setApplications] = useState<Application[]>([]);
@@ -96,6 +98,9 @@ function CombinedProfileContent() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  // Applications panel: collapsed by default, opened from a notification (#applications) or by click.
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [newAppIds, setNewAppIds] = useState<string[]>([]);
 
   // Practice eligibility map
   const [practiceEligibility, setPracticeEligibility] = useState<Record<string, any>>({});
@@ -125,11 +130,17 @@ function CombinedProfileContent() {
           githubUrl: p?.githubUrl || '',
           behanceUrl: p?.behanceUrl || '',
           workStyle: p?.workStyle || 'REMOTE',
+          emailJobAlerts: p?.emailJobAlerts !== false,
         });
         if (p?.profileImageUrl) setImagePreview(assetUrl(p.profileImageUrl));
 
         const apps: Application[] = appsRes.data?.data || [];
         setApplications(apps);
+        try {
+          const raw = localStorage.getItem('seekerAppSeen');
+          const seen: Record<string, string> = raw ? JSON.parse(raw) : {};
+          if (raw) setNewAppIds(apps.filter((a) => seen[a.id] !== a.status).map((a) => a.id));
+        } catch { /* ignore storage errors */ }
 
         const checks: Record<string, any> = {};
         for (const app of apps) {
@@ -151,6 +162,25 @@ function CombinedProfileContent() {
     }
     loadData();
   }, []);
+
+  // Open + scroll to the applications panel when arriving from a notification.
+  useEffect(() => {
+    if (loading) return;
+    if (window.location.hash === '#applications') {
+      setAppsOpen(true);
+      setTimeout(() => document.getElementById('applications')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    }
+  }, [loading]);
+
+  // Opening the panel marks every current status as seen (dots stay for this visit only).
+  useEffect(() => {
+    if (!appsOpen || applications.length === 0) return;
+    try {
+      const seen: Record<string, string> = {};
+      applications.forEach((a) => { seen[a.id] = a.status; });
+      localStorage.setItem('seekerAppSeen', JSON.stringify(seen));
+    } catch { /* ignore */ }
+  }, [appsOpen, applications]);
 
   const basicSchema = z.object({
   fullName: personName('Full name'),
@@ -258,6 +288,23 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     }
   }
 
+  // The e-mail alert switch saves on its own: the seeker should not need "Save Preferences" for it.
+  async function toggleEmailAlerts(next: boolean) {
+    setProfile((prev) => ({ ...prev, emailJobAlerts: next }));
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('emailJobAlerts', String(next));
+      await api.patch('/auth/seeker/profile', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setSuccess(next ? 'Job match e-mails are on.' : 'Job match e-mails are off.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch {
+      setProfile((prev) => ({ ...prev, emailJobAlerts: !next }));   // put the switch back
+      setError('Could not change the e-mail setting. Please try again.');
+      setTimeout(() => setError(''), 4000);
+    }
+  }
+
   const openLinkModal = (platform: PortfolioPlatform) => {
     setActivePlatform(platform);
     setTempLinkValue(profile[platform] || '');
@@ -307,24 +354,45 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     );
   }
 
+  const STATUS_META: Record<string, { dot: string; text: string; bg: string; label: string }> = {
+    PENDING:     { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',     label: 'Pending' },
+    REVIEWING:   { dot: 'bg-[#0F9DE4]',   text: 'text-[#0025B8]',   bg: 'bg-sky-50 border-sky-200',         label: 'Reviewing' },
+    SHORTLISTED: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', label: 'Shortlisted' },
+    INTERVIEW:   { dot: 'bg-violet-500',  text: 'text-violet-700',  bg: 'bg-violet-50 border-violet-200',   label: 'Interview' },
+    REJECTED:    { dot: 'bg-slate-400',   text: 'text-slate-600',   bg: 'bg-slate-100 border-slate-200',    label: 'Not selected' },
+  };
+  const STAGES = ['PENDING', 'REVIEWING', 'SHORTLISTED', 'INTERVIEW'] as const;
+  const STAGE_LABELS: Record<string, string> = { PENDING: 'Applied', REVIEWING: 'Reviewing', SHORTLISTED: 'Shortlisted', INTERVIEW: 'Interview' };
+
+  const LINKS: { key: PortfolioPlatform; label: string; Icon: typeof Globe }[] = [
+    { key: 'websiteUrl', label: 'Personal Website', Icon: Globe },
+    { key: 'githubUrl', label: 'GitHub', Icon: Globe2 },
+    { key: 'behanceUrl', label: 'Behance', Icon: Grid },
+  ];
+
+  const cardCls = 'bg-white rounded-3xl border border-sky-100 shadow-sm';
+
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
       <ProfileHeroSection />
 
-      <main className="flex-1 py-12 px-4 sm:px-6 lg:px-8">
-        <motion.div 
+      <main className="flex-1 py-10 px-4 sm:px-6 lg:px-8">
+        {/* The whole Candidate Profile section: modals inside it blur only this card */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-7xl mx-auto bg-white/90 backdrop-blur-xl border border-sky-100 rounded-[32px] p-6 sm:p-8 md:p-12 shadow-2xl space-y-10"
+          className="relative max-w-7xl mx-auto bg-white border border-sky-100 rounded-[32px] p-5 sm:p-8 lg:p-10 shadow-2xl space-y-8"
         >
-          
           {/* Header */}
           <div className="flex justify-between items-center pb-4 border-b border-sky-100">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Candidate Profile</h2>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Candidate Profile</h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Your details, applications and resume in one place</p>
+            </div>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-white/10 hover:bg-white/25 backdrop-blur-md px-4 py-2 rounded-full border border-sky-200 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 text-xs font-semibold bg-white hover:bg-sky-50 px-4 py-2 rounded-full border border-sky-200 transition-all shadow-sm"
             >
               <ArrowLeft className="w-4 h-4 text-[#0F9DE4]" />
               <span className="text-[#0025B8]">Back to Home</span>
@@ -332,7 +400,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
           </div>
 
           {success && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-800 shadow-sm flex items-center gap-2"
@@ -342,7 +410,7 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             </motion.div>
           )}
           {error && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -5 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-800 shadow-sm flex items-center gap-2"
@@ -352,339 +420,128 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
             </motion.div>
           )}
 
-          {/* Profile Card */}
-          <div className="bg-gradient-to-br from-sky-50/60 via-blue-50/30 to-white rounded-3xl border border-sky-100 p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-            <div className="flex items-center gap-5 w-full md:w-auto">
-              <div className="relative shrink-0">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden bg-sky-100 border-2 border-white shadow-md">
-                  {imagePreview ? (
-                    <img src={imagePreview} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-[#0025B8] text-3xl font-bold bg-sky-50">
-                      {profile.fullName?.[0]?.toUpperCase() || 'U'}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* ───────── LEFT: profile details first ───────── */}
+            <aside className="lg:col-span-4 space-y-6">
+              {/* Profile Card */}
+              <div className="bg-gradient-to-br from-sky-50/70 via-blue-50/30 to-white rounded-3xl border border-sky-100 p-6 shadow-sm">
+                <div className="flex flex-col items-center text-center">
+                  <div className="relative shrink-0">
+                    <div className="w-28 h-28 rounded-3xl overflow-hidden bg-sky-100 border-4 border-white shadow-md">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[#0025B8] text-4xl font-bold bg-sky-50">
+                          {profile.fullName?.[0]?.toUpperCase() || 'U'}
+                        </div>
+                      )}
                     </div>
-                  )}
+                    <label
+                      htmlFor="profile-img"
+                      className="absolute -bottom-1 -right-1 w-9 h-9 bg-white border border-sky-200 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-sky-50 transition-colors"
+                      title="Change photo"
+                    >
+                      <Pencil className="w-4 h-4 text-[#0F9DE4]" />
+                      <input id="profile-img" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    </label>
+                    {imagePreview && (
+                      <button type="button" onClick={removePhoto}
+                        className="absolute -top-1 -right-1 w-6 h-6 bg-white border border-rose-200 rounded-full text-rose-500 text-xs font-bold flex items-center justify-center shadow hover:bg-rose-50 cursor-pointer"
+                        title="Remove photo" aria-label="Remove photo">×</button>
+                    )}
+                  </div>
+
+                  <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-4 break-words max-w-full">{profile.fullName || 'User Name'}</h1>
+                  <p className="text-xs font-medium text-slate-500 mt-1 break-words max-w-full">
+                    {profile.professionalSummary || 'Add a short title'}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-0.5">{profile.location || 'Add your location'}</p>
+
+                  <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="mt-4">
+                    <Button
+                      type="button"
+                      onClick={() => setIsEditing(!isEditing)}
+                      variant="gradient"
+                      className="px-6 py-2 text-white text-xs font-semibold rounded-full shadow-md tracking-wider uppercase cursor-pointer"
+                    >
+                      {isEditing ? 'Cancel Edit' : 'Edit Profile'}
+                    </Button>
+                  </motion.div>
                 </div>
-                <label
-                  htmlFor="profile-img"
-                  className="absolute -bottom-1 -right-1 w-8 h-8 bg-white border border-sky-200 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:bg-sky-50 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-[#0F9DE4]" />
-                  <input id="profile-img" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                </label>
-                {imagePreview && (
-                  <button type="button" onClick={removePhoto}
-                    className="absolute -top-1 -right-1 w-6 h-6 bg-white border border-rose-200 rounded-full text-rose-500 text-xs font-bold flex items-center justify-center shadow hover:bg-rose-50 cursor-pointer"
-                    title="Remove photo" aria-label="Remove photo">×</button>
-                )}
+
+                <div className="mt-6 space-y-2 text-xs bg-white/80 p-4 rounded-2xl border border-sky-100">
+                  <p className="text-slate-600 flex justify-between gap-3">
+                    <span className="font-bold text-slate-900">Mobile</span>
+                    <span className="truncate">{profile.phone || '+94 71 123 4567'}</span>
+                  </p>
+                  <p className="text-slate-600 flex justify-between gap-3">
+                    <span className="font-bold text-slate-900">Email</span>
+                    <span className="truncate">{user?.email || 'john@gmail.com'}</span>
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{profile.fullName || 'User Name'}</h1>
-                <p className="text-xs font-medium text-slate-500 mt-1">
-                  {profile.professionalSummary || 'Add a short title'} • {profile.location || 'Add your location'}
-                </p>
-                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-block mt-3">
-                  <Button
-                    type="button"
-                    onClick={() => setIsEditing(!isEditing)}
-                    variant="gradient"
-                    className="px-5 py-2 text-white text-xs font-semibold rounded-full shadow-md tracking-wider uppercase cursor-pointer"
-                  >
-                    {isEditing ? 'Cancel Edit' : 'Edit Profile'}
+              {/* Edit Form */}
+              {isEditing && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="bg-slate-50 rounded-3xl border border-sky-100 p-6 space-y-5 shadow-inner"
+                >
+                  <h3 className="text-sm font-bold text-slate-900 border-b border-sky-100 pb-3 tracking-tight">Edit Basic Information</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-700">Full Name</Label>
+                      <Input value={profile.fullName} maxLength={80} onChange={(e) => setProfile({ ...profile, fullName: stripName(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-slate-700">Phone</Label>
+                      <Input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: stripPhone(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-slate-700">Location</Label>
+                      <Input maxLength={100} value={profile.location} onChange={(e) => setProfile({ ...profile, location: stripPlace(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-slate-700">Title / Short Summary</Label>
+                      <Input maxLength={2000} value={profile.professionalSummary} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
+                    </div>
+                  </div>
+                  <Button onClick={handleSave} disabled={saving} variant="gradient" className="w-full rounded-full h-11 text-xs font-bold text-white shadow-md cursor-pointer">
+                    {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </motion.div>
-              </div>
-            </div>
+              )}
 
-            <div className="text-right space-y-1.5 self-start md:self-center w-full md:w-auto text-xs bg-white/80 p-4 rounded-2xl border border-sky-100 shadow-xs">
-              <p className="text-slate-600">
-                <span className="font-bold text-slate-900">Mobile: </span>
-                {profile.phone || '+94 71 123 4567'}
-              </p>
-              <p className="text-slate-600">
-                <span className="font-bold text-slate-900">Email: </span>
-                {user?.email || 'john@gmail.com'}
-              </p>
-            </div>
-          </div>
-
-          {/* Edit Form Drawer */}
-          {isEditing && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-slate-50 rounded-3xl border border-sky-100 p-6 sm:p-8 space-y-6 shadow-inner"
-            >
-              <h3 className="text-sm font-bold text-slate-900 border-b border-sky-100 pb-3 tracking-tight">Edit Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <Label className="text-xs font-bold text-slate-700">Full Name</Label>
-                  <Input value={profile.fullName} maxLength={80} onChange={(e) => setProfile({ ...profile, fullName: stripName(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
-                </div>
-                <div>
-                  <Label className="text-xs font-bold text-slate-700">Phone</Label>
-                  <Input type="tel" inputMode="tel" maxLength={20} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: stripPhone(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
-                </div>
-                <div>
-                  <Label className="text-xs font-bold text-slate-700">Location</Label>
-                  <Input maxLength={100} value={profile.location} onChange={(e) => setProfile({ ...profile, location: stripPlace(e.target.value) })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
-                </div>
-                <div>
-                  <Label className="text-xs font-bold text-slate-700">Title / Short Summary</Label>
-                  <Input maxLength={2000} value={profile.professionalSummary} onChange={(e) => setProfile({ ...profile, professionalSummary: e.target.value })} className="mt-1.5 bg-white rounded-xl border-sky-100 h-11 text-xs" />
-                </div>
-              </div>
-              <Button onClick={handleSave} disabled={saving} variant="gradient" className="rounded-full px-6 h-11 text-xs font-bold text-white shadow-md cursor-pointer">
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </motion.div>
-          )}
-
-          {/* Applications Section */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5 tracking-tight">
-                  <Briefcase className="w-5 h-5 text-[#0F9DE4]" />
-                  My Applications
-                  <span className="inline-flex items-center justify-center min-w-[24px] h-[24px] px-2 rounded-full bg-sky-100 text-[#0025B8] text-xs font-extrabold shadow-xs">
-                    {applications.length}
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5 font-medium">Track every application and its current stage</p>
-              </div>
-              <Link href="/jobs">
-                <Button size="sm" variant="outline" className="text-xs font-semibold text-[#0025B8] border-sky-200 hover:bg-sky-50 rounded-full h-10 px-5 shadow-xs border-2">
-                  Browse More Jobs
-                </Button>
-              </Link>
-            </div>
-
-            {applications.length === 0 ? (
-              <div className="bg-white rounded-3xl border-2 border-dashed border-sky-200 p-12 text-center shadow-sm">
-                <div className="w-14 h-14 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-4 border border-sky-100 shadow-sm">
-                  <Briefcase className="w-6 h-6 text-[#0F9DE4]" />
-                </div>
-                <p className="text-sm font-bold text-slate-800">No applications yet</p>
-                <p className="text-xs text-slate-400 mt-1 mb-6 font-medium">Once you apply for a role, it will show up here.</p>
-                <Link href="/jobs">
-                  <Button size="sm" variant="gradient" className="text-xs rounded-full px-6 h-11 font-bold shadow-md">
-                    Find Opportunities
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {applications.map((app) => {
-                  const eligibility = practiceEligibility[app.id];
-
-                  const STATUS_META: Record<string, { dot: string; text: string; bg: string; label: string }> = {
-                    PENDING:     { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',   label: 'Pending' },
-                    REVIEWING:   { dot: 'bg-[#0F9DE4]',   text: 'text-[#0025B8]',   bg: 'bg-sky-50 border-sky-200',        label: 'Reviewing' },
-                    SHORTLISTED: { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', label: 'Shortlisted' },
-                    INTERVIEW:   { dot: 'bg-violet-500',  text: 'text-violet-700',  bg: 'bg-violet-50 border-violet-200', label: 'Interview' },
-                    REJECTED:    { dot: 'bg-slate-400',   text: 'text-slate-600',   bg: 'bg-slate-100 border-slate-200',  label: 'Not selected' },
-                  };
-                  const meta = STATUS_META[app.status] ?? STATUS_META.PENDING;
-
+              {/* Portfolio links */}
+              <div className={`${cardCls} p-6 space-y-3`}>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Portfolio Links</h3>
+                {LINKS.map(({ key, label, Icon }) => {
+                  const has = !!profile[key];
                   return (
-                    <motion.div
-                      key={app.id}
-                      whileHover={{ y: -2 }}
-                      transition={{ duration: 0.2 }}
-                      className="bg-white/90 backdrop-blur-xl rounded-2xl border border-sky-100 hover:shadow-xl transition-all overflow-hidden shadow-sm"
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => openLinkModal(key)}
+                      className={`w-full flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-all cursor-pointer group ${
+                        has ? 'border-[#0F9DE4] bg-sky-50/60' : 'border-sky-100 bg-white hover:border-[#0F9DE4]'
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-4 p-6 pb-4">
-                        <div className="flex items-start gap-4 min-w-0">
-                          <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center flex-shrink-0 mt-0.5 border border-sky-100 shadow-sm">
-                            <Briefcase className="w-5 h-5 text-[#0F9DE4]" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-base tracking-tight truncate">{app.job?.title || 'Position Title'}</p>
-                            <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                              {app.job?.companyName ? `${app.job.companyName} · ` : ''}{app.job?.location || 'Location'}
-                            </p>
-                            <p className="text-[11px] text-slate-400 mt-1 font-medium">
-                              Applied {new Date(app.createdAt).toLocaleDateString('en-GB', {
-                                day: '2-digit', month: 'short', year: 'numeric',
-                              })}
-                            </p>
-                          </div>
-                        </div>
-
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3.5 py-1.5 rounded-full border whitespace-nowrap flex-shrink-0 shadow-xs ${meta.bg} ${meta.text}`}>
-                          <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
-                          {meta.label}
-                        </span>
-                      </div>
-
-                      {app.status === 'INTERVIEW' && app.interviewDate && (
-                        <div className="mx-6 mb-4 bg-sky-50/60 border border-sky-100 rounded-2xl p-4 shadow-xs">
-                          <div className="flex items-center gap-2 text-[#0025B8] font-bold text-xs mb-2">
-                            <Calendar className="w-4 h-4 text-[#0F9DE4]" />
-                            Interview scheduled
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600 font-medium">
-                            <p>
-                              <span className="text-slate-400">Date & time </span>
-                              <span className="font-bold text-slate-800">
-                                {new Date(app.interviewDate).toLocaleDateString('en-GB', {
-                                  weekday: 'short', day: '2-digit', month: 'short',
-                                })} · {app.interviewTime}
-                              </span>
-                            </p>
-                            {app.interviewVenue && (
-                              <p>
-                                <span className="text-slate-400">Venue </span>
-                                <span className="font-bold text-slate-800">{app.interviewVenue}</span>
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                      <Icon className={`w-5 h-5 shrink-0 ${has ? 'text-[#0025B8]' : 'text-slate-400 group-hover:text-[#0F9DE4]'}`} />
+                      <span className="text-xs font-bold text-slate-800 flex-1">{label}</span>
+                      {has ? (
+                        <span className="text-[10px] font-bold text-[#0025B8] flex items-center gap-1">Added <ExternalLink className="w-2.5 h-2.5" /></span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#0F9DE4] flex items-center gap-0.5"><Plus className="w-2.5 h-2.5" /> Add</span>
                       )}
-
-                      {app.status === 'REJECTED' && (app.rejectionReason || app.rejectionMessage) && (
-                        <div className="mx-6 mb-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
-                            <AlertCircle className="w-4 h-4 text-slate-400" />
-                            Feedback on this application
-                          </div>
-                          {app.rejectionReason && (
-                            <p className="text-xs font-bold text-slate-800 mb-1">{app.rejectionReason}</p>
-                          )}
-                          {app.rejectionMessage && (
-                            <p className="text-xs text-slate-500 leading-relaxed font-medium">{app.rejectionMessage}</p>
-                          )}
-                        </div>
-                      )}
-
-                      {app.status === 'INTERVIEW' && (
-                        <div className="flex items-center justify-between flex-wrap gap-3 px-6 py-4 border-t border-sky-100 bg-sky-50/20">
-                          {eligibility?.can_practice ? (
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                              <Link href={`/seeker/interview/${app.id}`} className="w-full sm:w-auto">
-                                <Button size="sm" variant="gradient" className="w-full sm:w-auto text-xs font-bold rounded-full px-6 h-10 shadow-md flex items-center gap-2 cursor-pointer">
-                                  <Video className="w-4 h-4" />
-                                  Practice interview
-                                </Button>
-                              </Link>
-                              {eligibility.expires_at && (
-                                <span className="text-[11px] text-slate-400 font-medium">
-                                  Available until {new Date(eligibility.expires_at).toLocaleString('en-GB', {
-                                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-                                  })}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Button size="sm" disabled className="opacity-40 cursor-not-allowed text-xs rounded-full px-6">
-                                Practice interview
-                              </Button>
-                              <span className="text-[11px] text-slate-400 font-medium">
-                                {eligibility?.reason || 'Practice window unavailable'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </motion.div>
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </div>
 
-          {/* Grid for Resume, Links, and Preferences */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-2">
-            
-            {/* Resume & Portfolio */}
-            <div className="lg:col-span-2 bg-gradient-to-br from-slate-50 to-sky-50/30 rounded-[28px] border border-sky-100 p-6 sm:p-8 space-y-6 shadow-xl">
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Resume & Portfolio</h3>
-
-              <ResumeManager />
-
-              {/* Links Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div
-                  onClick={() => openLinkModal('websiteUrl')}
-                  className={`border rounded-2xl p-4 text-center transition-all cursor-pointer group relative shadow-xs ${
-                    profile.websiteUrl
-                      ? 'border-[#0F9DE4] bg-sky-50/60 ring-1 ring-[#0F9DE4]'
-                      : 'border-sky-100 bg-white hover:border-[#0F9DE4]'
-                  }`}
-                >
-                  <div className={`flex justify-center mb-2 ${profile.websiteUrl ? 'text-[#0025B8]' : 'text-slate-400 group-hover:text-[#0F9DE4]'}`}>
-                    <Globe className="w-5 h-5" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-800">Personal Website</p>
-                  {profile.websiteUrl ? (
-                    <p className="text-[10px] text-[#0025B8] font-bold truncate mt-1 flex items-center justify-center gap-1">
-                      <span>Added</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 group-hover:text-[#0F9DE4] mt-1 font-bold flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" /> Add Link
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  onClick={() => openLinkModal('githubUrl')}
-                  className={`border rounded-2xl p-4 text-center transition-all cursor-pointer group relative shadow-xs ${
-                    profile.githubUrl
-                      ? 'border-[#0F9DE4] bg-sky-50/60 ring-1 ring-[#0F9DE4]'
-                      : 'border-sky-100 bg-white hover:border-[#0F9DE4]'
-                  }`}
-                >
-                  <div className={`flex justify-center mb-2 ${profile.githubUrl ? 'text-[#0025B8]' : 'text-slate-400 group-hover:text-[#0F9DE4]'}`}>
-                    <Globe2 className="w-5 h-5" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-800">GitHub</p>
-                  {profile.githubUrl ? (
-                    <p className="text-[10px] text-[#0025B8] font-bold truncate mt-1 flex items-center justify-center gap-1">
-                      <span>Added</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 group-hover:text-[#0F9DE4] mt-1 font-bold flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" /> Add Link
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  onClick={() => openLinkModal('behanceUrl')}
-                  className={`border rounded-2xl p-4 text-center transition-all cursor-pointer group relative shadow-xs ${
-                    profile.behanceUrl
-                      ? 'border-[#0F9DE4] bg-sky-50/60 ring-1 ring-[#0F9DE4]'
-                      : 'border-sky-100 bg-white hover:border-[#0F9DE4]'
-                  }`}
-                >
-                  <div className={`flex justify-center mb-2 ${profile.behanceUrl ? 'text-[#0025B8]' : 'text-slate-400 group-hover:text-[#0F9DE4]'}`}>
-                    <Grid className="w-5 h-5" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-800">Behance</p>
-                  {profile.behanceUrl ? (
-                    <p className="text-[10px] text-[#0025B8] font-bold truncate mt-1 flex items-center justify-center gap-1">
-                      <span>Added</span>
-                      <ExternalLink className="w-2.5 h-2.5" />
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 group-hover:text-[#0F9DE4] mt-1 font-bold flex items-center justify-center gap-0.5">
-                      <Plus className="w-2.5 h-2.5" /> Add Link
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar Preferences */}
-            <div className="space-y-6">
-              <div className="bg-gradient-to-br from-slate-50 to-sky-50/30 rounded-[28px] border border-sky-100 p-6 sm:p-8 space-y-6 shadow-xl">
-                <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Career Preferences</h3>
+              {/* Career Preferences */}
+              <div className={`${cardCls} p-6 space-y-5`}>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Career Preferences</h3>
 
                 <div>
                   <Label className="text-xs font-bold text-slate-700 block mb-2">Target Roles</Label>
@@ -722,121 +579,309 @@ function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
                   </select>
                 </div>
 
-                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving}
-                    variant="gradient"
-                    className="w-full text-sm font-medium rounded-full py-3 h-12  tracking-wider shadow-md cursor-pointer"
-                  >
-                    {saving ? 'Saving...' : 'Save Preferences'}
-                  </Button>
-                </motion.div>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  variant="gradient"
+                  className="w-full text-sm font-medium rounded-full h-11 tracking-wider shadow-md cursor-pointer"
+                >
+                  {saving ? 'Saving...' : 'Save Preferences'}
+                </Button>
               </div>
 
-              {/* Privacy */}
-              <div className="bg-gradient-to-br from-slate-50 to-sky-50/30 rounded-[28px] border border-sky-100 p-6 sm:p-8 space-y-5 shadow-xl">
-                <h3 className="text-lg font-bold text-slate-900 tracking-tight">Account & Privacy</h3>
+              {/* Account & Privacy */}
+              <div className={`${cardCls} p-6 space-y-4`}>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Account & Privacy</h3>
 
-                <div className="flex items-center justify-between border-b border-sky-100 pb-4">
+                <div className="flex items-center justify-between gap-3 border-b border-sky-100 pb-4">
                   <div>
                     <p className="text-xs font-bold text-slate-900">Email Alerts</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Job Matches & Updates</p>
+                    <p className="text-[11px] text-slate-400 font-medium">E-mail me when a new job matches my CV (70%+)</p>
                   </div>
-                  <input type="checkbox" defaultChecked className="h-4 w-7 accent-[#0F9DE4] cursor-pointer" />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-sky-100 pb-4">
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Data Visibility</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Recruiter Search Results</p>
-                  </div>
-                  <input type="checkbox" defaultChecked className="h-4 w-7 accent-[#0F9DE4] cursor-pointer" />
-                </div>
-
-                <div className="flex items-center justify-between border-b border-sky-100 pb-4 cursor-pointer group">
-                  <p className="text-xs font-bold text-slate-900 group-hover:text-[#0F9DE4] transition-colors">
-                    Security Settings
-                  </p>
-                  <Lock className="w-4 h-4 text-slate-400 group-hover:text-[#0F9DE4]" />
-                </div>
-
-                <div className="pt-2">
-                  <Link href="/settings/delete-account">
-                    <button className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center justify-between w-full cursor-pointer">
-                      <span>Delete Account</span>
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </Link>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-        </motion.div>
-      </main>
-
-      {/* Modal */}
-      <AnimatePresence>
-        {activePlatform && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white/95 backdrop-blur-2xl rounded-[28px] shadow-2xl w-full max-w-md p-6 sm:p-8 border border-sky-100"
-            >
-              <div className="flex items-center justify-between mb-5 pb-3 border-b border-sky-100">
-                <h3 className="font-bold text-slate-900 text-base tracking-tight">
-                  Add {getPlatformLabel(activePlatform)} Link
-                </h3>
-                <button
-                  onClick={() => setActivePlatform(null)}
-                  className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-sky-50 transition-all cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <Label className="text-xs font-bold text-slate-700 mb-2 block">
-                    {getPlatformLabel(activePlatform)} URL
-                  </Label>
-                  <Input
-                    type="url"
-                    maxLength={200}
-                    placeholder={`https://${activePlatform === 'githubUrl' ? 'github.com/username' : activePlatform === 'behanceUrl' ? 'behance.net/username' : 'yourwebsite.com'}`}
-                    value={tempLinkValue}
-                    onChange={(e) => setTempLinkValue(e.target.value)}
-                    className="h-12 text-xs bg-slate-50 border-sky-100 rounded-2xl focus-visible:ring-[#0F9DE4] px-4 shadow-sm"
+                  <input
+                    type="checkbox"
+                    aria-label="Email alerts for matching jobs"
+                    checked={profile.emailJobAlerts !== false}
+                    onChange={(e) => toggleEmailAlerts(e.target.checked)}
+                    className="h-4 w-7 accent-[#0F9DE4] cursor-pointer"
                   />
                 </div>
 
-                <div className="flex gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setActivePlatform(null)}
-                    className="flex-1 text-xs h-11 rounded-full border-sky-200 text-slate-700 hover:bg-sky-50 font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleSaveLink}
-                    variant="gradient"
-                    className="flex-1 text-xs h-11 rounded-full text-white font-bold shadow-md cursor-pointer"
-                  >
-                    Save Link
-                  </Button>
-                </div>
+                <Link href="/settings/delete-account">
+                  <button className="text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center justify-between w-full cursor-pointer">
+                    <span>Delete Account</span>
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </Link>
               </div>
-            </motion.div>
+            </aside>
+
+            {/* ───────── RIGHT: applications + resume ───────── */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Applications */}
+              <section id="applications" className="space-y-5 scroll-mt-24">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAppsOpen((o) => !o)}
+                    aria-expanded={appsOpen}
+                    className="flex-1 min-w-0 flex items-center justify-between gap-3 text-left bg-sky-50/50 hover:bg-sky-50 border border-sky-100 rounded-2xl px-4 py-3 cursor-pointer transition-colors"
+                  >
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2.5 tracking-tight">
+                        <Briefcase className="w-5 h-5 text-[#0F9DE4]" />
+                        My Applications
+                        <span className="inline-flex items-center justify-center min-w-[24px] h-[24px] px-2 rounded-full bg-sky-100 text-[#0025B8] text-xs font-extrabold">
+                          {applications.length}
+                        </span>
+                        {newAppIds.length > 0 && (
+                          <span className="relative flex h-2.5 w-2.5" title="New update">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+                          </span>
+                        )}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                        {newAppIds.length > 0 ? `${newAppIds.length} new update${newAppIds.length > 1 ? 's' : ''} — tap to view` : 'Tap to view every application and its stage'}
+                      </p>
+                    </div>
+                    <ChevronDown className={`w-5 h-5 text-[#0F9DE4] shrink-0 transition-transform ${appsOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  <Link href="/jobs">
+                    <Button size="sm" variant="outline" className="text-xs font-semibold text-[#0025B8] border-sky-200 hover:bg-sky-50 rounded-full h-9 px-4 border-2">
+                      Browse More Jobs
+                    </Button>
+                  </Link>
+                </div>
+
+                {!appsOpen ? null : applications.length === 0 ? (
+                  <div className="bg-white rounded-3xl border-2 border-dashed border-sky-200 p-10 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-4 border border-sky-100">
+                      <Briefcase className="w-6 h-6 text-[#0F9DE4]" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">No applications yet</p>
+                    <p className="text-xs text-slate-400 mt-1 mb-6 font-medium">Once you apply for a role, it will show up here.</p>
+                    <Link href="/jobs">
+                      <Button size="sm" variant="gradient" className="text-xs rounded-full px-6 h-11 font-bold shadow-md">
+                        Find Opportunities
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1">
+                    {applications.map((app) => {
+                      const eligibility = practiceEligibility[app.id];
+                      const meta = STATUS_META[app.status] ?? STATUS_META.PENDING;
+                      const stageIdx = STAGES.indexOf(app.status as (typeof STAGES)[number]);
+
+                      return (
+                        <div
+                          key={app.id}
+                          className="bg-white rounded-2xl border border-sky-100 hover:shadow-lg transition-shadow overflow-hidden shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-4 p-5 pb-4">
+                            <div className="flex items-start gap-4 min-w-0">
+                              <div className="w-11 h-11 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0 border border-sky-100">
+                                <Briefcase className="w-5 h-5 text-[#0F9DE4]" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-base tracking-tight truncate">{app.job?.title || 'Position Title'}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                                  {app.job?.companyName ? `${app.job.companyName} · ` : ''}{app.job?.location || 'Location'}
+                                </p>
+                                <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                                  Applied {new Date(app.createdAt).toLocaleDateString('en-GB', {
+                                    day: '2-digit', month: 'short', year: 'numeric',
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                            {newAppIds.includes(app.id) && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600"><span className="w-2 h-2 rounded-full bg-rose-500" />New update</span>
+                            )}
+                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border whitespace-nowrap ${meta.bg} ${meta.text}`}>
+                              <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                              {meta.label}
+                            </span>
+                            </div>
+                          </div>
+
+                          {/* Progress stepper */}
+                          {app.status !== 'REJECTED' && stageIdx >= 0 && (
+                            <div className="px-5 pb-4">
+                              <div className="flex items-center">
+                                {STAGES.map((s, i) => (
+                                  <div key={s} className="flex items-center flex-1 last:flex-none">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className={`w-3 h-3 rounded-full border-2 ${
+                                        i <= stageIdx ? 'bg-[#0F9DE4] border-[#0F9DE4]' : 'bg-white border-slate-200'
+                                      }`} />
+                                      <span className={`text-[10px] font-semibold whitespace-nowrap ${i <= stageIdx ? 'text-[#0025B8]' : 'text-slate-400'}`}>
+                                        {STAGE_LABELS[s]}
+                                      </span>
+                                    </div>
+                                    {i < STAGES.length - 1 && (
+                                      <span className={`h-0.5 flex-1 mx-1 mb-4 rounded ${i < stageIdx ? 'bg-[#0F9DE4]' : 'bg-slate-200'}`} />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {app.status === 'INTERVIEW' && app.interviewDate && (
+                            <div className="mx-5 mb-4 bg-sky-50/60 border border-sky-100 rounded-2xl p-4">
+                              <div className="flex items-center gap-2 text-[#0025B8] font-bold text-xs mb-2">
+                                <Calendar className="w-4 h-4 text-[#0F9DE4]" />
+                                Interview scheduled
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-slate-600 font-medium">
+                                <p>
+                                  <span className="text-slate-400">Date & time </span>
+                                  <span className="font-bold text-slate-800">
+                                    {new Date(app.interviewDate).toLocaleDateString('en-GB', {
+                                      weekday: 'short', day: '2-digit', month: 'short',
+                                    })} · {app.interviewTime}
+                                  </span>
+                                </p>
+                                {app.interviewVenue && (
+                                  <p>
+                                    <span className="text-slate-400">Venue </span>
+                                    <span className="font-bold text-slate-800">{app.interviewVenue}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {app.status === 'REJECTED' && (app.rejectionReason || app.rejectionMessage) && (
+                            <div className="mx-5 mb-4 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
+                                <AlertCircle className="w-4 h-4 text-slate-400" />
+                                Feedback on this application
+                              </div>
+                              {app.rejectionReason && (
+                                <p className="text-xs font-bold text-slate-800 mb-1">{app.rejectionReason}</p>
+                              )}
+                              {app.rejectionMessage && (
+                                <p className="text-xs text-slate-500 leading-relaxed font-medium">{app.rejectionMessage}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {app.status === 'INTERVIEW' && (
+                            <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-t border-sky-100 bg-sky-50/20">
+                              {eligibility?.can_practice ? (
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                  <Link href={`/seeker/interview/${app.id}`} className="w-full sm:w-auto">
+                                    <Button size="sm" variant="gradient" className="w-full sm:w-auto text-xs font-bold rounded-full px-6 h-10 shadow-md flex items-center gap-2 cursor-pointer">
+                                      <Video className="w-4 h-4" />
+                                      Practice interview
+                                    </Button>
+                                  </Link>
+                                  {eligibility.expires_at && (
+                                    <span className="text-[11px] text-slate-400 font-medium">
+                                      Available until {new Date(eligibility.expires_at).toLocaleString('en-GB', {
+                                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Button size="sm" disabled className="opacity-40 cursor-not-allowed text-xs rounded-full px-6">
+                                    Practice interview
+                                  </Button>
+                                  <span className="text-[11px] text-slate-400 font-medium">
+                                    {eligibility?.reason || 'Practice window unavailable'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* Resume */}
+              <section className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">Resume</h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">Upload, preview or replace your CV</p>
+                </div>
+                <ResumeManager />
+              </section>
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          {/* Link modal: covers only this section */}
+          <AnimatePresence>
+            {activePlatform && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className="bg-white rounded-[28px] shadow-2xl w-full max-w-md p-6 sm:p-8 border border-sky-100"
+                >
+                  <div className="flex items-center justify-between mb-5 pb-3 border-b border-sky-100">
+                    <h3 className="font-bold text-slate-900 text-base tracking-tight">
+                      Add {getPlatformLabel(activePlatform)} Link
+                    </h3>
+                    <button
+                      onClick={() => setActivePlatform(null)}
+                      className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-sky-50 transition-all cursor-pointer"
+                      aria-label="Close"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div>
+                      <Label className="text-xs font-bold text-slate-700 mb-2 block">
+                        {getPlatformLabel(activePlatform)} URL
+                      </Label>
+                      <Input
+                        type="url"
+                        maxLength={200}
+                        placeholder={`https://${activePlatform === 'githubUrl' ? 'github.com/username' : activePlatform === 'behanceUrl' ? 'behance.net/username' : 'yourwebsite.com'}`}
+                        value={tempLinkValue}
+                        onChange={(e) => setTempLinkValue(e.target.value)}
+                        className="h-12 text-xs bg-slate-50 border-sky-100 rounded-2xl focus-visible:ring-[#0F9DE4] px-4 shadow-sm"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setActivePlatform(null)}
+                        className="flex-1 text-xs h-11 rounded-full border-sky-200 text-slate-700 hover:bg-sky-50 font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSaveLink}
+                        variant="gradient"
+                        className="flex-1 text-xs h-11 rounded-full text-white font-bold shadow-md cursor-pointer"
+                      >
+                        Save Link
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </main>
     </div>
   );
 }

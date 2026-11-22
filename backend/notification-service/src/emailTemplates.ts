@@ -78,6 +78,28 @@ export const emailTemplates = {
     `,
   }),
 
+  // New job that matches the seeker's CV. Every value arrives HTML-escaped from the caller.
+  jobMatch: (p: {
+    seekerName: string; jobTitle: string; companyName: string; location: string;
+    score: number; matchedSkills: string[]; jobUrl: string; settingsUrl: string;
+  }) => ({
+    subject: `New job match (${p.score}%): ${p.jobTitle} at ${p.companyName}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#f9fafb;padding:32px;border-radius:12px;">
+        <h1 style="color:#1e293b;font-size:22px;">A new job matches your CV</h1>
+        <p style="color:#64748b;">Hi ${p.seekerName}, <strong>${p.companyName}</strong> has just published a job that fits the CV on your profile.</p>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin:20px 0;">
+          <p style="color:#1e293b;font-size:18px;font-weight:700;margin:0 0 6px;">${p.jobTitle}</p>
+          <p style="color:#64748b;font-size:14px;margin:0 0 12px;">${p.companyName} · ${p.location}</p>
+          <p style="color:#0f766e;font-size:15px;font-weight:700;margin:0 0 ${p.matchedSkills.length ? '8px' : '0'};">Your CV match: ${p.score}%</p>
+          ${p.matchedSkills.length ? `<p style="color:#64748b;font-size:13px;margin:0;">Matching skills: ${p.matchedSkills.join(', ')}</p>` : ''}
+        </div>
+        <p style="margin:24px 0;"><a href="${p.jobUrl}" style="background:#0F9DE4;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:999px;font-weight:700;font-size:14px;">View job</a></p>
+        <p style="color:#94a3b8;font-size:12px;line-height:1.5;">The match score is calculated from the CV on your profile. You are receiving this because job match alerts are on. You can turn them off any time under Account &amp; Privacy in <a href="${p.settingsUrl}" style="color:#94a3b8;">your profile</a>.</p>
+      </div>
+    `,
+  }),
+
   shortlisted: (
     seekerName: string,
     jobTitle: string,

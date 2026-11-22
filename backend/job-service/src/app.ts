@@ -7,6 +7,7 @@ import axios from 'axios';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { authenticate, requireCompany } from './middleware/authenticate';
+import { queueJobMatchAlerts } from './lib/jobMatchAlerts';
 import { jobSchema, statusSchema, screeningSchema, validateBody, validateParams, paging, searchTerm, isUuid } from './lib/validation';
 
 /** The screening threshold is a company-only setting; never send it to candidates. */
@@ -435,6 +436,9 @@ router.post(
       });
 
       res.status(201).json({ success: true, data: newJob });
+
+      // A job published straight away is matched against seekers' CVs in the background.
+      if (newJob.status === 'ACTIVE') queueJobMatchAlerts(prisma, newJob.id);
     } catch (e) { next(e); }
   }
 );
@@ -484,6 +488,9 @@ router.patch(
         data:  { status },
       });
       res.json({ success: true, data: updated });
+
+      // Publishing a saved draft counts as a new job. Re-opening an older job does not e-mail anyone.
+      if (status === 'ACTIVE' && job.status === 'DRAFT') queueJobMatchAlerts(prisma, updated.id);
     } catch (e) { next(e); }
   }
 );

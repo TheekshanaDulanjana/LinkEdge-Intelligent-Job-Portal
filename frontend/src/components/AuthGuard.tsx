@@ -31,7 +31,7 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     if (requiredRole && user?.role !== requiredRole) {
       // Wrong role: send to their correct dashboard
       router.replace(
-        user?.role === 'ADMIN' ? '/admin' : user?.role === 'SEEKER' ? '/seeker/dashboard' : '/company/dashboard'
+        user?.role === 'ADMIN' ? '/admin' : user?.role === 'SEEKER' ? '/seeker/profile' : '/company/dashboard'
       );
     }
   }, [isHydrated, isAuthenticated, user, requiredRole, router]);

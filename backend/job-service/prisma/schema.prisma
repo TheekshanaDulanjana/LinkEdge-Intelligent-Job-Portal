@@ -31,6 +31,12 @@ model User {
   sentNotifications     Notification[]   @relation("NotificationSender")
   receivedNotifications Notification[]   @relation("NotificationReceiver")
   resume                CandidateResume?
+  status                AccountStatus    @default(ACTIVE)   // set by the admin back-office (auth-service)
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
 }
 
 model JobSeeker {
@@ -44,6 +50,8 @@ model JobSeeker {
   interestArea        String?
   workStatus          WorkStatus @default(UNEMPLOYED)
   professionalSummary String?
+  // Seeker's choice on the profile page: e-mail me when a newly posted job matches my CV
+  emailJobAlerts      Boolean    @default(true)
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 }
@@ -188,6 +196,19 @@ model ATSScore {
 // ─── Calendar ───────────────────────────────────────────────────
 // NOTE: owned by application-service — declared here only for schema
 // consistency across the shared database.
+
+// One row per (job, seeker) e-mail sent when a new job matched the seeker's CV.
+// The unique key makes the alert idempotent: re-publishing a job never e-mails twice.
+model JobMatchAlert {
+  id        String   @id @default(uuid())
+  jobId     String
+  userId    String
+  score     Float
+  sentAt    DateTime @default(now())
+
+  @@unique([jobId, userId])
+  @@index([userId, sentAt])
+}
 
 model CalendarEvent {
   id            String            @id @default(uuid())
