@@ -158,7 +158,7 @@ def generate_json(
     """
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     # When the main model is overloaded (503/429) the next try uses a lighter model instead of waiting on the same one.
-    fallback = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite")
+    fallback = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite")
     last_err: Optional[Exception] = None
     use_schema = schema is not None
     budget = thinking_budget

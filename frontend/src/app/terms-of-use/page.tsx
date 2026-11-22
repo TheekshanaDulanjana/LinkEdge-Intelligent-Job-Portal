@@ -1,127 +1,107 @@
-'use client';
+import type { Metadata } from 'next';
+import LegalPage, { type LegalSection } from '@/components/LegalPage';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { FileText, Shield, CheckCircle2 } from 'lucide-react';
+export const metadata: Metadata = {
+  title: 'Terms of Use | SkillSync',
+  description: 'The rules for using the SkillSync hiring platform.',
+};
+
+const SECTIONS: LegalSection[] = [
+  {
+    heading: 'Agreement',
+    paragraphs: [
+      'These terms govern your use of SkillSync, a hiring platform built in Sri Lanka. By creating an account or using the site you agree to them and to our Privacy Policy. If you do not agree, please do not use the platform.',
+    ],
+  },
+  {
+    heading: 'Your account',
+    list: [
+      'You must be at least 18 years old and able to enter into a binding agreement.',
+      'Each account has one role: job seeker or company. Give accurate information and keep it up to date.',
+      'Keep your password secret. You are responsible for activity on your account, and you must tell us promptly if you suspect unauthorised use.',
+      'Company accounts must be created by someone authorised to act for that company.',
+    ],
+  },
+  {
+    heading: 'What job seekers agree to',
+    list: [
+      'Your profile, CV and answers are true and are yours to share.',
+      'You will not upload content that is unlawful, misleading, or contains malware or other people\'s private data.',
+      'You understand that applying shares your profile and CV with that company.',
+    ],
+  },
+  {
+    heading: 'What companies agree to',
+    list: [
+      'Job posts are genuine, lawful and not discriminatory, and describe the role honestly.',
+      'You will charge no fee to applicants and will not ask for payment, bank or identity-document details.',
+      'You will use applicant data only for recruitment, and protect it as required by law, including the Personal Data Protection Act, No. 9 of 2022.',
+    ],
+  },
+  {
+    heading: 'Acceptable use',
+    paragraphs: ['You must not:'],
+    list: [
+      'scrape, copy or resell data from the platform, or interfere with its operation;',
+      'attempt to access accounts, systems or data you are not authorised to use;',
+      'harass others, impersonate anyone or post spam;',
+      'misuse the AI features, for example to generate harmful content or to overload the service.',
+    ],
+  },
+  {
+    heading: 'AI features',
+    paragraphs: [
+      'Match scores, skill gap reports and interview feedback are produced by automated systems and can be wrong or incomplete. They are provided as guidance, not as professional advice or a guarantee of any outcome. Companies remain solely responsible for their hiring decisions.',
+    ],
+  },
+  {
+    heading: 'Jobs and third parties',
+    paragraphs: [
+      'SkillSync is a platform that connects people. We do not employ job seekers, are not a party to any employment contract and do not guarantee that a job will be filled or that an applicant is suitable. Course suggestions link to third-party providers whose content and terms we do not control.',
+    ],
+  },
+  {
+    heading: 'Content and licence',
+    paragraphs: [
+      'You keep ownership of the content you submit. You give SkillSync a limited licence to store, process and display it as needed to run the service, including sharing your CV with companies you apply to. The SkillSync name, design and software belong to us and may not be copied without permission.',
+    ],
+  },
+  {
+    heading: 'Availability and changes',
+    paragraphs: [
+      'We work to keep the platform available but cannot promise it will always be uninterrupted or error free. We may change or remove features, and we may update these terms. Continuing to use SkillSync after a change means you accept the updated terms.',
+    ],
+  },
+  {
+    heading: 'Suspension and termination',
+    paragraphs: [
+      'You can close your account at any time by contacting us. We may suspend or remove accounts or content that breach these terms or put others at risk.',
+    ],
+  },
+  {
+    heading: 'Liability',
+    paragraphs: [
+      'To the fullest extent the law allows, SkillSync is provided "as is", and we are not liable for indirect or consequential loss, or for loss of opportunity or profit arising from your use of the platform. Nothing in these terms limits liability that cannot be limited by law.',
+    ],
+  },
+  {
+    heading: 'Governing law',
+    paragraphs: ['These terms are governed by the laws of Sri Lanka, and the courts of Sri Lanka have jurisdiction over any dispute.'],
+  },
+  {
+    heading: 'Contact',
+    paragraphs: ['Questions about these terms: info.linkedge@gmail.com.'],
+  },
+];
 
 export default function TermsOfUsePage() {
   return (
-    <div className="min-h-screen bg-slate-50/50 text-slate-800 font-sans">
-      
-      {/* Hero Section matching Jobs page style */}
-      <div className="relative w-full bg-gradient-to-br from-[#0025B8] to-[#0F9DE4] px-4 py-20 md:py-28 text-center text-white overflow-hidden shadow-xl">
-        <motion.div
-          animate={{ backgroundPosition: ["0px 0px", "64px 64px"] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 opacity-35 pointer-events-none"
-          style={{
-            backgroundImage: `linear-gradient(to right, #0F9DE4 1px, transparent 1px), linear-gradient(to bottom, #0F9DE4 1px, transparent 1px)`,
-            backgroundSize: "32px 32px",
-            maskImage: "linear-gradient(to bottom, #0F9DE4, transparent)",
-            WebkitMaskImage: "linear-gradient(to bottom, white, transparent)",
-          }}
-        />
-
-        <div className="max-w-4xl mx-auto relative z-10 space-y-4">
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-semibold border border-white/20 shadow-sm"
-          >
-            <FileText className="w-3.5 h-3.5 text-cyan-200" />
-            <span>Legal Agreement</span>
-          </motion.div>
-
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight"
-          >
-            Terms of Use
-          </motion.h1>
-
-          <motion.p 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-white/90 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed"
-          >
-            Please read these terms carefully before using the SkillSync AI-powered recruitment and job matching platform.
-          </motion.p>
-        </div>
-      </div>
-
-      {/* Content Container */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white/90 backdrop-blur-xl rounded-[32px] border border-sky-100 p-8 sm:p-12 shadow-xl space-y-10"
-        >
-          <div className="border-b border-sky-100 pb-4 text-xs font-semibold text-slate-400">
-            Last updated: October 23, 2026
-          </div>
-
-          <div className="space-y-8 text-slate-600 text-sm sm:text-base leading-relaxed">
-            <section className="space-y-3">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#0F9DE4]" />
-                1. Acceptance of Terms
-              </h2>
-              <p>
-                By accessing or using SkillSync, you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree with any part of these terms, you are prohibited from using or accessing our platform.
-              </p>
-            </section>
-
-            <section className="space-y-3">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#0F9DE4]" />
-                2. User Accounts & Eligibility
-              </h2>
-              <p>
-                To use certain features of SkillSync, you must register for an account. You agree to provide accurate, current, and complete information during registration and keep your account details updated. Accounts are categorized into two primary roles:
-              </p>
-              <ul className="list-disc pl-5 space-y-2 pt-1 font-medium text-slate-700">
-                <li><strong className="text-slate-900">Job Seekers:</strong> Permitted to build profiles, upload CVs, run AI analyses, and apply for active vacancies.</li>
-                <li><strong className="text-slate-900">Companies / Recruiters:</strong> Permitted to post job vacancies, manage applicants, and review AI-driven candidate ranking scores.</li>
-              </ul>
-            </section>
-
-            <section className="space-y-3">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#0F9DE4]" />
-                3. Acceptable Use Policy
-              </h2>
-              <p>
-                You agree not to misuse the SkillSync platform. Prohibited activities include uploading malicious files, scraping data without authorization, submitting false candidate or company credentials, or attempting to bypass platform security measures and AI rate limits.
-              </p>
-            </section>
-
-            <section className="space-y-3">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#0F9DE4]" />
-                4. Intellectual Property Rights
-              </h2>
-              <p>
-                All platform software, user interface designs, AI models, graphics, and text content are the property of SkillSync and protected under international copyright and trademark laws. You retain ownership of any personal resumes or corporate content you upload.
-              </p>
-            </section>
-
-            <section className="space-y-3">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#0F9DE4]" />
-                5. Limitation of Liability
-              </h2>
-              <p>
-                SkillSync provides AI-powered job matching and interview simulations as tools to assist recruitment. We do not guarantee employment placement or candidate hiring outcomes. The platform is provided on an &quot;as-is&quot; and &quot;as-available&quot; basis without warranties of any kind.
-              </p>
-            </section>
-          </div>
-        </motion.div>
-      </div>
-    </div>
+    <LegalPage
+      tag="Legal"
+      title="Terms of Use"
+      intro="The simple ground rules for using SkillSync as a job seeker or as a company."
+      updated="22 November 2026"
+      sections={SECTIONS}
+    />
   );
 }

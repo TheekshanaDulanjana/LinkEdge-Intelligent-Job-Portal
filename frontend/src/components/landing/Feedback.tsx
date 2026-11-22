@@ -45,7 +45,7 @@ function Row({ items, direction, className = '' }: { items: Testimonial[]; direc
   // Speed stays the same no matter how many cards there are (about 6 seconds per card).
   const seconds = Math.max(30, items.length * 6);
   return (
-    <div className={`testimonial-row ${className}`}>
+    <div className={`testimonial-row py-3 ${className}`}>
       <div
         className={`testimonial-track ${direction === 'left' ? 'testimonial-left' : 'testimonial-right'}`}
         style={{ animationDuration: `${seconds}s` }}
@@ -67,9 +67,7 @@ export default function TestimonialsSection({ content }: { content: Testimonials
   const rowB = fill(all.length >= 8 ? all.filter((_, i) => i % 2 === 1) : [...all].reverse());
 
   return (
-    <section className="relative w-full py-20 lg:py-24 font-sans overflow-hidden bg-gradient-to-b from-white via-sky-50/40 to-white">
-      <div className="absolute top-1/3 left-10 w-72 h-72 bg-sky-200/40 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-blue-200/40 rounded-full blur-[140px] pointer-events-none" />
+    <section className="relative w-full py-20 lg:py-24 font-sans overflow-hidden bg-white"> 
 
       <div className="relative z-10 max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-6 items-center">
         {/* Left: heading */}
@@ -93,7 +91,7 @@ export default function TestimonialsSection({ content }: { content: Testimonials
 
         {/* Right: two rows moving in opposite directions */}
         <div className="lg:col-span-8 xl:col-span-9 relative min-w-0">
-          <div className="space-y-5 py-3">
+          <div className="space-y-0">
             <Row items={rowA} direction="left" />
             <Row items={rowB} direction="right" />
           </div>
